@@ -31,6 +31,6 @@ client.once(Events.ClientReady, readyClient => {
 
 client.commands = new Collection<string, Command>();
 
-await deploy(client.commands);
+await deploy(client);
 
 client.login(process.env.DISCORD_TOKEN);

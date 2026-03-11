@@ -6,6 +6,7 @@
       "name": "robo-pope",
       "dependencies": {
         "discord.js": "^14.25.1",
+        "execSync": "^1.0.2",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -48,13 +49,21 @@
 
     "discord.js": ["discord.js@14.25.1", "", { "dependencies": { "@discordjs/builders": "^1.13.0", "@discordjs/collection": "1.5.3", "@discordjs/formatters": "^0.6.2", "@discordjs/rest": "^2.6.0", "@discordjs/util": "^1.2.0", "@discordjs/ws": "^1.2.3", "@sapphire/snowflake": "3.5.3", "discord-api-types": "^0.38.33", "fast-deep-equal": "3.1.3", "lodash.snakecase": "4.1.1", "magic-bytes.js": "^1.10.0", "tslib": "^2.6.3", "undici": "6.21.3" } }, "sha512-2l0gsPOLPs5t6GFZfQZKnL1OJNYFcuC/ETWsW4VtKVD/tg4ICa9x+jb9bkPffkMdRpRpuUaO/fKkHCBeiCKh8g=="],
 
+    "execSync": ["execSync@1.0.2", "", { "dependencies": { "temp": "~0.5.1" } }, "sha512-ul1uCl3e2DLlTl8z8R7OFb9PDXI08YkXbgknWZQCrpQjZh7cpntAzDI6oEqetaWpx+RdySFcxHVyG98CFg2lTQ=="],
+
     "fast-deep-equal": ["fast-deep-equal@3.1.3", "", {}, "sha512-f3qQ9oQy9j2AhBe/H9VC91wLmKBCCU/gDOnKNAYG5hswO7BLKj09Hc5HYNz9cGI++xlpDCIgDaitVs03ATR84Q=="],
+
+    "graceful-fs": ["graceful-fs@1.2.3", "", {}, "sha512-iiTUZ5vZ+2ZV+h71XAgwCSu6+NAizhFU3Yw8aC/hH5SQ3SnISqEqAek40imAFGtDcwJKNhXvSY+hzIolnLwcdQ=="],
 
     "lodash": ["lodash@4.17.23", "", {}, "sha512-LgVTMpQtIopCi79SJeDiP0TfWi5CNEc/L/aRdTh3yIvmZXTnheWpKjSZhnvMl8iXbC1tFg9gdHHDMLoV7CnG+w=="],
 
     "lodash.snakecase": ["lodash.snakecase@4.1.1", "", {}, "sha512-QZ1d4xoBHYUeuouhEq3lk3Uq7ldgyFXGBhg04+oRLnIz8o9T65Eh+8YdroUwn846zchkA9yDsDl5CVVaV2nqYw=="],
 
     "magic-bytes.js": ["magic-bytes.js@1.13.0", "", {}, "sha512-afO2mnxW7GDTXMm5/AoN1WuOcdoKhtgXjIvHmobqTD1grNplhGdv3PFOyjCVmrnOZBIT/gD/koDKpYG+0mvHcg=="],
+
+    "rimraf": ["rimraf@2.1.4", "", { "optionalDependencies": { "graceful-fs": "~1" } }, "sha512-tzwmX16YQhcFu0T/m0gHBcFKx6yQAg77Z6WWaQSJsUekXYa6yaAmHhrDdmFicgauX/er7GsdN+vRao3mBhA4kQ=="],
+
+    "temp": ["temp@0.5.1", "", { "dependencies": { "rimraf": "~2.1.4" } }, "sha512-Gwc1QWGkf3f3d0y8wNyC9uvVqAsmVdUMPzdiLJDNVAHhlxZmSWlvVZAk1LmZcBuYcmhvJ0oHDVHksghU3VI/0w=="],
 
     "ts-mixer": ["ts-mixer@6.0.4", "", {}, "sha512-ufKpbmrugz5Aou4wcr5Wc1UUFWOLhq+Fm6qa6P0w0K5Qw2yhaUoiWszhCVuNQyNwrlGiscHOmqYoAox1PtvgjA=="],
 

@@ -1,4 +1,4 @@
-import { Collection, SlashCommandBuilder, ChatInputCommandInteraction } from "discord.js";
+import { Collection, SlashCommandBuilder, ChatInputCommandInteraction, Client } from "discord.js";
 import { REST, Routes } from 'discord.js';
 import { error } from "node:console";
 import { readdir } from "node:fs/promises";
@@ -8,8 +8,12 @@ export interface Command {
     execute: (interaction: ChatInputCommandInteraction) => Promise<void>;
 }
 
-export default async function(client_commands: Collection<string,Command>) {
-  const path = './commands/'
+export default async function(client: Client) {
+  deply_commands(client.commands);
+}
+
+async function deply_commands(client_commands: Collection<string,Command>) {
+    const path = './commands/'
   const files = await readdir(path);
 
   let commands = new Map<string, Command>();
