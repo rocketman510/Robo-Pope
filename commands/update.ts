@@ -1,0 +1,85 @@
+import { SlashCommandBuilder, ChatInputCommandInteraction, MessageFlags, SectionBuilder, ButtonStyle } from "discord.js";
+import { execSync } from 'child_process';
+import type { Command } from "../deploy";
+
+
+export default {
+  data: new SlashCommandBuilder()
+    .setName('update')
+    .setDescription('This command updates the bot to the latest version.'),
+  async execute(interaction: ChatInputCommandInteraction) {
+    console.log(interaction.user.username);
+    let developers = process.env.DEVELOPER_IDS || '[]';
+
+    if (developers.includes(interaction.user.id)) {
+      console.log(await getLatestVersion());
+      console.log(await getVersion());
+
+      const version = await getVersion();
+      const latest = await getLatestVersion();
+
+      const massage = getLatestTagMessage();
+
+      const updateSection = new SectionBuilder()
+        .addTextDisplayComponents(
+          (textDisplay) => textDisplay.setContent(`The Bot has an update.\nCurrent: \`${version}\` => \`${latest}\``,),
+          (textDisplay) => textDisplay.setContent(`\`\`\`dif\n${massage}\`\`\``),
+        )
+        .setButtonAccessory(
+          (button) => button.setCustomId('update').setLabel('Update the Bot').setStyle(ButtonStyle.Success),
+        );
+
+      if (version !== latest) {
+        //interaction.reply({ content: `The Bot is the Latest version: \`${latest}\``, flags: MessageFlags.Ephemeral})
+        interaction.reply({components: [updateSection], flags: MessageFlags.Ephemeral | MessageFlags.IsComponentsV2})
+      } else {
+        interaction.reply({content: `The Bot has an update. would you like to update?\nCurrent: \`${version}\` => \`${latest}\``, flags: MessageFlags.Ephemeral})
+      }
+    } else {
+      interaction.reply({ content: 'You are not a developer you can not use this command.', flags: MessageFlags.Ephemeral });
+    }
+  },
+} as Command;
+
+async function getLatestVersion() {
+  const owner = "rocketman510";
+  const repo = "Robo-Pope";
+  const token = process.env.GITHUB_TOKEN;
+
+  if (!token) throw new Error("No GITHUB_TOKEN");
+  const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/releases/latest`, {
+    headers: {
+      Accept: "application/vnd.github+json",
+      Authorization: `Bearer ${token}`,
+      "X-GitHub-Api-Version": "2022-11-28"
+    }
+  });
+
+  if (!res.ok) {
+    if (res.status === 404) return null;
+    throw new Error(`GitHub API error: ${res.status}`);
+  }
+
+  const data = await res.json();
+  return data.tag_name;
+}
+
+async function getVersion() {
+  try {
+    return execSync('git describe --tags --exact-match 2>/dev/null || git rev-parse --short HEAD')
+      .toString()
+      .trim();
+  } catch {
+    return 'unknown';
+  }
+}
+
+function getLatestTagMessage(): string {
+  try {
+    const latestTag = execSync('git describe --tags --abbrev=0').toString().trim();
+    const message = execSync(`git tag -l --format='%(contents)' ${latestTag}`).toString().trim();
+    return message || 'No tag message';
+  } catch {
+    return 'No tags found';
+  }
+}

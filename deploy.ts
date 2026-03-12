@@ -1,4 +1,4 @@
-import { Collection, SlashCommandBuilder, ChatInputCommandInteraction, Client } from "discord.js";
+import { Collection, SlashCommandBuilder, ChatInputCommandInteraction, Client, type Interaction, type ButtonInteraction } from "discord.js";
 import { REST, Routes } from 'discord.js';
 import { error } from "node:console";
 import { readdir } from "node:fs/promises";
@@ -8,12 +8,18 @@ export interface Command {
     execute: (interaction: ChatInputCommandInteraction) => Promise<void>;
 }
 
+export interface Button {
+  data: string;
+  execute: (Interaction: ButtonInteraction) => Promise<void>;
+}
+
 export default async function(client: Client) {
   deply_commands(client.commands);
+  deply_buttons(client.buttons);
 }
 
 async function deply_commands(client_commands: Collection<string,Command>) {
-    const path = './commands/'
+  const path = './commands/'
   const files = await readdir(path);
 
   let commands = new Map<string, Command>();
@@ -45,4 +51,18 @@ async function deply_commands(client_commands: Collection<string,Command>) {
 
     client_commands.set(element.id, script);
   } 
+}
+
+async function deply_buttons(buttons: Collection<string, Button>) {
+  const path = './button/'
+  const files = await readdir(path);
+
+  for (const index in files) {
+    const file = path + files[index];
+
+    const module = await import(file);
+    const button = module.default as Button;
+
+   buttons.set(button.data, button); 
+  }
 }
