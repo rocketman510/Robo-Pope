@@ -1,11 +1,12 @@
 import { Client, Events, GatewayIntentBits, Collection, MessageFlags} from "discord.js";
-import type { Command } from "./deploy";
+import type { Command, Button } from "./deploy";
 import deploy from "./deploy";
 import { error } from "node:console";
 
 declare module "discord.js" {
     export interface Client {
         commands: Collection<string, Command>;
+        buttons: Collection<string, Button>;
     }
 }
 
@@ -25,12 +26,19 @@ client.once(Events.ClientReady, readyClient => {
       try {
         script(interaction);
       } catch (err) {error(err)};
+    } else if (interaction.isButton()) {
+      const button = client.buttons.get(interaction.customId)
+      if (!button) return;
+      try {
+        button.execute(interaction)
+      } catch (err) {error(err)}
     }; 
   });
 });
 
 client.commands = new Collection<string, Command>();
+client.buttons = new Collection<string, Button>();
 
-await deploy(client.commands);
+await deploy(client);
 
 client.login(process.env.DISCORD_TOKEN);
