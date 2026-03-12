@@ -9,8 +9,10 @@ export default {
         console.log(interaction.user.username);
         if (interaction.user.username == 'rocketman510') {
           interaction.reply("Pong");
+        } else if (interaction.user.username == 'jorby_official') {
+          interaction.reply("https://tenor.com/view/we-do-not-care-juan-gif-22047769");
         } else {
-          interaction.reply("L bozo. You think I have to care what you say? No...")
+          interaction.reply("L bozo. You think I have to care what you say? No...");
         }
     },
 } as Command;
