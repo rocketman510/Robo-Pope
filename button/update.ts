@@ -7,7 +7,7 @@ export default {
     async execute(interaction: ButtonInteraction) {
       if (process.env.DEVELOPER_IDS?.includes(interaction.user.id)) {
         const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
-        spawn("../update.sh", [GITHUB_TOKEN], {
+        spawn("./update.sh", [GITHUB_TOKEN], {
           detached: true,
           stdio: "ignore",
         }).unref();
