@@ -29,11 +29,10 @@ export default {
           (button) => button.setCustomId('update').setLabel('Update the Bot').setStyle(ButtonStyle.Success),
         );
 
-      if (version !== latest) {
-        //interaction.reply({ content: `The Bot is the Latest version: \`${latest}\``, flags: MessageFlags.Ephemeral})
-        interaction.reply({components: [updateSection], flags: MessageFlags.Ephemeral | MessageFlags.IsComponentsV2})
-      } else {
+      if (version == latest) {
         interaction.reply({content: `The Bot has an update. would you like to update?\nCurrent: \`${version}\` => \`${latest}\``, flags: MessageFlags.Ephemeral})
+      } else {
+        interaction.reply({components: [updateSection], flags: MessageFlags.Ephemeral | MessageFlags.IsComponentsV2})
       }
     } else {
       interaction.reply({ content: 'You are not a developer you can not use this command.', flags: MessageFlags.Ephemeral });
