@@ -1,8 +1,9 @@
 #!/bin/bash
 TOKEN=$1
 
-pm2 stop index.ts
-
+git fetch --tags https://$TOKEN@github.com/rocketman510/Robo-Pope.git
+latest=$(git describe --tags --abbrev=0)
+git checkout "$latest"
 git pull https://$TOKEN@github.com/rocketman510/Robo-Pope.git main
 
-pm2 start index.ts
+pm2 restart index.ts

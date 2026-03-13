@@ -11,7 +11,9 @@ declare module "discord.js" {
 }
 
 const client = new Client({ intents: [
-  GatewayIntentBits.Guilds
+  GatewayIntentBits.Guilds,
+  GatewayIntentBits.DirectMessages,
+  GatewayIntentBits.GuildMembers
 ]});
 
 client.once(Events.ClientReady, readyClient => {
