@@ -40,6 +40,7 @@ client.once(Events.ClientReady, readyClient => {
 
 client.commands = new Collection<string, Command>();
 client.buttons = new Collection<string, Button>();
+client.shouldStopSpam = false;
 
 await deploy(client);
 
