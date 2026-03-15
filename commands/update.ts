@@ -30,7 +30,7 @@ export default {
         );
 
       if (version == latest) {
-        interaction.reply({content: `The Bot has an update. would you like to update?\nCurrent: \`${version}\` => \`${latest}\``, flags: MessageFlags.Ephemeral})
+        interaction.reply({content: `The Bot up-to-date. Version: \`${version}\``, flags: MessageFlags.Ephemeral})
       } else {
         interaction.reply({components: [updateSection], flags: MessageFlags.Ephemeral | MessageFlags.IsComponentsV2})
       }
