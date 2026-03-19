@@ -49,21 +49,37 @@ function countWords(str: string): number {
   return str.trim().split(/\s+/).filter(Boolean).length;
 }
 
-export function getLevel(xp: number): { level: number; min_xp: number; max_xp: number } {
-  let level = 0;
-  let xp_pool = xp;
-  let max_xp = 50;
+export function getLevel(xp: number) {
+  const a = 200;
+  const b = 10;
+  const c = 1.05;
 
-  while (xp_pool >= max_xp) {
-    xp_pool -= max_xp;
-    level++;
+  // inline total XP function
+  const totalXP = (level: number) => a * level + b * (Math.pow(c, level) - 1);
 
-    max_xp = Math.floor(max_xp * 1.5);
+  // inline XP needed for next level
+  const xpForLevel = (level: number) => totalXP(level + 1) - totalXP(level);
+
+  // binary search to find the level
+  let low = 0;
+  let high = 1000; // adjust if needed for max possible level
+
+  while (low < high) {
+    const mid = Math.floor((low + high + 1) / 2);
+    if (totalXP(mid) <= xp) {
+      low = mid;
+    } else {
+      high = mid - 1;
+    }
   }
+
+  const level = low;
+  const min_xp = xp - totalXP(level);
+  const max_xp = xpForLevel(level);
 
   return {
     level,
-    min_xp: xp_pool,
-    max_xp
+    min_xp: Math.floor(min_xp),
+    max_xp: Math.floor(max_xp),
   };
 }
