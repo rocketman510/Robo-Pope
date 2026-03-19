@@ -23,7 +23,7 @@ export default async function(client: Client) {
   client.messages = new Collection<string, Collection<string, number>>()
 
   client.shouldStopSpam = false;
-  client.is_counting_messages = false;
+  client.is_counting_messages = true;
   console.log("Clearing Cache");
   if (fs.existsSync('./cache/level.png')) {
     fs.unlinkSync('./cache/level.png');
@@ -36,7 +36,7 @@ export default async function(client: Client) {
   client.browser = await puppeteer.launch({headless: true});
   console.log(client.browser);
   console.log("Fetching Messages...");
-  //await get_user_messages_for_all(client);
+  await get_user_messages_for_all(client);
 }
 
 async function deply_commands(client_commands: Collection<string,Command>) {
