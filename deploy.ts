@@ -1,7 +1,9 @@
 import { Collection, SlashCommandBuilder, ChatInputCommandInteraction, Client, type Interaction, type ButtonInteraction } from "discord.js";
 import { REST, Routes } from 'discord.js';
-import { error } from "node:console";
+import { error, log } from "node:console";
 import { readdir } from "node:fs/promises";
+import { getMessageHistory } from "./level";
+import { sleep } from "bun";
 
 export interface Command {
     data: SlashCommandBuilder;
@@ -16,6 +18,8 @@ export interface Button {
 export default async function(client: Client) {
   deply_commands(client.commands);
   deply_buttons(client.buttons);
+  get_user_messages_for_all(client);
+  client.is_counting_messages = false;
 }
 
 async function deply_commands(client_commands: Collection<string,Command>) {
@@ -65,4 +69,18 @@ async function deply_buttons(buttons: Collection<string, Button>) {
 
    buttons.set(button.data, button); 
   }
+}
+
+async function get_user_messages_for_all(client: Client) {
+  const guilds = client.guilds.cache;
+
+  for (const [guild_id, guild] of guilds) {
+    const channels = guild.channels.cache;
+    for (const [channel_id, channel] of channels) {
+      await getMessageHistory(client, channel, guild_id);
+    }
+  }
+  console.log(client.messages);
+  console.log("DONE");
+  client.is_counting_messages = false;
 }
