@@ -1,6 +1,7 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction, MessageFlags } from "discord.js";
+import { SlashCommandBuilder, ChatInputCommandInteraction, MessageFlags, AttachmentBuilder } from "discord.js";
 import type { Command } from "../deploy";
-import { getLevel } from "../level";
+import fs from "fs";
+import { getLevel, getLevelBanner } from "../level";
 
 export default {
     data: new SlashCommandBuilder()
@@ -16,10 +17,18 @@ export default {
       if (!words) {fail(interaction, "Could not get your data");return;}
 
       const level = getLevel(words);
-      if (interaction.user.id == '715043871503024218') {
-        interaction.reply({ content: `You have spocken ${words} words in this server. level is ${level.level} minxp: ${level.min_xp} and maxxp is ${level.max_xp}`, flags: MessageFlags.Ephemeral})
-      } else {
-        interaction.reply({ content: `You have spocken ${words} words in this server.`, flags: MessageFlags.Ephemeral})
+
+      let imagePath = await getLevelBanner(interaction.user, interaction.guildId);
+      if (!imagePath) {fail("Somthing happend I cant find you data!?"); return;}
+
+      const attachment = new AttachmentBuilder(imagePath);
+
+      await interaction.reply({ files: [attachment], flags: MessageFlags.Ephemeral});
+
+      console.log(fs.existsSync(imagePath));
+
+      if (fs.existsSync(imagePath)) {
+        fs.unlinkSync(imagePath);
       }
     },
 } as Command;

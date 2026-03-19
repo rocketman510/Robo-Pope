@@ -2,8 +2,10 @@ import { Collection, SlashCommandBuilder, ChatInputCommandInteraction, Client, t
 import { REST, Routes } from 'discord.js';
 import { error, log } from "node:console";
 import { readdir } from "node:fs/promises";
-import { getMessageHistory } from "./level";
-import { sleep } from "bun";
+import { getMessageHistory, getLevelBanner } from "./level";
+import puppeteer from 'puppeteer';
+import type { Browser } from "puppeteer";
+import fs from "fs";
 
 export interface Command {
     data: SlashCommandBuilder;
@@ -16,10 +18,25 @@ export interface Button {
 }
 
 export default async function(client: Client) {
-  deply_commands(client.commands);
-  deply_buttons(client.buttons);
-  get_user_messages_for_all(client);
+  client.commands = new Collection<string, Command>();
+  client.buttons = new Collection<string, Button>();
+  client.messages = new Collection<string, Collection<string, number>>()
+
+  client.shouldStopSpam = false;
   client.is_counting_messages = false;
+  console.log("Clearing Cache");
+  if (fs.existsSync('./cache/level.png')) {
+    fs.unlinkSync('./cache/level.png');
+  }
+  console.log("Louding Commands...");
+  await deply_commands(client.commands);
+  console.log("Louding Buttons...");
+  await deply_buttons(client.buttons);
+  console.log("Louding Browser...");
+  client.browser = await puppeteer.launch({headless: true});
+  console.log(client.browser);
+  console.log("Fetching Messages...");
+  //await get_user_messages_for_all(client);
 }
 
 async function deply_commands(client_commands: Collection<string,Command>) {

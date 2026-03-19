@@ -3,6 +3,7 @@ import type { Command, Button } from "./deploy";
 import deploy from "./deploy";
 import { addUserMessage } from "./level"
 import { error } from "node:console";
+import { Browser } from 'puppeteer';
 
 declare module "discord.js" {
     export interface Client {
@@ -11,6 +12,7 @@ declare module "discord.js" {
         messages: Collection<string, Collection<string, number>>;
         shouldStopSpam: boolean;
         is_counting_messages: boolean;
+        browser: Browser;
     }
 }
 
@@ -21,14 +23,6 @@ const client = new Client({ intents: [
   GatewayIntentBits.GuildMembers,
   GatewayIntentBits.MessageContent
 ]});
-
-client.commands = new Collection<string, Command>();
-client.buttons = new Collection<string, Button>();
-client.messages = new Collection<string, Collection<string, number>>();
-client.shouldStopSpam = false;
-client.is_counting_messages = true;
-
-let llm_context = [{role: "system", content: "You are Robo-Pope you are a robot catholic pope that is a cat as well. you talk like a pope and not a robot or a cat but you still are one. You are messaging through Discord. Speak as if you are writing a message in Discord, that being short and quick to the point."}];
 
 client.once(Events.ClientReady, async readyClient => {
   await deploy(client);
@@ -45,7 +39,6 @@ client.once(Events.ClientReady, async readyClient => {
       const command = client.commands.get(interaction.commandId);
       if (!command) return;
       let script = command.execute;
-
       try {
         script(interaction);
       } catch (err) {error(err)};
