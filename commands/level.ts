@@ -28,7 +28,9 @@ export default {
       console.log(fs.existsSync(imagePath));
 
       if (fs.existsSync(imagePath)) {
-        fs.unlinkSync(imagePath);
+        try {
+          fs.unlinkSync(imagePath);
+        } catch (err) {}
       }
     },
 } as Command;
