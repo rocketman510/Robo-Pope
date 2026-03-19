@@ -1,0 +1,53 @@
+* {
+  margin: 0;
+  padding: 0;
+  color: #e0e3ff;
+
+  font-family: 'ABC Ginto Nord Condensed Unlicensed Trial', sans-serif;
+}
+
+body {
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
+  align-items: center;
+  justify-content: center;
+  height: 22px;
+  gap: 5px;
+}
+
+#lvl_text {
+  font-weight: 500;
+}
+
+#max_xp_text {
+  font-weight: 500;
+}
+
+progress {
+  flex: 1;
+  background-color: #5865f2;
+  color: #5865f2;
+  height: 10px;
+  border-radius: 10px;
+}
+
+progress::-webkit-progress-bar {
+  background: #e0e3ff;
+  border-radius: 10px;
+}
+
+progress::-webkit-progress-value {
+  background: #5865f2;
+  border-radius: 10px;
+}
+
+img {
+  height: 22px;
+  width: 22px;
+  border-radius: 100%; 
+}
+
+span {
+  font-size: 10px;
+}

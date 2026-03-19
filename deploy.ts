@@ -1,7 +1,11 @@
 import { Collection, SlashCommandBuilder, ChatInputCommandInteraction, Client, type Interaction, type ButtonInteraction } from "discord.js";
 import { REST, Routes } from 'discord.js';
-import { error } from "node:console";
+import { error, log } from "node:console";
 import { readdir } from "node:fs/promises";
+import { getMessageHistory, getLevelBanner } from "./level";
+import puppeteer from 'puppeteer';
+import type { Browser } from "puppeteer";
+import fs from "fs";
 
 export interface Command {
     data: SlashCommandBuilder;
@@ -14,8 +18,25 @@ export interface Button {
 }
 
 export default async function(client: Client) {
-  deply_commands(client.commands);
-  deply_buttons(client.buttons);
+  client.commands = new Collection<string, Command>();
+  client.buttons = new Collection<string, Button>();
+  client.messages = new Collection<string, Collection<string, number>>()
+
+  client.shouldStopSpam = false;
+  client.is_counting_messages = false;
+  console.log("Clearing Cache");
+  if (fs.existsSync('./cache/level.png')) {
+    fs.unlinkSync('./cache/level.png');
+  }
+  console.log("Louding Commands...");
+  await deply_commands(client.commands);
+  console.log("Louding Buttons...");
+  await deply_buttons(client.buttons);
+  console.log("Louding Browser...");
+  client.browser = await puppeteer.launch({headless: true});
+  console.log(client.browser);
+  console.log("Fetching Messages...");
+  //await get_user_messages_for_all(client);
 }
 
 async function deply_commands(client_commands: Collection<string,Command>) {
@@ -65,4 +86,18 @@ async function deply_buttons(buttons: Collection<string, Button>) {
 
    buttons.set(button.data, button); 
   }
+}
+
+async function get_user_messages_for_all(client: Client) {
+  const guilds = client.guilds.cache;
+
+  for (const [guild_id, guild] of guilds) {
+    const channels = guild.channels.cache;
+    for (const [channel_id, channel] of channels) {
+      await getMessageHistory(client, channel, guild_id);
+    }
+  }
+  console.log(client.messages);
+  console.log("DONE");
+  client.is_counting_messages = false;
 }
