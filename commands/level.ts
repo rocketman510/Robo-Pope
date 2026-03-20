@@ -25,8 +25,6 @@ export default {
 
       await interaction.reply({ files: [attachment], flags: MessageFlags.Ephemeral});
 
-      console.log(fs.existsSync(imagePath));
-
       if (fs.existsSync(imagePath)) {
         try {
           fs.unlinkSync(imagePath);

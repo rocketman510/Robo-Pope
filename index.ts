@@ -1,15 +1,16 @@
 import { Client, Events, GatewayIntentBits, Collection, MessageFlags} from "discord.js";
 import type { Command, Button } from "./deploy";
 import deploy from "./deploy";
-import { addUserMessage } from "./level"
-import { error } from "node:console";
+import { error, log } from "node:console";
 import { Browser } from 'puppeteer';
+import { handleLevel, handleReaction } from "./level";
 
 declare module "discord.js" {
     export interface Client {
         commands: Collection<string, Command>;
         buttons: Collection<string, Button>;
         messages: Collection<string, Collection<string, number>>;
+        xp: Collection<string, Collection<string, number>>;
         shouldStopSpam: boolean;
         is_counting_messages: boolean;
         browser: Browser;
@@ -21,18 +22,21 @@ const client = new Client({ intents: [
   GatewayIntentBits.GuildMessages,
   GatewayIntentBits.DirectMessages,
   GatewayIntentBits.GuildMembers,
-  GatewayIntentBits.MessageContent
+  GatewayIntentBits.MessageContent,
+  GatewayIntentBits.GuildMessageReactions
 ]});
 
 client.once(Events.ClientReady, async readyClient => {
   await deploy(client);
   console.log(`Ready! Logged in as ${readyClient.user.tag}`);
 
-  client.on(Events.MessageCreate, (message) => {
-    if (!client.is_counting_messages) {
-      addUserMessage(client, message);
-    }
+  client.on(Events.MessageCreate, async (message) => {
+    await handleLevel(client, message);
   });
+
+  client.on(Events.MessageReactionAdd, async (reaction, user) => {
+    await handleReaction(reaction, user);
+  })
 
   client.on(Events.InteractionCreate, (interaction) => {
     if (interaction.isChatInputCommand()) {
