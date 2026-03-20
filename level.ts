@@ -1,4 +1,4 @@
-import { type Client, type Channel, Collection, Message, User, MessageReaction } from "discord.js";
+import { type Client, type Channel, Collection, Message, User, MessageReaction, MessageFlags } from "discord.js";
 import { readFileSync, existsSync } from 'fs';
 import fs from 'fs';
 import { resolve } from 'path';
@@ -158,11 +158,13 @@ export async function handleLevel(client: Client, message: Message) {
 
   if (!user_xp || !next_level) {return};
 
-  console.log(user_xp + " " + next_level);
-  
-
   if (user_xp >= next_level) {
-    await message.react('<:Click_to_see_level:1484622933061271775>');
+    const level = getLevel(user_xp).level;
+    if (level % 10 === 0) {
+      await message.react('<:Click_to_see_level:1484691165281255457>')
+    } else {
+      await message.react('<:Click_to_see_level:1484622933061271775>');
+    }
     client.xp.get(guild_id!)?.set(user_id, getLevel(user_xp).total_max_xp); // Sets new milestone
   }
 }
@@ -182,5 +184,5 @@ export async function handleReaction(reaction: MessageReaction, user: User) {
 
   if (!level) {return};
 
-  reaction.message.reply({ content: `You made it to Level ${level} :partying_face:`});
+  reaction.message.reply({ content: `You made it to Level ${level} :partying_face:` });
 }
