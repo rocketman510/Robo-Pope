@@ -2,7 +2,7 @@ import { Collection, SlashCommandBuilder, ChatInputCommandInteraction, Client, t
 import { REST, Routes } from 'discord.js';
 import { error, log } from "node:console";
 import { readdir } from "node:fs/promises";
-import { getMessageHistory, getLevelBanner } from "./level";
+import { getMessageHistory, getLevelBanner, getLevel } from "./level";
 import puppeteer from 'puppeteer';
 import type { Browser } from "puppeteer";
 import fs from "fs";
@@ -20,10 +20,12 @@ export interface Button {
 export default async function(client: Client) {
   client.commands = new Collection<string, Command>();
   client.buttons = new Collection<string, Button>();
-  client.messages = new Collection<string, Collection<string, number>>()
+  client.messages = new Collection<string, Collection<string, number>>();
+  client.xp = new Collection<string, Collection<string, number>>();
 
   client.shouldStopSpam = false;
   client.is_counting_messages = true;
+
   console.log("Clearing Cache");
   if (fs.existsSync('./cache/level.png')) {
     fs.unlinkSync('./cache/level.png');
@@ -34,9 +36,10 @@ export default async function(client: Client) {
   await deply_buttons(client.buttons);
   console.log("Louding Browser...");
   client.browser = await puppeteer.launch({headless: true, executablePath: process.env.PUPPETEEREXECUTABLEPATH});
-  console.log(client.browser);
-  console.log("Fetching Messages..."); //TODO UNCOMENT
-  //await get_user_messages_for_all(client);
+  console.log("Fetching Messages...");
+  await get_user_messages_for_all(client);
+  console.log("Calculating Level Data");
+  deply_xp(client);
 }
 
 async function deply_commands(client_commands: Collection<string,Command>) {
@@ -100,4 +103,20 @@ async function get_user_messages_for_all(client: Client) {
   console.log(client.messages);
   console.log("DONE");
   client.is_counting_messages = false;
+}
+
+/**
+ * Sets the client.xp witch is a Map of Maps that hold the users next level milestone per guild.
+ * @param {Client} client - Takes the client obj where .xp and .messages are.
+ * */
+function deply_xp(client: Client) {
+  const words = client.messages;
+  let xp = client.xp;
+
+  for (const [guild_id, guild] of words) {
+    let guild_xp = xp.get(guild_id) ?? xp.set(guild_id, new Collection()).get(guild_id);
+    for (const [user_id, words_said] of guild) {
+      guild_xp!.set(user_id, getLevel(words_said).total_max_xp);
+    }
+  }
 }

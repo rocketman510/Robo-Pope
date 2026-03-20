@@ -1,4 +1,4 @@
-import { type Client, type Channel, Collection, Message, User } from "discord.js";
+import { type Client, type Channel, Collection, Message, User, MessageReaction } from "discord.js";
 import { readFileSync, existsSync } from 'fs';
 import fs from 'fs';
 import { resolve } from 'path';
@@ -30,7 +30,7 @@ export async function getMessageHistory(client: Client, channel: Channel, guild_
       }
 
       if (messages.size < 100) {
-        return
+    return
       }
       beforeMessage = messages.last().id;
     }
@@ -51,38 +51,38 @@ function countWords(str: string): number {
   return str.trim().split(/\s+/).filter(Boolean).length;
 }
 
-export function getLevel(xp: number) {// Made with AI Don't touch
+export function getLevel(xp: number) {
   const a = 200;
   const b = 10;
   const c = 1.05;
 
-  // inline total XP function
-  const totalXP = (level: number) => a * level + b * (Math.pow(c, level) - 1);
+  // 1. Math.round handles floating point errors from the exponent
+  const totalxp = (level: number): number => 
+    Math.round(a * level + b * (Math.pow(c, level) - 1));
 
-  // inline XP needed for next level
-  const xpForLevel = (level: number) => totalXP(level + 1) - totalXP(level);
-
-  // binary search to find the level
   let low = 0;
-  let high = 1000; // adjust if needed for max possible level
+  let high = 1000; 
 
-  while (low < high) {
-    const mid = Math.floor((low + high + 1) / 2);
-    if (totalXP(mid) <= xp) {
-      low = mid;
+  // 2. The <= check ensures that hitting the EXACT XP requirement 
+  // pushes the user into the new level instead of leaving them at 100%.
+  while (low <= high) {
+    const mid = Math.floor((low + high) / 2);
+    if (totalxp(mid) <= xp) {
+      low = mid + 1;
     } else {
       high = mid - 1;
     }
   }
 
-  const level = low;
-  const min_xp = xp - totalXP(level);
-  const max_xp = xpForLevel(level);
+  const level = high;
+  const currentLevelTotal = totalxp(level);
+  const nextLevelTotal = totalxp(level + 1);
 
   return {
     level,
-    min_xp: Math.floor(min_xp),
-    max_xp: Math.floor(max_xp),
+    min_xp: Math.floor(xp - currentLevelTotal),
+    max_xp: Math.floor(nextLevelTotal - currentLevelTotal),
+    total_max_xp: nextLevelTotal,
   };
 }
 
@@ -94,7 +94,7 @@ export async function getLevelBanner(user: User, guildId: string) {
   let html = readFileSync(htmlPath, 'utf-8');
   const css = readFileSync(cssPath, 'utf-8');
   
-  const level = getLevel(user.client.messages.get(guildId)?.get(user.id));
+  const level = getLevel(user.client.messages.get(guildId)?.get(user.id)!);
   if (!level) {return false}
 
   const replaceWith = {
@@ -140,3 +140,47 @@ async function waitForFileDeletion(filePath: string) {
   }
 }
 
+/**
+ * This function handles leveling up and attributing proper XP.
+ * @param {Client} client
+ * @param {Message} message
+ */
+export async function handleLevel(client: Client, message: Message) {
+  if (message.author.bot) {return};
+  if (client.is_counting_messages) {return};
+
+  addUserMessage(client, message);
+
+  const guild_id = message.guildId;
+  const user_id = message.author.id;
+  const user_xp = client.messages.get(guild_id!)?.get(user_id);
+  let next_level = client.xp.get(guild_id!)?.get(user_id);
+
+  if (!user_xp || !next_level) {return};
+
+  console.log(user_xp + " " + next_level);
+  
+
+  if (user_xp >= next_level) {
+    await message.react('<:Click_to_see_level:1484622933061271775>');
+    client.xp.get(guild_id!)?.set(user_id, getLevel(user_xp).total_max_xp); // Sets new milestone
+  }
+}
+
+export async function handleReaction(reaction: MessageReaction, user: User) {
+  const client = reaction.client;
+  if (user.bot) {return};
+  if (client.is_counting_messages) {return};
+  if (user.id != reaction.message.author?.id) {return};
+  if (reaction.emoji.id != '1484622933061271775') {return};
+
+  const words = client.messages.get(reaction.message.guildId!)!.get(user.id);
+
+  if (!words) {return};
+
+  const level = getLevel(words!).level;
+
+  if (!level) {return};
+
+  reaction.message.reply({ content: `You made it to Level ${level} :partying_face:`});
+}
