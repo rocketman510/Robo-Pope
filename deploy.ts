@@ -35,8 +35,8 @@ export default async function(client: Client) {
   console.log("Louding Browser...");
   client.browser = await puppeteer.launch({headless: true, executablePath: process.env.PUPPETEEREXECUTABLEPATH});
   console.log(client.browser);
-  console.log("Fetching Messages...");
-  await get_user_messages_for_all(client);
+  console.log("Fetching Messages..."); //TODO UNCOMENT
+  //await get_user_messages_for_all(client);
 }
 
 async function deply_commands(client_commands: Collection<string,Command>) {

@@ -117,6 +117,10 @@ export async function getLevelBanner(user: User, guildId: string) {
 
   await page.setContent(html);
 
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+  });
+
   await waitForFileDeletion(imagePath);
 
   await page.screenshot({
