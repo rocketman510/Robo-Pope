@@ -32,7 +32,7 @@ export default {
         .setStyle(ButtonStyle.Secondary)
         .setDisabled(true);
 
-      const action_row = new ActionRowBuilder()
+      const action_row = new ActionRowBuilder<ButtonBuilder>()
         .addComponents(button_share)
         .addComponents(button_settings);
 
