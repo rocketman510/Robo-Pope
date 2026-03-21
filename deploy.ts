@@ -4,6 +4,7 @@ import { error, log } from "node:console";
 import { readdir } from "node:fs/promises";
 import { getMessageHistory, getLevelBanner, getLevel } from "./level";
 import puppeteer from 'puppeteer';
+import { MongoClient, Db } from "mongodb";
 import type { Browser } from "puppeteer";
 import fs from "fs";
 
@@ -38,8 +39,10 @@ export default async function(client: Client) {
   client.browser = await puppeteer.launch({headless: true, executablePath: process.env.PUPPETEEREXECUTABLEPATH});
   console.log("Fetching Messages...");
   await get_user_messages_for_all(client);
-  console.log("Calculating Level Data");
+  console.log("Calculating Level Data..");
   deply_xp(client);
+  console.log("Connecteing to DB");
+  client.db = await deply_db();
 }
 
 async function deply_commands(client_commands: Collection<string,Command>) {
@@ -118,5 +121,18 @@ function deply_xp(client: Client) {
     for (const [user_id, words_said] of guild) {
       guild_xp!.set(user_id, getLevel(words_said).total_max_xp);
     }
+  }
+}
+
+export async function deply_db() {
+  const uri = `mongodb://admin:${process.env.DB_PASSWORD}@${process.env.DB_DOMAIN}`;
+  const client = new MongoClient(uri);
+  try {
+    await client.connect();
+    console.log("Connected to MongoDB!");
+    return client.db("Robo-Pope-DB");
+  } catch (err) {
+    console.error("MongoDB connection failed:", err);
+    throw err;
   }
 }

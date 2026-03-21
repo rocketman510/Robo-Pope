@@ -4,6 +4,7 @@ import deploy from "./deploy";
 import { error, log } from "node:console";
 import { Browser } from 'puppeteer';
 import { handleLevel, handleReaction } from "./level";
+import type { Db } from "mongodb"
 
 declare module "discord.js" {
     export interface Client {
@@ -14,6 +15,7 @@ declare module "discord.js" {
         shouldStopSpam: boolean;
         is_counting_messages: boolean;
         browser: Browser;
+        db: Db;
     }
 }
 
