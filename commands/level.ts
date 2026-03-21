@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction, MessageFlags, AttachmentBuilder } from "discord.js";
+import { SlashCommandBuilder, ChatInputCommandInteraction, MessageFlags, AttachmentBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, Emoji } from "discord.js";
 import type { Command } from "../deploy";
 import fs from "fs";
 import { getLevel, getLevelBanner } from "../level";
@@ -16,14 +16,27 @@ export default {
       const words = messages?.get(interaction.user.id);
       if (!words) {fail(interaction, "Could not get your data");return;}
 
-      const level = getLevel(words);
-
-      let imagePath = await getLevelBanner(interaction.user, interaction.guildId);
+      let imagePath = await getLevelBanner(interaction.user, interaction.guildId!);
       if (!imagePath) {fail("Somthing happend I cant find you data!?"); return;}
 
       const attachment = new AttachmentBuilder(imagePath);
 
-      await interaction.reply({ files: [attachment], flags: MessageFlags.Ephemeral});
+      const button_share = new ButtonBuilder()
+        .setCustomId('level_share')
+        .setLabel('Share')
+        .setStyle(ButtonStyle.Primary)
+
+      const button_settings = new ButtonBuilder()//TODO
+        .setCustomId('level_settings')
+        .setEmoji('⚙️')
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(true);
+
+      const action_row = new ActionRowBuilder()
+        .addComponents(button_share)
+        .addComponents(button_settings);
+
+      await interaction.reply({ components: [action_row], files: [attachment], flags: MessageFlags.Ephemeral});
 
       if (fs.existsSync(imagePath)) {
         try {
