@@ -1,7 +1,7 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction, MessageFlags, AttachmentBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, Emoji } from "discord.js";
 import type { Command } from "../deploy";
 import fs from "fs";
-import { getLevel, getLevelBanner } from "../level";
+import { getLevelBanner } from "../level";
 
 export default {
     data: new SlashCommandBuilder()
