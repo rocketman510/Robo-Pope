@@ -1,5 +1,5 @@
 import { Client, Events, GatewayIntentBits, Collection, MessageFlags} from "discord.js";
-import type { Command, Button } from "./deploy";
+import type { Command, Button, Modal } from "./deploy";
 import deploy from "./deploy";
 import { error, log } from "node:console";
 import { Browser } from 'puppeteer';
@@ -10,6 +10,7 @@ declare module "discord.js" {
     export interface Client {
         commands: Collection<string, Command>;
         buttons: Collection<string, Button>;
+        modals: Collection<string, Modal>;
         messages: Collection<string, Collection<string, number>>;
         xp: Collection<string, Collection<string, number>>;
         shouldStopSpam: boolean;
@@ -58,6 +59,12 @@ client.once(Events.ClientReady, async readyClient => {
       if (!button) return;
       try {
         button.execute(interaction)
+      } catch (err) {error(err)}
+    } else if (interaction.isModalSubmit()) {
+      const modal = client.modals.get(interaction.customId)
+      if (!modal) return;
+      try {
+        modal.execute(interaction)
       } catch (err) {error(err)}
     }; 
   });
