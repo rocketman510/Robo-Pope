@@ -1,9 +1,16 @@
 * {
   margin: 0;
   padding: 0;
-  color: #e0e3ff;
+  color: ${TEXTCOLOR};
 
   font-family: 'ABC Ginto Nord Condensed Unlicensed Trial', sans-serif;
+}
+
+html {
+  height: 100vh;
+  width: 100vw;
+  display: flex;
+  place-items: center;
 }
 
 body {
@@ -13,7 +20,20 @@ body {
   align-items: center;
   justify-content: center;
   height: 22px;
+  width: 256px;
   gap: 5px;
+  margin: auto;
+}
+
+#trans {
+  background: #0000;
+}
+
+#img {
+  background: url('${BACKGRONDURL}');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat; 
 }
 
 #lvl_text {
@@ -26,19 +46,19 @@ body {
 
 progress {
   flex: 1;
-  background-color: #5865f2;
-  color: #5865f2;
   height: 10px;
   border-radius: 10px;
+  box-shadow: 0px 3px 4px ${SHADOWCOLOR};
 }
 
 progress::-webkit-progress-bar {
-  background: #e0e3ff;
+  background: ${SECONDARYCOLOR};
+  backdrop-filter: blur(${FROST}px);
   border-radius: 10px;
 }
 
 progress::-webkit-progress-value {
-  background: #5865f2;
+  background: ${PRIMARYCOLOR};
   border-radius: 10px;
 }
 
@@ -46,8 +66,13 @@ img {
   height: 22px;
   width: 22px;
   border-radius: 100%; 
+  box-shadow: 0px 3px 4px ${SHADOWCOLOR};
 }
 
 span {
   font-size: 10px;
+}
+
+p {
+  text-shadow: 0px 3px 3px ${SHADOWCOLOR};
 }

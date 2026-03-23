@@ -36,7 +36,7 @@ export default async function(client: Client) {
   console.log("Louding Buttons...");
   await deply_buttons(client.buttons);
   console.log("Louding Browser...");
-  client.browser = await puppeteer.launch({headless: true, executablePath: process.env.PUPPETEEREXECUTABLEPATH});
+  client.browser = await puppeteer.launch({headless: false/*TODO SET TO TRUE BEFOR UPDATE*/, executablePath: process.env.PUPPETEEREXECUTABLEPATH});
   console.log("Fetching Messages...");
   await get_user_messages_for_all(client);
   console.log("Calculating Level Data..");

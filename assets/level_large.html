@@ -10,9 +10,15 @@ ${CSS}
   </style>
 </head>
 <body id="${HASCOSTOMEBACKGROUND}">
-  <img src="${USERAVATARURL}">
-  <p id="lvl_text" >Lvl. ${LEVEL}</p>
-  <progress value="${MINXP}" max="${MAXXP}"></progress>
-  <p id="max_xp_text">${MAXXP} <span>XP</span></p>
+  <div id="top_wrapper">
+    <h1 style="text-align: right;">${USERNAME}</h1>
+    <img src="${USERAVATARURL}">
+    <h1>Level: ${LEVEL}</h1>
+  </div>
+  <div id="wrapper">
+    <p id="lvl_text" >${MINXP}<span>XP</span></p>
+    <progress value="${MINXP}" max="${MAXXP}"></progress>
+    <p id="max_xp_text">${MAXXP} <span>XP</span></p>
+  </div>
 </body>
 </html>

@@ -1,13 +1,15 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction, MessageFlags, AttachmentBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, Emoji } from "discord.js";
 import type { Command } from "../deploy";
 import fs from "fs";
-import { getLevelBanner } from "../level";
+import { getLevelBanner, getLevelBannerSettings, type LevelSettings } from "../level";
 
 export default {
     data: new SlashCommandBuilder()
         .setName('level')
         .setDescription('Get your level'),
     async execute(interaction: ChatInputCommandInteraction) {
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
       const client = interaction.client
       if (client.is_counting_messages) {fail(interaction, "Come back later, I'm still tallying up the score."); return;}
 
@@ -15,8 +17,9 @@ export default {
       if (!messages) {fail(interaction, "Could not get Server's data");return;}
       const words = messages?.get(interaction.user.id);
       if (!words) {fail(interaction, "Could not get your data");return;}
+      const level_setting: LevelSettings = await getLevelBannerSettings(client, interaction.user.id, interaction.guildId!);
 
-      let imagePath = await getLevelBanner(interaction.user, interaction.guildId!);
+      let imagePath = await getLevelBanner(interaction.user, interaction.guildId!, level_setting);
       if (!imagePath) {fail(interaction, "Somthing happend I cant find you data!?"); return;}
 
       const attachment = new AttachmentBuilder(imagePath);
@@ -30,13 +33,12 @@ export default {
         .setCustomId('level_settings')
         .setEmoji('⚙️')
         .setStyle(ButtonStyle.Secondary)
-        .setDisabled(true);
 
       const action_row = new ActionRowBuilder<ButtonBuilder>()
         .addComponents(button_share)
         .addComponents(button_settings);
 
-      await interaction.reply({ components: [action_row], files: [attachment], flags: MessageFlags.Ephemeral});
+      await interaction.editReply({ components: [action_row], files: [attachment], /*flags: MessageFlags.Ephemeral*/});
 
       if (fs.existsSync(imagePath)) {
         try {
