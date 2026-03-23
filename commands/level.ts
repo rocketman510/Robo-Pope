@@ -19,7 +19,7 @@ export default {
       if (!words) {fail(interaction, "Could not get your data");return;}
       const level_setting: LevelSettings = await getLevelBannerSettings(client, interaction.user.id, interaction.guildId!);
 
-      let imagePath = await getLevelBanner(interaction.user, interaction.guildId!, level_setting);
+      let imagePath = await getLevelBanner(interaction.user, level_setting);
       if (!imagePath) {fail(interaction, "Somthing happend I cant find you data!?"); return;}
 
       const attachment = new AttachmentBuilder(imagePath);

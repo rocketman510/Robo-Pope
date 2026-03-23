@@ -99,7 +99,7 @@ export async function getLevelBanner(user: User, level_setting: LevelSettings) {
 
   let html = readFileSync(htmlPath, 'utf-8');
   let css = readFileSync(cssPath, 'utf-8');
-  
+
   const words = getUsersWords(user.client, user.id, level_setting.guild_id!);
   const level = getLevel(words);
 
@@ -277,6 +277,6 @@ export function hexNumToStr(hex: number, alpha: number): string {
 
 function getUsersWords(client: Client, user_id: string | undefined | null, guild_id: string | undefined | null) {
   const fixed_user = ensure(user_id, "No valid User Id was provided for the function getUserWords");
-  const fixed_guild= ensure(guild_id, "No valid Guild Id was provided for the functoion getUsersWords");
+  const fixed_guild = ensure(guild_id, "No valid Guild Id was provided for the functoion getUsersWords");
   return client.messages.ensure(fixed_guild, () => new Collection<string, number>()).ensure(fixed_user, () => 0);
 }
