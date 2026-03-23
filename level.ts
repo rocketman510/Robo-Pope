@@ -3,6 +3,7 @@ import { readFileSync, existsSync } from 'fs';
 import { resolve } from 'path';
 import { ensure } from ".";
 import { error } from "console";
+import level_settings from "./button/level_settings";
 
 /**
  * This is for tthe users Level banner display settings.
@@ -88,7 +89,7 @@ export function getLevel(xp: number) {
   }
 }
 
-export async function getLevelBanner(user: User, guildId: string, level_setting: LevelSettings) {
+export async function getLevelBanner(user: User, level_setting: LevelSettings) {
   const htmlPath = level_setting.is_large ? resolve('./assets/level_large.html') : resolve('./assets/level_small.html');
   const cssPath = level_setting.is_large ? resolve('./assets/level_large.css') : resolve('./assets/level_small.css');
   const imagePath = resolve('./cache/level.png')
@@ -99,8 +100,8 @@ export async function getLevelBanner(user: User, guildId: string, level_setting:
   let html = readFileSync(htmlPath, 'utf-8');
   let css = readFileSync(cssPath, 'utf-8');
   
-  //Gets the level obj form the xp cache in the client obj. If the server is not on record, or the user is not on record then it will throw.
-  const level = getLevel(ensure(ensure(user.client.messages.get(guildId),"Guild has no messages on record").get(user.id),"User has no messages in the guild"));
+  const words = getUsersWords(user.client, user.id, level_setting.guild_id!);
+  const level = getLevel(words);
 
   const replaceCSS = {
     PRIMARYCOLOR: hexNumToStr(level_setting.primary_color, level_setting.primary_color_trans),
