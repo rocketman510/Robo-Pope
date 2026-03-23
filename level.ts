@@ -247,7 +247,25 @@ export async function getLevelBannerSettings(client: Client, user_id: string, gu
   return result as LevelSettings;
 }
 
-function hexNumToStr(hex: number, alpha: number): string {
+export async function setLevelBannerSettings(client: Client, level_settings: LevelSettings) {
+    const db = client.db;
+    const collection = db.collection<LevelSettings>("level_settings");
+
+    const filter = {
+        user_id: level_settings.user_id,
+        user_guild: level_settings.guild_id,
+    };
+
+    const { _id, ...safeLevelSettings } = level_settings as any;
+
+    await collection.updateOne(
+        filter,
+        { $set: safeLevelSettings },
+        { upsert: true }
+    );
+}
+
+export function hexNumToStr(hex: number, alpha: number): string {
   const rgb = hex.toString(16).padStart(6, "0").toUpperCase();
   const a = Math.round(Math.max(0, Math.min(1, alpha)) * 255)
     .toString(16)
