@@ -1,8 +1,8 @@
 import { type Client, type Channel, Collection, Message, User, MessageReaction, MessageFlags } from "discord.js";
 import { readFileSync, existsSync } from 'fs';
-import fs from 'fs';
 import { resolve } from 'path';
-import { Db } from "mongodb";
+import { ensure } from ".";
+import { error } from "console";
 
 /**
  * This is for tthe users Level banner display settings.
@@ -27,46 +27,41 @@ export interface LevelSettings {
 }
 
 async function getMessages(before: string, channel: Channel) {
+  if (!channel.isTextBased()) {return null}
   const messages = await channel.messages.fetch({ limit: 100, before: before });
   return messages
 }
 
 export async function getMessageHistory(client: Client, channel: Channel, guild_id: string) {
   try {
+    if (!channel.isTextBased()) {throw "Is not a text channel"}
     const firstMessage = await channel.messages.fetch({ limit: 1 });
 
-    if (firstMessage.size < 1) {
-      return
-    }
-
-    let beforeMessage = firstMessage.first().id;
-
+    let beforeMessage = ensure(firstMessage.first()?.id, "Could not feach the fisrt message in a channel. This is becasue there are none");
 
     let number_of_messages = 1;
 
     while (true) {
-      const messages = await getMessages(beforeMessage, channel);
-      for (const [key, value] of messages) {
+      const messages = ensure(await getMessages(beforeMessage, channel), "Is not a text channel");
+      for (const [_, value] of messages) {
         number_of_messages++;
         addUserMessage(client, value);
         console.log(value.author.displayName + " with " + value.content);
       }
 
       if (messages.size < 100) {
-    return
+        throw "No more messages";
       }
-      beforeMessage = messages.last().id;
+      beforeMessage = ensure(messages.last()?.id);
     }
-  } catch (error) {
-    console.error('Fetch failed:', error);
-  }
+  } catch (_) {}
 }
 
 export function addUserMessage(client: Client, message: Message) {
-  const guild_id = message.guildId!;
+  const guild_id = ensure(message.guildId, "Message must be form a guild");
   const wordCount = countWords(message.content);
   const userKey = message.author.id;
-  let members = client.messages.get(guild_id) ?? client.messages.set(guild_id, new Collection()).get(guild_id)!;
+  let members = ensure(client.messages.get(guild_id) ?? client.messages.set(guild_id, new Collection()).get(guild_id), "Failed to Set and Get a obj to the client.messages Collection");
   members.set(userKey, (members.get(userKey) ?? 0) + wordCount);
 }
 
@@ -93,23 +88,7 @@ export function getLevel(xp: number) {
   }
 }
 
-export async function getLevelBanner(user: User, guildId: string, levelsetting: LevelSettings) {
-  let level_setting: LevelSettings = {
-    user_id: '',
-    guild_id: '',
-    frost: true,
-    primary_color: 0x5865f2,
-    primary_color_trans: 0.7,
-    secondary_color: 0xe0e3ff,
-    secondary_color_trans: 0,
-    text_color: 0xe0e3ff,
-    text_color_trans: 1,
-    shadow_strength: 0.5,
-    shadow_color: 0x1a1a1a,
-    has_costome_background: true,
-    backgrond_url: 'https://media.discordapp.net/attachments/1466974789490184204/1483667216598831124/Screenshot_20260317-222129_Gallery.jpg?ex=69c2ac85&is=69c15b05&hm=22520ba3e652bcf62c718bab3971889c8b4ee7dff71f02a334e46c80149845a8&animated=true',
-    is_large: false,
-  };
+export async function getLevelBanner(user: User, guildId: string, level_setting: LevelSettings) {
   const htmlPath = level_setting.is_large ? resolve('./assets/level_large.html') : resolve('./assets/level_small.html');
   const cssPath = level_setting.is_large ? resolve('./assets/level_large.css') : resolve('./assets/level_small.css');
   const imagePath = resolve('./cache/level.png')
@@ -120,8 +99,8 @@ export async function getLevelBanner(user: User, guildId: string, levelsetting: 
   let html = readFileSync(htmlPath, 'utf-8');
   let css = readFileSync(cssPath, 'utf-8');
   
-  const level = getLevel(user.client.messages.get(guildId)?.get(user.id)!);
-  if (!level) {return false}
+  //Gets the level obj form the xp cache in the client obj. If the server is not on record, or the user is not on record then it will throw.
+  const level = getLevel(ensure(ensure(user.client.messages.get(guildId),"Guild has no messages on record").get(user.id),"User has no messages in the guild"));
 
   const replaceCSS = {
     PRIMARYCOLOR: hexNumToStr(level_setting.primary_color, level_setting.primary_color_trans),
@@ -133,7 +112,8 @@ export async function getLevelBanner(user: User, guildId: string, levelsetting: 
   }
 
   css = css.replace(/\$\{(.*?)\}/g, (_, repName) => {
-    return replaceCSS[repName] ?? '';
+    const value = replaceCSS[repName as keyof typeof replaceCSS];
+    return value?.toString() ?? '';
   });
 
   const replaceHTML = {
@@ -147,7 +127,8 @@ export async function getLevelBanner(user: User, guildId: string, levelsetting: 
   }
 
   html = html.replace(/\$\{(.*?)\}/g, (_, repName) => {
-    return replaceHTML[repName] ?? '';
+    const value = replaceHTML[repName as keyof typeof replaceHTML];
+    return value?.toString() ?? '';
   });
 
   const browser = user.client.browser;
@@ -169,18 +150,17 @@ export async function getLevelBanner(user: User, guildId: string, levelsetting: 
 
   await page.screenshot({
     path: imagePath,
-    omitBackground: true, // VERY IMPORTANT
+    omitBackground: true,
     fullPage: true,
   });
 
-  //await page.close();
+  //TODO:await page.close();
 
   return imagePath;
 }
 
 async function waitForFileDeletion(filePath: string) {
   while (existsSync(filePath)) {
-    // wait 100ms before checking again
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
 }
@@ -215,33 +195,31 @@ export async function handleLevel(client: Client, message: Message) {
 }
 
 export async function handleReaction(reaction: MessageReaction, user: User) {
-  const client = reaction.client;
-  if (user.bot) {return};
-  if (client.is_counting_messages) {return};
-  if (user.id != reaction.message.author?.id) {return};
-  if (reaction.emoji.id != '1484622933061271775') {return};
+  try {
+    const client = reaction.client;
+    if (user.bot) {return};
+    if (client.is_counting_messages) {return};
+    if (user.id != reaction.message.author?.id) {return};
+    if (reaction.emoji.id != '1484622933061271775') {return};
+    if (!reaction.message.guildId) {return}
 
-  const words = client.messages.get(reaction.message.guildId!)!.get(user.id);
+    const words = getUsersWords(client, user.id, reaction.message.guildId);
 
-  if (!words) {return};
+    const level = getLevel(words).level;
 
-  const level = getLevel(words!).level;
-
-  if (!level) {return};
-
-  reaction.message.reply({ content: `You made it to Level ${level} :partying_face:` });
+    reaction.message.reply({ content: `You made it to Level ${level} :partying_face:` });
+  } catch (err) {error('handleReaction in ./level.ts function failed error: ' + err)}
 }
 
 export async function getLevelBannerSettings(client: Client, user_id: string, guild_id: string): Promise<LevelSettings> {
   const default_settings: LevelSettings = {
     user_id,
     guild_id,
+    frost: false,
     primary_color: 0x5865f2,
     primary_color_trans: 1.0,
-    primary_frost: false,
     secondary_color: 0xe0e3ff,
     secondary_color_trans: 1.0,
-    secondary_frost: false,
     text_color: 0xe0e3ff,
     text_color_trans: 1.0,
     shadow_color: 0x1a1a1a,
@@ -276,4 +254,10 @@ function hexNumToStr(hex: number, alpha: number): string {
     .toUpperCase();
 
   return `#${rgb}${a}`;
+}
+
+function getUsersWords(client: Client, user_id: string | undefined | null, guild_id: string | undefined | null) {
+  const fixed_user = ensure(user_id, "No valid User Id was provided for the function getUserWords");
+  const fixed_guild= ensure(guild_id, "No valid Guild Id was provided for the functoion getUsersWords");
+  return client.messages.ensure(fixed_guild, () => new Collection<string, number>()).ensure(fixed_user, () => 0);
 }

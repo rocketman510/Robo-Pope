@@ -19,6 +19,11 @@ declare module "discord.js" {
     }
 }
 
+export function ensure<T>(value: T | null | undefined, error?: string): T {
+    if (value == null || value == undefined) throw new Error(error ?? "Unexpected null!");
+    return value;
+}
+
 const client = new Client({ intents: [
   GatewayIntentBits.Guilds,
   GatewayIntentBits.GuildMessages,
