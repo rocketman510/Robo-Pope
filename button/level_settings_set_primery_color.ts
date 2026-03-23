@@ -13,9 +13,6 @@ export default {
         ensure(interaction.message.guildId)
       );
 
-      console.log(level_settings);
-      
-
       const curent_color = hexNumToStr(level_settings.primary_color & 0xffffff, 0).slice(0,7);
       const curent_trans = level_settings.primary_color_trans.toFixed(1).toString().slice(0,5);
 

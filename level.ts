@@ -253,7 +253,7 @@ export async function setLevelBannerSettings(client: Client, level_settings: Lev
 
     const filter = {
         user_id: level_settings.user_id,
-        user_guild: level_settings.guild_id,
+        guild_id: level_settings.guild_id,
     };
 
     const { _id, ...safeLevelSettings } = level_settings as any;
