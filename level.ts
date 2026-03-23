@@ -258,7 +258,7 @@ export async function setLevelBannerSettings(client: Client, level_settings: Lev
 
     const { _id, ...safeLevelSettings } = level_settings as any;
 
-    await collection.updateOne(
+    return await collection.updateOne(
         filter,
         { $set: safeLevelSettings },
         { upsert: true }

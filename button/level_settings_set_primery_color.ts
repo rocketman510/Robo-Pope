@@ -2,17 +2,19 @@ import { ButtonInteraction, LabelBuilder, MessageFlags, ModalBuilder, TextInputB
 import type { Button } from "../deploy";
 import { getLevelBannerSettings, hexNumToStr } from "../level";
 import { ensure } from "..";
-import { generateComponents } from "../functions/level_settings";
 
 export default {
   data: "level_settings_set_primery_color",
   async execute(interaction: ButtonInteraction) {
     try {
       const level_settings = await getLevelBannerSettings(
-      interaction.client,
+        interaction.client,
         interaction.user.id,
         ensure(interaction.message.guildId)
       );
+
+      console.log(level_settings);
+      
 
       const curent_color = hexNumToStr(level_settings.primary_color & 0xffffff, 0).slice(0,7);
       const curent_trans = level_settings.primary_color_trans.toFixed(1).toString().slice(0,5);

@@ -29,7 +29,7 @@ export default {
         .setLabel('Share')
         .setStyle(ButtonStyle.Primary)
 
-      const button_settings = new ButtonBuilder()//TODO
+      const button_settings = new ButtonBuilder()
         .setCustomId('level_settings')
         .setEmoji('⚙️')
         .setStyle(ButtonStyle.Secondary)
@@ -38,7 +38,7 @@ export default {
         .addComponents(button_share)
         .addComponents(button_settings);
 
-      await interaction.editReply({ components: [action_row], files: [attachment], /*flags: MessageFlags.Ephemeral*/});
+      await interaction.editReply({ components: [action_row], files: [attachment] });
 
       if (fs.existsSync(imagePath)) {
         try {

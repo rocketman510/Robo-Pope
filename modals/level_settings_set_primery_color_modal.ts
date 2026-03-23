@@ -20,7 +20,7 @@ export default {
         }
 
         if (!trans_match) {
-          interaction.reply({ content: "Improperly formatted transparency value. Try again", flags: [ MessageFlags.Ephemeral ] });
+    interaction.reply({ content: "Improperly formatted transparency value. Try again", flags: [ MessageFlags.Ephemeral ] });
           return
         }
 
@@ -29,7 +29,7 @@ export default {
 
         await interaction.deferUpdate()
 
-        console.log(finle_color, finle_trans);
+        console.log("colors:", finle_color, finle_trans);
         
 
         let level_settings = await getLevelBannerSettings(

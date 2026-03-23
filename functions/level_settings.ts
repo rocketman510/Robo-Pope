@@ -2,6 +2,7 @@ import type { LevelSettings } from "../level";
 import { ensure } from "..";
 import { AttachmentBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ContainerBuilder, ButtonBuilder, MediaGalleryBuilder, MediaGalleryItemBuilder, ButtonStyle, type Client } from "discord.js";
 import { getLevelBanner } from "../level";
+import fs from "fs";
 
 export async function generateComponents(level_setting: LevelSettings, client: Client) {
   const cache_channel = ensure(await client.channels.fetch('1485110171922337812'), "Cant find cache_channel");
@@ -18,6 +19,12 @@ export async function generateComponents(level_setting: LevelSettings, client: C
   const image_atachment = new AttachmentBuilder(image_path);
 
   const message_cache = await cache_channel.send({ files: [image_atachment]});
+
+  if (fs.existsSync(image_path)) {
+    try {
+      fs.unlinkSync(image_path);
+    } catch (_) {}
+  }
 
   const image_url = message_cache.attachments.first()!.url;
 
