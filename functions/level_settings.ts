@@ -3,6 +3,7 @@ import { ensure } from "..";
 import { AttachmentBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ContainerBuilder, ButtonBuilder, MediaGalleryBuilder, MediaGalleryItemBuilder, ButtonStyle, type Client } from "discord.js";
 import { getLevelBanner } from "../level";
 import fs from "fs";
+import level_settings from "../button/level_settings";
 
 export async function generateComponents(level_setting: LevelSettings, client: Client) {
   const cache_channel = ensure(await client.channels.fetch('1485110171922337812'), "Cant find cache_channel");
@@ -59,10 +60,21 @@ export async function generateComponents(level_setting: LevelSettings, client: C
     .addTextDisplayComponents((td) => td.setContent('**Text Color:**\n-# This is the Color of the Text'))
     .addActionRowComponents((ar) => ar.setComponents(new ButtonBuilder().setCustomId('level_settings_set_text_color').setLabel('Set Color').setStyle(ButtonStyle.Secondary)));
   
-  const backgrond_image_container = new ContainerBuilder()
+  const height = level_setting.is_large ? 125 : (level_setting.has_costome_background ? 8 : 0) + 22;
+  const width = level_setting.is_large ? 512 : (level_setting.has_costome_background ? 8 : 0) + 256;
+
+  const backgrond_image_description = `**Backgrond Image:**\n-# This is the image that will be the backgrond\nResolution: ${height + 'x' + width}`
+
+  let backgrond_image_container = new ContainerBuilder()
     .setAccentColor(0x242429)
-    .addTextDisplayComponents((td) => td.setContent('**Backgrond Image:**\n-# This is the image that will be the backgrond'))
-    .addActionRowComponents((ar) => ar.setComponents(new ButtonBuilder().setCustomId('level_settings_background').setLabel('Set Backgrond Image').setStyle(ButtonStyle.Secondary)));
+    .addTextDisplayComponents((td) => td.setContent(backgrond_image_description))
+    .addActionRowComponents((ar) => ar.setComponents(new ButtonBuilder().setCustomId('level_settings_background').setLabel('Set Backgrond Image').setStyle(ButtonStyle.Secondary)))
+
+  if (user_settings.has_costome_background) {
+    backgrond_image_container.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(user_settings.backgrond_url).setDescription("Image 1")));
+  } else {
+    backgrond_image_container.addTextDisplayComponents((td) => td.setContent('Style Transparent, No Backgrond Image'));
+  }
 
   const size_container = new ContainerBuilder()
     .setAccentColor(0x242429)
