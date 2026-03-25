@@ -1,4 +1,4 @@
-import { Collection, SlashCommandBuilder, ChatInputCommandInteraction, Client, type Interaction, type ButtonInteraction, ModalSubmitInteraction } from "discord.js";
+import { Collection, SlashCommandBuilder, ChatInputCommandInteraction, Client, type ButtonInteraction, ModalSubmitInteraction, UserSelectMenuInteraction, ChannelSelectMenuInteraction, MentionableSelectMenuInteraction, RoleSelectMenuInteraction, StringSelectMenuInteraction } from "discord.js";
 import { REST, Routes } from 'discord.js';
 import { error, log } from "node:console";
 import { readdir } from "node:fs/promises";
@@ -23,10 +23,16 @@ export interface Modal {
   execute: (Interaction: ModalSubmitInteraction) => Promise<void>;
 }
 
+export interface SelectionMenu {
+  data: string;
+  execute: (Interaction: UserSelectMenuInteraction | ChannelSelectMenuInteraction | StringSelectMenuInteraction | RoleSelectMenuInteraction | MentionableSelectMenuInteraction) => Promise<void>;
+}
+
 export default async function(client: Client) {
   client.commands = new Collection<string, Command>();
   client.buttons = new Collection<string, Button>();
   client.modals = new Collection<string, Modal>();
+  client.selection_menus = new Collection<string, SelectionMenu>();
   client.messages = new Collection<string, Collection<string, number>>();
   client.xp = new Collection<string, Collection<string, number>>();
 
@@ -43,6 +49,8 @@ export default async function(client: Client) {
   await deply_buttons(client.buttons);
   console.log("Loading Modals...");
   await deply_modals(client.modals);
+  console.log('Loading Selection Menus...');
+  await deply_selection_menus(client.selection_menus)
   console.log("Loading Browser...");
   client.browser = await puppeteer.launch({headless: false/*TODO SET TO TRUE BEFOR UPDATE*/, executablePath: process.env.PUPPETEEREXECUTABLEPATH});
   console.log("Fetching Messages...");
@@ -111,8 +119,21 @@ async function deply_modals(modals: Collection<string, Modal>) {
 
     const module = await import(file);
     const modal = module.default as Modal;
-      modals.set(modal.data, modal); 
-    }
+    modals.set(modal.data, modal); 
+  }
+}
+
+async function deply_selection_menus(selection_menus: Collection<string, SelectionMenu>) {
+  const path = './selection_menus/'
+  const files = await readdir(path);
+
+  for (const index in files) {
+    const file = path + files[index];
+
+    const module = await import(file);
+    const selection_menu = module.default as SelectionMenu;
+    selection_menus.set(selection_menu.data, selection_menu);
+  }
 }
 
 async function get_user_messages_for_all(client: Client) {

@@ -1,5 +1,5 @@
 import { Client, Events, GatewayIntentBits, Collection, MessageFlags} from "discord.js";
-import type { Command, Button, Modal } from "./deploy";
+import type { Command, Button, Modal, SelectionMenu } from "./deploy";
 import deploy from "./deploy";
 import { error, log } from "node:console";
 import { Browser } from 'puppeteer';
@@ -11,6 +11,7 @@ declare module "discord.js" {
         commands: Collection<string, Command>;
         buttons: Collection<string, Button>;
         modals: Collection<string, Modal>;
+        selection_menus: Collection<string, SelectionMenu>;
         messages: Collection<string, Collection<string, number>>;
         xp: Collection<string, Collection<string, number>>;
         shouldStopSpam: boolean;
@@ -65,6 +66,12 @@ client.once(Events.ClientReady, async readyClient => {
       if (!modal) return;
       try {
         modal.execute(interaction)
+      } catch (err) {error(err)}
+    } else if (interaction.isAnySelectMenu()) {
+      const selection_menu = client.selection_menus.get(interaction.customId)
+      if (!selection_menu) return;
+      try {
+        selection_menu.execute(interaction)
       } catch (err) {error(err)}
     }; 
   });

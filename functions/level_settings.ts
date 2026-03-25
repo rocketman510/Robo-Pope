@@ -31,7 +31,7 @@ export async function generateComponents(level_setting: LevelSettings, client: C
 
   const level_settings_size_select = new StringSelectMenuBuilder()
     .setCustomId("level_settings_size")
-    .setPlaceholder(`Change Size (${user_settings.is_large ?? 'Large', 'Small'})`)
+    .setPlaceholder(`Change Size (${user_settings.is_large ? 'Large':'Small'})`)
     .addOptions(
       new StringSelectMenuOptionBuilder()
         .setLabel("Large")
