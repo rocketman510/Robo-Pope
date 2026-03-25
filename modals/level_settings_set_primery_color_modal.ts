@@ -20,7 +20,7 @@ export default {
         }
 
         if (!trans_match) {
-    interaction.reply({ content: "Improperly formatted transparency value. Try again", flags: [ MessageFlags.Ephemeral ] });
+          interaction.reply({ content: "Improperly formatted transparency value. Try again", flags: [ MessageFlags.Ephemeral ] });
           return
         }
 
