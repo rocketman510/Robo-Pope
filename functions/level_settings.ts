@@ -86,6 +86,10 @@ export async function generateComponents(level_setting: LevelSettings, client: C
     .addTextDisplayComponents((td) => td.setContent('**Preciew:**\n-# This what the Banner will look like.'))
     .addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(image_url).setDescription("Image 1")));
 
+  const warning_container = new ContainerBuilder()
+    .setAccentColor(0xFFAA00)
+    .addTextDisplayComponents((td) => td.setContent('### :warning: Refresh time can vary, be patient and don\'t try to use it between Refreshs'))
+
   return [
     level_settings_container,
     primary_color_container,
@@ -94,5 +98,6 @@ export async function generateComponents(level_setting: LevelSettings, client: C
     backgrond_image_container,
     size_container,
     preview_container,
+    warning_container,
   ]
 }

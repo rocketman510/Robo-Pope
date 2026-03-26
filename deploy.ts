@@ -7,6 +7,7 @@ import puppeteer from 'puppeteer';
 import { MongoClient, Db } from "mongodb";
 import type { Browser } from "puppeteer";
 import fs from "fs";
+import path from "node:path";
 
 export interface Command {
     data: SlashCommandBuilder;
@@ -40,9 +41,7 @@ export default async function(client: Client) {
   client.is_counting_messages = true;
 
   console.log("Clearing Cache");
-  if (fs.existsSync('./cache/level.png')) {
-    fs.unlinkSync('./cache/level.png');
-  }
+  clear_cache('./cache/');
   console.log("Loading Commands...");
   await deply_commands(client.commands);
   console.log("Loading Buttons...");
@@ -176,5 +175,20 @@ export async function deply_db() {
   } catch (err) {
     console.error("MongoDB connection failed:", err);
     throw err;
+  }
+}
+
+function clear_cache(cacheDir: string) {
+  if (fs.existsSync(cacheDir)) {
+    fs.readdirSync(cacheDir).forEach(item => {
+      const itemPath = path.join(cacheDir, item);
+      if (fs.lstatSync(itemPath).isFile()) {
+        fs.unlinkSync(itemPath); // delete file
+        console.log(`Deleted file: ${item}`);
+      } else if (fs.lstatSync(itemPath).isDirectory()) {
+        fs.rmSync(itemPath, { recursive: true, force: true }); // delete folder
+        console.log(`Deleted folder: ${item}`);
+      }
+    });
   }
 }

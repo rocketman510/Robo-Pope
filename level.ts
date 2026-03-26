@@ -1,5 +1,5 @@
 import { type Client, type Channel, Collection, Message, User, MessageReaction, MessageFlags } from "discord.js";
-import { readFileSync, existsSync } from 'fs';
+import fs from 'fs';
 import { resolve } from 'path';
 import { ensure } from ".";
 import { error } from "console";
@@ -97,11 +97,31 @@ export async function getLevelBanner(user: User, level_setting: LevelSettings) {
   const height = level_setting.is_large ? 125 : (level_setting.has_costome_background ? 8 : 0) + 22;
   const width = level_setting.is_large ? 512 : (level_setting.has_costome_background ? 8 : 0) + 256;
 
-  let html = readFileSync(htmlPath, 'utf-8');
-  let css = readFileSync(cssPath, 'utf-8');
+  let html = fs.readFileSync(htmlPath, 'utf-8');
+  let css = fs.readFileSync(cssPath, 'utf-8');
 
   const words = getUsersWords(user.client, user.id, level_setting.guild_id!);
   const level = getLevel(words);
+
+  const parsedUrl = new URL(level_setting.backgrond_url).pathname.split("/").pop();
+
+  let backgrond_url = ''
+
+  if (fs.existsSync(process.env.CACHE_PATH! + parsedUrl!)) {
+    backgrond_url = 'file://' + process.env.CACHE_PATH! + parsedUrl!;
+    /*const data = fs.readFileSync(process.env.CACHE_PATH! + parsedUrl!);
+    const base64 = data.toString("base64");
+    const dataUrl = `data:image/png;base64,${base64}`;
+    backgrond_url = dataUrl;
+    console.log(backgrond_url);*/
+  } else {
+    backgrond_url = level_setting.backgrond_url;
+    const res = await fetch(level_setting.backgrond_url);
+    if (!res.ok) throw new Error(`Failed: ${res.statusText}`);
+
+    const buffer = Buffer.from(await res.arrayBuffer());
+    fs.writeFileSync(process.env.CACHE_PATH! + parsedUrl!, buffer);
+  }
 
   const replaceCSS = {
     PRIMARYCOLOR: hexNumToStr(level_setting.primary_color, level_setting.primary_color_trans),
@@ -109,7 +129,7 @@ export async function getLevelBanner(user: User, level_setting: LevelSettings) {
     FROST: level_setting.frost ? "10" : "0",
     TEXTCOLOR: hexNumToStr(level_setting.text_color, level_setting.text_color_trans),
     SHADOWCOLOR: hexNumToStr(level_setting.shadow_color, level_setting.shadow_strength),
-    BACKGRONDURL: level_setting.backgrond_url,
+    BACKGRONDURL: backgrond_url,
   }
 
   css = css.replace(/\$\{(.*?)\}/g, (_, repName) => {
@@ -132,16 +152,15 @@ export async function getLevelBanner(user: User, level_setting: LevelSettings) {
     return value?.toString() ?? '';
   });
 
+  fs.writeFileSync(process.env.CACHE_PATH! + 'html.html', html);
+
   const browser = user.client.browser;
 
   const page = await browser.newPage();
 
   await page.setViewport({height, width})
 
-  console.log(height, width);
-  
-
-  await page.setContent(html);
+  await page.goto('file://' + process.env.CACHE_PATH! + 'html.html')
 
   await page.evaluate(async () => {
     await document.fonts.ready;
@@ -155,13 +174,13 @@ export async function getLevelBanner(user: User, level_setting: LevelSettings) {
     fullPage: true,
   });
 
-  //TODO:await page.close();
+  await page.close();
 
   return imagePath;
 }
 
 async function waitForFileDeletion(filePath: string) {
-  while (existsSync(filePath)) {
+  while (fs.existsSync(filePath)) {
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
 }

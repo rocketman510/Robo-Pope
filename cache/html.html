@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+  <link href="https://fonts.cdnfonts.com/css/abc-ginto-nord-unlicensed-trial" rel="stylesheet">
+  <style>
+* {
+  margin: 0;
+  padding: 0;
+  color: #FFFFFFFF;
+
+  font-family: 'ABC Ginto Nord Condensed Unlicensed Trial', sans-serif;
+}
+
+html {
+  height: 100vh;
+  width: 100vw;
+  display: flex;
+  place-items: center;
+}
+
+body {
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
+  align-items: center;
+  justify-content: center;
+  height: 22px;
+  width: 256px;
+  gap: 5px;
+  margin: auto;
+}
+
+#trans {
+  background: #0000;
+}
+
+#img {
+  background: url('file:///home/rocketman510/Programs/Robo-Pope/cache/z-image_00075_.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat; 
+}
+
+#lvl_text {
+  font-weight: 500;
+}
+
+#max_xp_text {
+  font-weight: 500;
+}
+
+progress {
+  flex: 1;
+  height: 10px;
+  border-radius: 10px;
+  box-shadow: 0px 3px 4px #1A1A1AFF;
+}
+
+progress::-webkit-progress-bar {
+  background: #E0E3FFFF;
+  backdrop-filter: blur(0px);
+  border-radius: 10px;
+}
+
+progress::-webkit-progress-value {
+  background: #FFAA00BF;
+  border-radius: 10px;
+}
+
+img {
+  height: 22px;
+  width: 22px;
+  border-radius: 100%; 
+  box-shadow: 0px 3px 4px #1A1A1AFF;
+}
+
+span {
+  font-size: 10px;
+}
+
+p {
+  text-shadow: 0px 3px 3px #1A1A1AFF;
+}
+
+  </style>
+</head>
+<body id="img">
+  <img src="https://cdn.discordapp.com/avatars/715043871503024218/6bfefae0763274ed654f67298e7f8a58.webp">
+  <p id="lvl_text" >Lvl. 17</p>
+  <progress value="37" max="370"></progress>
+  <p id="max_xp_text">370 <span>XP</span></p>
+</body>
+</html>
