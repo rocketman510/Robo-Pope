@@ -44,8 +44,6 @@ export default {
 
           const message = await cache_channel.send({ files: [attachment]})
 
-          console.log(message);
-
           level_settings.has_costome_background = true;
           level_settings.backgrond_url = message.attachments.first()!.url;
         }

@@ -16,12 +16,6 @@ export default {
       const curent_color = hexNumToStr(level_settings.text_color & 0xffffff, 0).slice(0,7);
       const curent_trans = level_settings.text_color_trans.toFixed(1).toString().slice(0,5);
 
-      console.log(curent_color);
-      console.log(curent_trans);
-      
-
-      
-
       const modal = new ModalBuilder()
         .setCustomId('level_settings_set_text_color_modal')
         .setTitle("text Color");

@@ -29,9 +29,6 @@ export default {
 
         await interaction.deferUpdate()
 
-        console.log("colors:", finle_color, finle_trans);
-        
-
         let level_settings = await getLevelBannerSettings(
           interaction.client,
           interaction.user.id,
