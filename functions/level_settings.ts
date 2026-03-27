@@ -3,7 +3,6 @@ import { ensure } from "..";
 import { AttachmentBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ContainerBuilder, ButtonBuilder, MediaGalleryBuilder, MediaGalleryItemBuilder, ButtonStyle, type Client } from "discord.js";
 import { getLevelBanner } from "../level";
 import fs from "fs";
-import level_settings from "../button/level_settings";
 
 export async function generateComponents(level_setting: LevelSettings, client: Client) {
   const cache_channel = ensure(await client.channels.fetch('1485110171922337812'), "Cant find cache_channel");

@@ -194,10 +194,10 @@ export async function handleLevel(client: Client, message: Message) {
 
   const guild_id = message.guildId;
   const user_id = message.author.id;
-  const user_xp = client.messages.get(guild_id!)?.get(user_id);
-  let next_level = client.xp.get(guild_id!)?.get(user_id);
+  const user_xp = client.messages.ensure(guild_id!, () => new Collection<string, number>()).ensure(user_id, () => 0);
+  let next_level = client.xp.ensure(guild_id!, () => new Collection<string, number>()).ensure(user_id, () => getLevel(user_xp).total_max_xp)
 
-  if (!user_xp || !next_level) {return};
+  if (!user_xp) {return};
 
   if (user_xp >= next_level) {
     const level = getLevel(user_xp).level;
