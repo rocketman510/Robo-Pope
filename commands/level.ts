@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction, MessageFlags, AttachmentBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, Emoji } from "discord.js";
+import { SlashCommandBuilder, ChatInputCommandInteraction, MessageFlags, AttachmentBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 import type { Command } from "../deploy";
 import fs from "fs";
 import { getLevelBanner, getLevelBannerSettings, type LevelSettings } from "../level";
@@ -49,5 +49,5 @@ export default {
 } as Command;
 
 function fail(interaction: ChatInputCommandInteraction, message: string) {
-  interaction.reply({ content: message, flags: MessageFlags.Ephemeral });
+  interaction.editReply({ content: message });
 }
