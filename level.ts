@@ -1,9 +1,9 @@
 import { type Client, type Channel, Collection, Message, User, MessageReaction, MessageFlags } from "discord.js";
 import fs from 'fs';
 import { resolve } from 'path';
-import { ensure } from ".";
-import { error } from "console";
+import { error, log } from "console";
 import level_settings from "./button/level_settings";
+import { ensure } from ".";
 
 /**
  * This is for tthe users Level banner display settings.
@@ -62,8 +62,9 @@ export function addUserMessage(client: Client, message: Message) {
   const guild_id = ensure(message.guildId, "Message must be form a guild");
   const wordCount = countWords(message.content);
   const userKey = message.author.id;
-  let members = ensure(client.messages.get(guild_id) ?? client.messages.set(guild_id, new Collection()).get(guild_id), "Failed to Set and Get a obj to the client.messages Collection");
+  let members = client.messages.ensure(guild_id, () => new Collection<string, number>())
   members.set(userKey, (members.get(userKey) ?? 0) + wordCount);
+  console.log(client.messages);
 }
 
 function countWords(str: string): number {
