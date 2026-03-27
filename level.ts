@@ -104,25 +104,20 @@ export async function getLevelBanner(user: User, level_setting: LevelSettings) {
   const words = getUsersWords(user.client, user.id, level_setting.guild_id!);
   const level = getLevel(words);
 
-  const parsedUrl = new URL(level_setting.backgrond_url).pathname.split("/").pop();
-
   let backgrond_url = ''
+  if (level_setting.has_costome_background) {
+    const parsedUrl = new URL(level_setting.backgrond_url).pathname.split("/").pop();
 
-  if (fs.existsSync(process.env.CACHE_PATH! + parsedUrl!)) {
+    if (!fs.existsSync(process.env.CACHE_PATH! + parsedUrl!)) {
+      const res = await fetch(level_setting.backgrond_url);
+      if (!res.ok) throw new Error(`Failed: ${res.statusText}`);
+
+      const buffer = Buffer.from(await res.arrayBuffer());
+      fs.writeFileSync(process.env.CACHE_PATH! + parsedUrl!, buffer);
+    }
+
     backgrond_url = 'file://' + process.env.CACHE_PATH! + parsedUrl!;
-    /*const data = fs.readFileSync(process.env.CACHE_PATH! + parsedUrl!);
-    const base64 = data.toString("base64");
-    const dataUrl = `data:image/png;base64,${base64}`;
-    backgrond_url = dataUrl;
-    console.log(backgrond_url);*/
-  } else {
-    backgrond_url = level_setting.backgrond_url;
-    const res = await fetch(level_setting.backgrond_url);
-    if (!res.ok) throw new Error(`Failed: ${res.statusText}`);
-
-    const buffer = Buffer.from(await res.arrayBuffer());
-    fs.writeFileSync(process.env.CACHE_PATH! + parsedUrl!, buffer);
-  }
+  } 
 
   const replaceCSS = {
     PRIMARYCOLOR: hexNumToStr(level_setting.primary_color, level_setting.primary_color_trans),
