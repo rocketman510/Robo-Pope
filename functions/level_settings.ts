@@ -9,6 +9,11 @@ export async function generateComponents(level_setting: LevelSettings, client: C
   if (!cache_channel.isTextBased()) {throw "Could not find text based cache_channel"};
   if (!cache_channel.isSendable()) {throw "Cant send in this Channel"};
 
+  const guild = await client.guilds.fetch(level_setting.guild_id!);
+  const guild_member = await guild.members.fetch(level_setting.user_id);
+  const pro_roles = JSON.parse(ensure(process.env.LEVEL_PRO_SETTINGS_ROLES, "No LEVEL_PRO_SETTINGS_ROLES ENV"));
+  const is_pro = guild_member.roles.cache.hasAny(...pro_roles);
+
   let user_settings: LevelSettings = level_setting
   console.log(user_settings);
 
@@ -38,7 +43,8 @@ export async function generateComponents(level_setting: LevelSettings, client: C
       new StringSelectMenuOptionBuilder()
         .setLabel("Default Small")
         .setValue("small")
-  );
+    )
+    .setDisabled(!is_pro);
 
   const level_settings_container = new ContainerBuilder()
     .setAccentColor(0x242429)
@@ -62,12 +68,12 @@ export async function generateComponents(level_setting: LevelSettings, client: C
   const height = level_setting.is_large ? 125 : (level_setting.has_costome_background ? 8 : 0) + 22;
   const width = level_setting.is_large ? 512 : (level_setting.has_costome_background ? 8 : 0) + 256;
 
-  const backgrond_image_description = `**Backgrond Image:**\n-# This is the image that will be the backgrond\nResolution: ${height + 'x' + width}`
+  const backgrond_image_description = `**Backgrond Image <:pro1:1487227954898538496><:pro2:1487227945348239564>:**\n-# This is the image that will be the backgrond\nResolution: ${height + 'x' + width}`
 
   let backgrond_image_container = new ContainerBuilder()
     .setAccentColor(0x242429)
     .addTextDisplayComponents((td) => td.setContent(backgrond_image_description))
-    .addActionRowComponents((ar) => ar.setComponents(new ButtonBuilder().setCustomId('level_settings_background').setLabel('Set Backgrond Image').setStyle(ButtonStyle.Secondary)))
+    .addActionRowComponents((ar) => ar.setComponents(new ButtonBuilder().setCustomId('level_settings_background').setLabel('Set Backgrond Image').setStyle(ButtonStyle.Secondary).setDisabled(!is_pro)))
 
   if (user_settings.has_costome_background) {
     backgrond_image_container.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(user_settings.backgrond_url).setDescription("Image 1")));
@@ -77,7 +83,7 @@ export async function generateComponents(level_setting: LevelSettings, client: C
 
   const size_container = new ContainerBuilder()
     .setAccentColor(0x242429)
-    .addTextDisplayComponents((td) => td.setContent('**Banner Size:**\n-# You can set the size of the Banner to Small or Large'))
+    .addTextDisplayComponents((td) => td.setContent('**Banner Size <:pro1:1487227954898538496><:pro2:1487227945348239564>:**\n-# You can set the size of the Banner to Small or Large'))
     .addActionRowComponents((ar) => ar.setComponents(level_settings_size_select));
 
   const preview_container = new ContainerBuilder()
