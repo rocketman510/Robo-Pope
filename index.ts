@@ -1,20 +1,30 @@
 import { Client, Events, GatewayIntentBits, Collection, MessageFlags} from "discord.js";
-import type { Command, Button } from "./deploy";
+import type { Command, Button, Modal, SelectionMenu } from "./deploy";
 import deploy from "./deploy";
 import { error, log } from "node:console";
 import { Browser } from 'puppeteer';
 import { handleLevel, handleReaction } from "./level";
+import type { Db } from "mongodb"
+import { handleOwsMessage } from "./functions/one_word_story";
 
 declare module "discord.js" {
     export interface Client {
         commands: Collection<string, Command>;
         buttons: Collection<string, Button>;
+        modals: Collection<string, Modal>;
+        selection_menus: Collection<string, SelectionMenu>;
         messages: Collection<string, Collection<string, number>>;
         xp: Collection<string, Collection<string, number>>;
         shouldStopSpam: boolean;
         is_counting_messages: boolean;
         browser: Browser;
+        db: Db;
     }
+}
+
+export function ensure<T>(value: T | null | undefined, error?: string): T {
+    if (value == null || value == undefined) throw new Error(error ?? "Unexpected null!");
+    return value;
 }
 
 const client = new Client({ intents: [
@@ -31,6 +41,7 @@ client.once(Events.ClientReady, async readyClient => {
   console.log(`Ready! Logged in as ${readyClient.user.tag}`);
 
   client.on(Events.MessageCreate, async (message) => {
+    await handleOwsMessage(message);
     await handleLevel(client, message);
   });
 
@@ -51,6 +62,18 @@ client.once(Events.ClientReady, async readyClient => {
       if (!button) return;
       try {
         button.execute(interaction)
+      } catch (err) {error(err)}
+    } else if (interaction.isModalSubmit()) {
+      const modal = client.modals.get(interaction.customId)
+      if (!modal) return;
+      try {
+        modal.execute(interaction)
+      } catch (err) {error(err)}
+    } else if (interaction.isAnySelectMenu()) {
+      const selection_menu = client.selection_menus.get(interaction.customId)
+      if (!selection_menu) return;
+      try {
+        selection_menu.execute(interaction)
       } catch (err) {error(err)}
     }; 
   });

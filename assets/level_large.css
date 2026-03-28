@@ -1,0 +1,129 @@
+* {
+  margin: 0;
+  padding: 0;
+  color: ${TEXTCOLOR};
+  font-family: 'ABC Ginto Nord Condensed Unlicensed Trial', sans-serif;
+}
+
+html {
+  height: 100vh;
+  width: 100vw;
+  display: flex;
+  place-items: center;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  align-items: center;
+  justify-content: center;
+  height: 105px;
+  width: 512px;
+  padding: 10px;
+}
+
+#wrapper {
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 10px;
+  height: 30px;
+}
+#top_wrapper {
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: calc(512px - 20px);
+  padding: 0px 10px 10px;
+}
+
+#trans {
+  background: #0000;
+}
+
+#img {
+  background: url('${BACKGRONDURL}');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat; 
+}
+
+#lvl_text {
+  font-weight: 500;
+}
+
+#max_xp_text {
+  font-weight: 500;
+}
+
+progress {
+  flex: 1;
+  height: 20px;
+  border-radius: 20px;
+  box-shadow: 0px 3px 4px ${SHADOWCOLOR};
+  width: 75vw;
+}
+
+progress::-webkit-progress-bar {
+  background: ${SECONDARYCOLOR};
+  backdrop-filter: blur(${FROST}px);
+  border-radius: 10px;
+}
+
+progress::-webkit-progress-value {
+  background: ${PRIMARYCOLOR};
+  border-radius: 20px;
+}
+
+#bar {
+  flex: 1;
+  height: 20px;
+  border-radius: 20px;
+  box-shadow: 0px 3px 4px ${SHADOWCOLOR};
+  width: 75vw;
+  background: ${SECONDARYCOLOR};
+  backdrop-filter: blur(${SECONDARYFROST}px);
+  -webkit-backdrop-filter: blur(${SECONDARYFROST}px);
+  border-radius: 10px;
+}
+
+#fill {
+  background: ${PRIMARYCOLOR};
+  backdrop-filter: blur(${PRIMARYFROST}px);
+  -webkit-backdrop-filter: blur(${PRIMARYFROST}px);
+  border-radius: 20px;
+}
+
+img {
+  height: 50vh;
+  width: 50vh;
+  border-radius: 100%; 
+  box-shadow: 0px 3px 4px ${SHADOWCOLOR};
+}
+
+span {
+  font-size: 10px;
+}
+
+p {
+  font-size: 20px;
+  line-height: 20px;
+  height: 20px;
+  text-shadow: 0px 3px 3px ${SHADOWCOLOR};
+}
+
+h1 {
+  font-size: 25px;
+  font-weight: 900;
+  width: 215px;
+  text-shadow: 0px 3px 5px ${SHADOWCOLOR};
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;  
+}

@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction, MessageFlags, SectionBuilder, ButtonStyle } from "discord.js";
+import { SlashCommandBuilder, ChatInputCommandInteraction, MessageFlags, SectionBuilder, ButtonStyle, ActionRowBuilder, ButtonBuilder } from "discord.js";
 import { execSync } from 'child_process';
 import type { Command } from "../deploy";
 
@@ -29,8 +29,16 @@ export default {
           (button) => button.setCustomId('update').setLabel('Update the Bot').setStyle(ButtonStyle.Success),
         );
 
+      const update_message_button = new ButtonBuilder()
+        .setLabel('Send Message')
+        .setStyle(ButtonStyle.Primary)
+        .setCustomId('send_update_massage');
+
+      const action_row = new ActionRowBuilder()
+        .addComponents(update_message_button)
+
       if (version == latest) {
-        interaction.reply({content: `The Bot up-to-date. Version: \`${version}\``, flags: MessageFlags.Ephemeral})
+        interaction.reply({content: `The Bot up-to-date. Version: \`${version}\``, components: [action_row], flags: MessageFlags.Ephemeral})
       } else {
         interaction.reply({components: [updateSection], flags: MessageFlags.Ephemeral | MessageFlags.IsComponentsV2})
       }
