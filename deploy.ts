@@ -145,6 +145,7 @@ async function get_user_messages_for_all(client: Client) {
   for (const [guild_id, guild] of guilds) {
     const channels = guild.channels.cache;
     for (const [channel_id, channel] of channels) {
+      console.log(channel_id);
       await getMessageHistory(client, channel, guild_id);
     }
   }

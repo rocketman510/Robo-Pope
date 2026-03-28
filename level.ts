@@ -39,24 +39,30 @@ export async function getMessageHistory(client: Client, channel: Channel, guild_
     if (!channel.isTextBased()) {throw "Is not a text channel"}
     const firstMessage = await channel.messages.fetch({ limit: 1 });
 
-    let beforeMessage = ensure(firstMessage.first()?.id, "Could not feach the fisrt message in a channel. This is becasue there are none");
+    const before_message = ensure(firstMessage.first(), "Could not feach the first message in a channel. This is becasue there are none");
+    let before_message_id = before_message.id
 
     let number_of_messages = 1;
 
     while (true) {
-      const messages = ensure(await getMessages(beforeMessage, channel), "Is not a text channel");
+      const messages = ensure(await getMessages(before_message_id, channel), "Is not a text channel");
+
+      addUserMessage(client, before_message);
+
       for (const [_, value] of messages) {
         number_of_messages++;
         addUserMessage(client, value);
+        console.log('addUserMessage:');
+        
         console.log(value.author.displayName + " with " + value.content);
       }
 
       if (messages.size < 100) {
-        throw "No more messages";
+        break;
       }
-      beforeMessage = ensure(messages.last()?.id);
+      before_message_id = ensure(messages.last()?.id);
     }
-  } catch (_) {}
+  } catch (err) {console.error(err);}
 }
 
 export function addUserMessage(client: Client, message: Message) {
@@ -65,7 +71,6 @@ export function addUserMessage(client: Client, message: Message) {
   const userKey = message.author.id;
   let members = client.messages.ensure(guild_id, () => new Collection<string, number>())
   members.set(userKey, (members.get(userKey) ?? 0) + wordCount);
-  console.log(client.messages);
 }
 
 function countWords(str: string): number {
