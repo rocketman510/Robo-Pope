@@ -62,7 +62,7 @@ export async function getMessageHistory(client: Client, channel: Channel, guild_
       }
       before_message_id = ensure(messages.last()?.id);
     }
-  } catch (err) {console.error(err);}
+  } catch (_) {}
 }
 
 export function addUserMessage(client: Client, message: Message) {

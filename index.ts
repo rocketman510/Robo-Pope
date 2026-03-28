@@ -5,6 +5,7 @@ import { error, log } from "node:console";
 import { Browser } from 'puppeteer';
 import { handleLevel, handleReaction } from "./level";
 import type { Db } from "mongodb"
+import { handleOwsMessage } from "./functions/one_word_story";
 
 declare module "discord.js" {
     export interface Client {
@@ -40,6 +41,7 @@ client.once(Events.ClientReady, async readyClient => {
   console.log(`Ready! Logged in as ${readyClient.user.tag}`);
 
   client.on(Events.MessageCreate, async (message) => {
+    await handleOwsMessage(message);
     await handleLevel(client, message);
   });
 
