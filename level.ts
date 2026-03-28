@@ -142,7 +142,7 @@ export async function getLevelBanner(user: User, level_setting: LevelSettings) {
   const replaceHTML = {
     CSS: css,
     USERNAME: user.displayName,
-    USERAVATARURL: user.avatarURL(),
+    USERAVATARURL: user.displayAvatarURL(),
     LEVEL: level.level,
     MAXXP: level.max_xp,
     MINXP: level.min_xp,
