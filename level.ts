@@ -4,6 +4,7 @@ import { resolve } from 'path';
 import { error, log } from "console";
 import level_settings from "./button/level_settings";
 import { ensure } from ".";
+import { update_leaderbord } from "./functions/level_leaderboard";
 
 /**
  * This is for tthe users Level banner display settings.
@@ -207,6 +208,15 @@ export async function handleLevel(client: Client, message: Message) {
       await message.react('<:Click_to_see_level:1484622933061271775>');
     }
     client.xp.get(guild_id!)?.set(user_id, getLevel(user_xp).total_max_xp); // Sets new milestone
+  }
+
+  const leaderboard_channel_ids = JSON.parse(ensure(process.env.LEADERBOARD_CHANNEL_ID, "No LEADERBOARD_CHANNEL_ID ENV"));
+  for (const channel_id of leaderboard_channel_ids) {
+    const channel = await client.channels.fetch(channel_id);
+
+    if (!channel || channel.guildId! != message.guildId) return;
+
+    await update_leaderbord(client, channel_id);
   }
 }
 

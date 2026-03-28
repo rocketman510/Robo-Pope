@@ -9,7 +9,7 @@ import type { Browser } from "puppeteer";
 import fs from "fs";
 import path from "node:path";
 import { ensure } from ".";
-import { generateLeaderbord } from "./functions/level_leaderboard";
+import { generateLeaderbord, update_leaderbord } from "./functions/level_leaderboard";
 
 export interface Command {
     data: SlashCommandBuilder;
@@ -199,17 +199,6 @@ function clear_cache(cacheDir: string) {
 
 async function clear_leaderbord(client: Client) {
   for (const channel_id of JSON.parse(ensure(process.env.LEADERBOARD_CHANNEL_ID, "No LEADERBOARD_CHANNEL_ID Environment variable."))) {
-    try {
-      const channel = await client.channels.fetch(channel_id) as GuildTextBasedChannel;
-      if (!channel || !channel.isTextBased()) {throw `Not a valid channel at ID: ${channel_id}`}
-      const message = await channel.messages.fetch({ limit: 1 })
-      if (message.size != 1) {
-        const components = await generateLeaderbord(client, channel.guild.id)
-        channel.send({ components, flags: MessageFlags.IsComponentsV2, });
-      } else if (message.first()?.author.id == ensure(process.env.CLIENT_ID, "No CLIENT_ID environment variable")) {
-        const components = await generateLeaderbord(client, channel.guild.id, message.first())
-        await message.first()?.edit({ components, flags: MessageFlags.IsComponentsV2});
-      }
-    } catch (err) {console.error(err)}
+    await update_leaderbord(client, channel_id);
   }
 }

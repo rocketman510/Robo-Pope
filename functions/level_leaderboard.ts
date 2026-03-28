@@ -1,5 +1,6 @@
-import { ContainerBuilder, ContainerComponent, Message, TextDisplayComponent, type Client } from "discord.js";
+import { ContainerBuilder, ContainerComponent, Message, MessageFlags, TextDisplayComponent, type Client, type GuildTextBasedChannel } from "discord.js";
 import { getLevel } from "../level";
+import { ensure } from "..";
 
 export async function generateLeaderbord(client: Client, guild_id: string, old_message?: Message) {
   try {
@@ -33,4 +34,19 @@ export async function generateLeaderbord(client: Client, guild_id: string, old_m
 
     return [c];
   } catch (_) {}
+}
+
+export async function update_leaderbord(client: Client, channel_id: string) {
+  try {
+    const channel = await client.channels.fetch(channel_id) as GuildTextBasedChannel;
+    if (!channel || !channel.isTextBased()) {throw `Not a valid channel at ID: ${channel_id}`}
+    const message = await channel.messages.fetch({ limit: 1 })
+    if (message.size != 1) {
+      const components = await generateLeaderbord(client, channel.guild.id)
+      channel.send({ components, flags: MessageFlags.IsComponentsV2, });
+    } else if (message.first()?.author.id == ensure(process.env.CLIENT_ID, "No CLIENT_ID environment variable")) {
+      const components = await generateLeaderbord(client, channel.guild.id, message.first())
+      await message.first()?.edit({ components, flags: MessageFlags.IsComponentsV2});
+    }
+  } catch (err) {console.error(err)}
 }
