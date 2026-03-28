@@ -48,11 +48,11 @@ export async function generateComponents(level_setting: LevelSettings, client: C
 
   const level_settings_container = new ContainerBuilder()
     .setAccentColor(0x242429)
-    .addTextDisplayComponents((td) => td.setContent('# Level Banner Settings'))
+    .addTextDisplayComponents((td) => td.setContent('# Level Banner Settings\nThis is the Settings page for configuring the look of your Level Banner. If you don\'t understand how to set the color then check out our resource [here](<https://htmlcolorcodes.com/>).\nIf you are interested in unlocking **PRO** features consider **Boosting** the server to unlock them.'))
 
   const primary_color_container = new ContainerBuilder()
     .setAccentColor(user_settings.primary_color)
-    .addTextDisplayComponents((td) => td.setContent('**Primery Color:**\n-# This is the Color of the Bar'))
+    .addTextDisplayComponents((td) => td.setContent('**Primery Color:**\n-# This is the Color of the Bar.'))
     .addActionRowComponents((ar) => ar.setComponents(new ButtonBuilder().setCustomId('level_settings_set_primery_color').setLabel('Set Color').setStyle(ButtonStyle.Secondary)));
 
   const secondary_color_container = new ContainerBuilder()
