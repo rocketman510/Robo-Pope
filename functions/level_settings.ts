@@ -7,7 +7,7 @@ import fs from "fs";
 export async function generateComponents(level_setting: LevelSettings, client: Client) {
   const cache_channel = ensure(await client.channels.fetch('1485110171922337812'), "Cant find cache_channel");
   if (!cache_channel.isTextBased()) {throw "Could not find text based cache_channel"};
-  if (!cache_channel.isSendable()) {throw "Cant send in this Channel"};
+  if(!cache_channel.isSendable()) {throw "Cant send in this Channel"};
 
   const guild = await client.guilds.fetch(level_setting.guild_id!);
   const guild_member = await guild.members.fetch(level_setting.user_id);
