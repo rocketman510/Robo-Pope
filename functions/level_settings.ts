@@ -43,6 +43,15 @@ export async function generateComponents(level_setting: LevelSettings, client: C
     )
     .setDisabled(!is_pro);
 
+  const level_settings_frost_select = new StringSelectMenuBuilder()
+    .setCustomId('level_settings_frost')
+    .setPlaceholder(`Change Backdrop Style (${user_settings.frost?'Frost':'Clear'})`)
+    .setOptions(
+      new StringSelectMenuOptionBuilder().setLabel('Frost').setValue('frost'),
+      new StringSelectMenuOptionBuilder().setLabel('Clear').setValue('clear')
+    )
+    .setDisabled(!is_pro);
+
   const level_settings_container = new ContainerBuilder()
     .setAccentColor(0x242429)
     .addTextDisplayComponents((td) => td.setContent('# Level Banner Settings\nThis is the Settings page for configuring the look of your Level Banner. If you don\'t understand how to set the color then check out our resource [here](<https://htmlcolorcodes.com/>).\nIf you are interested in unlocking **PRO** features consider **Boosting** the server to unlock them.'))
@@ -61,6 +70,11 @@ export async function generateComponents(level_setting: LevelSettings, client: C
     .setAccentColor(user_settings.text_color)
     .addTextDisplayComponents((td) => td.setContent('**Text Color:**\n-# This is the Color of the Text'))
     .addActionRowComponents((ar) => ar.setComponents(new ButtonBuilder().setCustomId('level_settings_set_text_color').setLabel('Set Color').setStyle(ButtonStyle.Secondary)));
+
+  const frost_container = new ContainerBuilder()
+    .setAccentColor(0x242429)
+    .addTextDisplayComponents((td) => td.setContent('**Frosted Background <:pro1:1487227954898538496><:pro2:1487227945348239564>:**\n-# This toggles backgrond blur for the progress bar'))
+    .addActionRowComponents((ar) => ar.setComponents(level_settings_frost_select));
   
   const height = level_setting.is_large ? 125 : (level_setting.has_costome_background ? 8 : 0) + 22;
   const width = level_setting.is_large ? 512 : (level_setting.has_costome_background ? 8 : 0) + 256;
@@ -93,6 +107,7 @@ export async function generateComponents(level_setting: LevelSettings, client: C
     text_color_container,
     backgrond_image_container,
     size_container,
+    frost_container,
     preview_container,
     warning_container,
   ]
