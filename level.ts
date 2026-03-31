@@ -35,16 +35,18 @@ async function getMessages(before: string, channel: Channel) {
 }
 
 export async function getMessageHistory(client: Client, channel: Channel, guild_id: string) {
-  if (!channel.isTextBased()) {throw "Is not a text channel"}
+  if (!channel.isTextBased()) {return}
   const firstMessage = await channel.messages.fetch({ limit: 1 });
 
-  const before_message = ensure(firstMessage.first(), "Could not feach the first message in a channel. This is becasue there are none");
+  const before_message = firstMessage.first();
+  if (!before_message) return;
   let before_message_id = before_message.id
 
   let number_of_messages = 1;
 
   while (true) {
-    const messages = ensure(await getMessages(before_message_id, channel), "Is not a text channel");
+    const messages = await getMessages(before_message_id, channel);
+    if (messages == null) return;
 
     addUserMessage(client, before_message);
 
