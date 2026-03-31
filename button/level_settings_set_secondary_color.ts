@@ -6,62 +6,52 @@ import { ensure } from "..";
 export default {
   data: "level_settings_set_secondary_color",
   async execute(interaction: ButtonInteraction) {
-    try {
-      const level_settings = await getLevelBannerSettings(
-        interaction.client,
-        interaction.user.id,
-        ensure(interaction.message.guildId)
-      );
+    const level_settings = await getLevelBannerSettings(
+      interaction.client,
+      interaction.user.id,
+      ensure(interaction.message.guildId)
+    );
 
-      const curent_color = hexNumToStr(level_settings.secondary_color & 0xffffff, 0).slice(0,7);
-      const curent_trans = level_settings.secondary_color_trans.toFixed(1).toString().slice(0,5);
+    const curent_color = hexNumToStr(level_settings.secondary_color & 0xffffff, 0).slice(0,7);
+    const curent_trans = level_settings.secondary_color_trans.toFixed(1).toString().slice(0,5);
 
-      console.log(curent_color);
-      console.log(curent_trans);
+    const modal = new ModalBuilder()
+      .setCustomId('level_settings_set_secondary_color_modal')
+      .setTitle("Secondary Color");
+
+    const color = new TextInputBuilder()
+      .setCustomId('level_settings_set_secondary_color_modal_color')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('#RRGGBB')
+      .setValue(curent_color)
+      .setRequired(true)
+      .setMaxLength(7)
+      .setMinLength(7);
+
+    const color_label = new LabelBuilder()
+      .setLabel("Set The Color")
+      .setDescription("Set the color as a Hexadecimal color. Formated formatted as #RRGGBB")
+      .setTextInputComponent(color);
+
+    const trans = new TextInputBuilder()
+      .setCustomId('level_settings_set_secondary_color_modal_trans')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('1.0 for fully opaque')
+      .setValue(curent_trans)
+      .setRequired(true)
+      .setMaxLength(5)
+      .setMinLength(3);
       
+    const trans_label = new LabelBuilder()
+      .setLabel("Set The Transparency")
+      .setDescription("Set the Transparency as a number from 1.0 - 0.0")
+      .setTextInputComponent(trans);
 
-      
+    modal
+      .addLabelComponents(color_label)
+      .addLabelComponents(trans_label);
 
-      const modal = new ModalBuilder()
-        .setCustomId('level_settings_set_secondary_color_modal')
-        .setTitle("Secondary Color");
-
-      const color = new TextInputBuilder()
-        .setCustomId('level_settings_set_secondary_color_modal_color')
-        .setStyle(TextInputStyle.Short)
-        .setPlaceholder('#RRGGBB')
-        .setValue(curent_color)
-        .setRequired(true)
-        .setMaxLength(7)
-        .setMinLength(7);
-
-      const color_label = new LabelBuilder()
-        .setLabel("Set The Color")
-        .setDescription("Set the color as a Hexadecimal color. Formated formatted as #RRGGBB")
-        .setTextInputComponent(color);
-
-      const trans = new TextInputBuilder()
-        .setCustomId('level_settings_set_secondary_color_modal_trans')
-        .setStyle(TextInputStyle.Short)
-        .setPlaceholder('1.0 for fully opaque')
-        .setValue(curent_trans)
-        .setRequired(true)
-        .setMaxLength(5)
-        .setMinLength(3);
-        
-      const trans_label = new LabelBuilder()
-        .setLabel("Set The Transparency")
-        .setDescription("Set the Transparency as a number from 1.0 - 0.0")
-        .setTextInputComponent(trans);
-
-      modal
-        .addLabelComponents(color_label)
-        .addLabelComponents(trans_label);
-
-      interaction.showModal(modal);
-    } catch (err) {
-      console.error("Failed to resond to level_settings button interaction. Error:" + err);
-    }
+    interaction.showModal(modal);
 },
 } as Button;
 

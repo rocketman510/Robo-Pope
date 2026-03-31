@@ -35,15 +35,10 @@ export default {
         console.log(canBan);
         console.log("Ban Perms:" + hasBanPerms);
         
-        
         await user.send(`You have been Excommunicated from ${interaction.guild?.name}`)
         
-        try {
-          guild.members.ban(user);
-          await interaction.reply({content: `${user?.displayName} has been Excommunicated`});
-        } catch (err) {
-          await interaction.reply({content: "You can not Excommunicate this Person", flags: MessageFlags.Ephemeral});
-        }
+        guild.members.ban(user);
+        await interaction.reply({content: `${user?.displayName} has been Excommunicated`});
       }
     },
 } as Command;

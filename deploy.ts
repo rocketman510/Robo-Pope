@@ -172,14 +172,9 @@ function deply_xp(client: Client) {
 export async function deply_db() {
   const uri = `mongodb://admin:${process.env.DB_PASSWORD}@${process.env.DB_DOMAIN}`;
   const client = new MongoClient(uri);
-  try {
-    await client.connect();
-    console.log("Connected to MongoDB!");
-    return client.db("Robo-Pope-DB");
-  } catch (err) {
-    console.error("MongoDB connection failed:", err);
-    throw err;
-  }
+  await client.connect();
+  console.log("Connected to MongoDB!");
+  return client.db("Robo-Pope-DB");
 }
 
 function clear_cache(cacheDir: string) {

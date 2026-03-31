@@ -26,9 +26,7 @@ export async function generateComponents(level_setting: LevelSettings, client: C
   const message_cache = await cache_channel.send({ files: [image_atachment]});
 
   if (fs.existsSync(image_path)) {
-    try {
-      fs.unlinkSync(image_path);
-    } catch (_) {}
+    fs.unlinkSync(image_path);
   }
 
   const image_url = message_cache.attachments.first()!.url;

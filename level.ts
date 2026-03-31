@@ -35,34 +35,32 @@ async function getMessages(before: string, channel: Channel) {
 }
 
 export async function getMessageHistory(client: Client, channel: Channel, guild_id: string) {
-  try {
-    if (!channel.isTextBased()) {throw "Is not a text channel"}
-    const firstMessage = await channel.messages.fetch({ limit: 1 });
+  if (!channel.isTextBased()) {throw "Is not a text channel"}
+  const firstMessage = await channel.messages.fetch({ limit: 1 });
 
-    const before_message = ensure(firstMessage.first(), "Could not feach the first message in a channel. This is becasue there are none");
-    let before_message_id = before_message.id
+  const before_message = ensure(firstMessage.first(), "Could not feach the first message in a channel. This is becasue there are none");
+  let before_message_id = before_message.id
 
-    let number_of_messages = 1;
+  let number_of_messages = 1;
 
-    while (true) {
-      const messages = ensure(await getMessages(before_message_id, channel), "Is not a text channel");
+  while (true) {
+    const messages = ensure(await getMessages(before_message_id, channel), "Is not a text channel");
 
-      addUserMessage(client, before_message);
+    addUserMessage(client, before_message);
 
-      for (const [_, value] of messages) {
-        number_of_messages++;
-        addUserMessage(client, value);
-        console.log('addUserMessage:');
-        
-        console.log(value.author.displayName + " with " + value.content);
-      }
-
-      if (messages.size < 100) {
-        break;
-      }
-      before_message_id = ensure(messages.last()?.id);
+    for (const [_, value] of messages) {
+      number_of_messages++;
+      addUserMessage(client, value);
+      console.log('addUserMessage:');
+      
+      console.log(value.author.displayName + " with " + value.content);
     }
-  } catch (_) {}
+
+    if (messages.size < 100) {
+      break;
+    }
+    before_message_id = ensure(messages.last()?.id);
+  }
 }
 
 export function addUserMessage(client: Client, message: Message) {
@@ -198,7 +196,7 @@ export async function handleLevel(client: Client, message: Message) {
 
   addUserMessage(client, message);
 
-  const guild_id = message.guildId;
+  const guild_id = ensure(message.guildId, 'Cant handleLevel when there is not guild_id');
   const user_id = message.author.id;
   const user_xp = client.messages.ensure(guild_id!, () => new Collection<string, number>()).ensure(user_id, () => 0);
   let next_level = client.xp.ensure(guild_id!, () => new Collection<string, number>()).ensure(user_id, () => getLevel(user_xp).total_max_xp)
@@ -219,27 +217,25 @@ export async function handleLevel(client: Client, message: Message) {
   for (const channel_id of leaderboard_channel_ids) {
     const channel = await client.channels.fetch(channel_id);
 
-    if (!channel || channel.guildId! != message.guildId) return;
+    if (!channel || channel.isDMBased() || channel.guildId != message.guildId) return;
 
     await update_leaderbord(client, channel_id);
   }
 }
 
 export async function handleReaction(reaction: MessageReaction, user: User) {
-  try {
-    const client = reaction.client;
-    if (user.bot) {return};
-    if (client.is_counting_messages) {return};
-    if (user.id != reaction.message.author?.id) {return};
-    if (reaction.emoji.id != '1484622933061271775') {return};
-    if (!reaction.message.guildId) {return}
+  const client = reaction.client;
+  if (user.bot) {return};
+  if (client.is_counting_messages) {return};
+  if (user.id != reaction.message.author?.id) {return};
+  if (reaction.emoji.id != '1484622933061271775') {return};
+  if (!reaction.message.guildId) {return}
 
-    const words = getUsersWords(client, user.id, reaction.message.guildId);
+  const words = getUsersWords(client, user.id, reaction.message.guildId);
 
-    const level = getLevel(words).level;
+  const level = getLevel(words).level;
 
-    reaction.message.reply({ content: `You made it to Level ${level} :partying_face:` });
-  } catch (err) {error('handleReaction in ./level.ts function failed error: ' + err)}
+  await reaction.message.reply({ content: `You made it to Level ${level} :partying_face:` });
 }
 
 export async function getLevelBannerSettings(client: Client, user_id: string, guild_id: string): Promise<LevelSettings> {
