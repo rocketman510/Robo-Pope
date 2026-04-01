@@ -10,8 +10,8 @@ export default {
     const color = interaction.fields.getTextInputValue('level_settings_set_primery_color_modal_color');
     const trans = interaction.fields.getTextInputValue('level_settings_set_primery_color_modal_trans');
 
-    const color_match = /^#([0-f]{6})$/.exec(color);
-    const trans_match = /^[0-9]+(\.[0-9]+)?$/.test(trans);
+    const color_match = /^#([0-9a-f]{6})$/i.exec(color);
+    const trans_match = /^[0-9]+(\.[0-9]+)?$/i.test(trans);
 
     if (color_match!.length < 1) {
       interaction.reply({ content: "Improperly formatted color. Try again", flags: [ MessageFlags.Ephemeral ] });

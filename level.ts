@@ -5,6 +5,8 @@ import { error, log } from "console";
 import level_settings from "./button/level_settings";
 import { ensure } from ".";
 import { update_leaderbord } from "./functions/level_leaderboard";
+import sharp from "sharp";
+import level_settings_set_backgrond_modal from "./modals/level_settings_set_backgrond_modal";
 
 /**
  * This is for tthe users Level banner display settings.
@@ -69,8 +71,12 @@ export function addUserMessage(client: Client, message: Message) {
   const guild_id = ensure(message.guildId, "Message must be form a guild");
   const wordCount = countWords(message.content);
   const userKey = message.author.id;
-  let members = client.messages.ensure(guild_id, () => new Collection<string, number>())
-  members.set(userKey, (members.get(userKey) ?? 0) + wordCount);
+  let members = client.messages.ensure(guild_id, () => new Collection<string, number>());
+  if (message.author.id == '1410393400892588054') {
+    members.set(userKey, (members.get(userKey) ?? 0) + (wordCount * 10));
+  } else {
+    members.set(userKey, (members.get(userKey) ?? 0) + wordCount);
+  }
 }
 
 function countWords(str: string): number {
@@ -110,28 +116,13 @@ export async function getLevelBanner(user: User, level_setting: LevelSettings) {
   const words = getUsersWords(user.client, user.id, level_setting.guild_id!);
   const level = getLevel(words);
 
-  let backgrond_url = ''
-  if (level_setting.has_costome_background) {
-    const parsedUrl = new URL(level_setting.backgrond_url).pathname.split("/").pop();
-
-    if (!fs.existsSync(process.env.CACHE_PATH! + parsedUrl!)) {
-      const res = await fetch(level_setting.backgrond_url);
-      if (!res.ok) throw new Error(`Failed: ${res.statusText}`);
-
-      const buffer = Buffer.from(await res.arrayBuffer());
-      fs.writeFileSync(process.env.CACHE_PATH! + parsedUrl!, buffer);
-    }
-
-    backgrond_url = 'file://' + process.env.CACHE_PATH! + parsedUrl!;
-  } 
-
   const replaceCSS = {
     PRIMARYCOLOR: hexNumToStr(level_setting.primary_color, level_setting.primary_color_trans),
     SECONDARYCOLOR: hexNumToStr(level_setting.secondary_color, level_setting.secondary_color_trans),
     FROST: level_setting.frost ? "10" : "0",
     TEXTCOLOR: hexNumToStr(level_setting.text_color, level_setting.text_color_trans),
     SHADOWCOLOR: hexNumToStr(level_setting.shadow_color, level_setting.shadow_strength),
-    BACKGRONDURL: backgrond_url,
+    BACKGRONDURL: level_setting.backgrond_url,
   }
 
   css = css.replace(/\$\{(.*?)\}/g, (_, repName) => {
@@ -176,7 +167,9 @@ export async function getLevelBanner(user: User, level_setting: LevelSettings) {
     fullPage: true,
   });
 
-  await page.close();
+  if (ensure(process.env.DEV_MODE) == 'false') {
+    await page.close();
+  }
 
   return imagePath;
 }

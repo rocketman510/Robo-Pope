@@ -53,7 +53,7 @@ export default async function(client: Client) {
   console.log('Loading Selection Menus...');
   await deply_selection_menus(client.selection_menus)
   console.log("Loading Browser...");
-  client.browser = await puppeteer.launch({headless: true, executablePath: process.env.PUPPETEEREXECUTABLEPATH});
+  client.browser = await puppeteer.launch({headless: ensure(process.env.DEV_MODE, "No DEV_MODE ENV") == 'false', executablePath: process.env.PUPPETEEREXECUTABLEPATH});
   console.log("Fetching Messages...");
   await get_user_messages_for_all(client);
   console.log("Clearing leaderbord Channel");

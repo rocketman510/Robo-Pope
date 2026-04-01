@@ -1,16 +1,15 @@
 import { ModalSubmitInteraction, MessageFlags, AttachmentBuilder } from "discord.js";
 import type { Modal } from "../deploy";
 import { ensure } from "..";
-import fs from 'fs';
 import { generateComponents } from "../functions/level_settings";
 import { getLevelBannerSettings, setLevelBannerSettings } from "../level";
+import sharp from "sharp";
 
 export default {
   data: "level_settings_set_backgrond_modal",
   async execute(interaction: ModalSubmitInteraction) {
     const values = interaction.fields.getStringSelectValues('level_settings_set_backgrond_modal_stlyle');
     let level_settings = await getLevelBannerSettings(interaction.client, interaction.user.id, ensure(interaction.guildId));
-
 
     if (values.includes('transparent')) {
       level_settings.has_costome_background = false;
@@ -27,24 +26,27 @@ export default {
 
       const url = image?.first()!.url;
 
-      const parsedUrl = new URL(url).pathname.split("/").pop();
+      const parsedUrl = await (async () => {
+        try {
+          const res = await fetch(url);
+          if (!res.ok) return url;
 
-      const fileUrl = process.env.CACHE_PATH! + parsedUrl!
-
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`Failed: ${res.statusText}`);
-
-      const buffer = Buffer.from(await res.arrayBuffer());
-      fs.writeFileSync(process.env.CACHE_PATH! + parsedUrl!, buffer);
-
-      const cache_channel = ensure(await interaction.client.channels.fetch(process.env.CACHE_CHANNEL_ID!));
-
-      const attachment = new AttachmentBuilder(fileUrl);
-
-      const message = await cache_channel.send({ files: [attachment]})
+          const buffer = Buffer.from(await res.arrayBuffer());
+          const cropped = await sharp(buffer)
+            .resize(512, 125, {
+              fit: "cover",
+              position: "center"
+            })
+            .toBuffer();
+          const base64 = cropped.toString("base64");
+          return `data:image/png;base64,${base64}`;
+        } catch {
+          return url;
+        }
+      })();
 
       level_settings.has_costome_background = true;
-      level_settings.backgrond_url = message.attachments.first()!.url;
+      level_settings.backgrond_url = parsedUrl;
     }
 
     await setLevelBannerSettings(interaction.client, level_settings);
