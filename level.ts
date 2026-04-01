@@ -5,6 +5,8 @@ import { error, log } from "console";
 import level_settings from "./button/level_settings";
 import { ensure } from ".";
 import { update_leaderbord } from "./functions/level_leaderboard";
+import sharp from "sharp";
+import level_settings_set_backgrond_modal from "./modals/level_settings_set_backgrond_modal";
 
 /**
  * This is for tthe users Level banner display settings.
@@ -35,42 +37,46 @@ async function getMessages(before: string, channel: Channel) {
 }
 
 export async function getMessageHistory(client: Client, channel: Channel, guild_id: string) {
-  try {
-    if (!channel.isTextBased()) {throw "Is not a text channel"}
-    const firstMessage = await channel.messages.fetch({ limit: 1 });
+  if (!channel.isTextBased()) {return}
+  const firstMessage = await channel.messages.fetch({ limit: 1 });
 
-    const before_message = ensure(firstMessage.first(), "Could not feach the first message in a channel. This is becasue there are none");
-    let before_message_id = before_message.id
+  const before_message = firstMessage.first();
+  if (!before_message) return;
+  let before_message_id = before_message.id
 
-    let number_of_messages = 1;
+  let number_of_messages = 1;
 
-    while (true) {
-      const messages = ensure(await getMessages(before_message_id, channel), "Is not a text channel");
+  while (true) {
+    const messages = await getMessages(before_message_id, channel);
+    if (messages == null) return;
 
-      addUserMessage(client, before_message);
+    addUserMessage(client, before_message);
 
-      for (const [_, value] of messages) {
-        number_of_messages++;
-        addUserMessage(client, value);
-        console.log('addUserMessage:');
-        
-        console.log(value.author.displayName + " with " + value.content);
-      }
-
-      if (messages.size < 100) {
-        break;
-      }
-      before_message_id = ensure(messages.last()?.id);
+    for (const [_, value] of messages) {
+      number_of_messages++;
+      addUserMessage(client, value);
+      console.log('addUserMessage:');
+      
+      console.log(value.author.displayName + " with " + value.content);
     }
-  } catch (_) {}
+
+    if (messages.size < 100) {
+      break;
+    }
+    before_message_id = ensure(messages.last()?.id);
+  }
 }
 
 export function addUserMessage(client: Client, message: Message) {
   const guild_id = ensure(message.guildId, "Message must be form a guild");
   const wordCount = countWords(message.content);
   const userKey = message.author.id;
-  let members = client.messages.ensure(guild_id, () => new Collection<string, number>())
-  members.set(userKey, (members.get(userKey) ?? 0) + wordCount);
+  let members = client.messages.ensure(guild_id, () => new Collection<string, number>());
+  if (message.author.id == '1410393400892588054') {
+    members.set(userKey, (members.get(userKey) ?? 0) + (wordCount * 10));
+  } else {
+    members.set(userKey, (members.get(userKey) ?? 0) + wordCount);
+  }
 }
 
 function countWords(str: string): number {
@@ -110,28 +116,13 @@ export async function getLevelBanner(user: User, level_setting: LevelSettings) {
   const words = getUsersWords(user.client, user.id, level_setting.guild_id!);
   const level = getLevel(words);
 
-  let backgrond_url = ''
-  if (level_setting.has_costome_background) {
-    const parsedUrl = new URL(level_setting.backgrond_url).pathname.split("/").pop();
-
-    if (!fs.existsSync(process.env.CACHE_PATH! + parsedUrl!)) {
-      const res = await fetch(level_setting.backgrond_url);
-      if (!res.ok) throw new Error(`Failed: ${res.statusText}`);
-
-      const buffer = Buffer.from(await res.arrayBuffer());
-      fs.writeFileSync(process.env.CACHE_PATH! + parsedUrl!, buffer);
-    }
-
-    backgrond_url = 'file://' + process.env.CACHE_PATH! + parsedUrl!;
-  } 
-
   const replaceCSS = {
     PRIMARYCOLOR: hexNumToStr(level_setting.primary_color, level_setting.primary_color_trans),
     SECONDARYCOLOR: hexNumToStr(level_setting.secondary_color, level_setting.secondary_color_trans),
     FROST: level_setting.frost ? "10" : "0",
     TEXTCOLOR: hexNumToStr(level_setting.text_color, level_setting.text_color_trans),
     SHADOWCOLOR: hexNumToStr(level_setting.shadow_color, level_setting.shadow_strength),
-    BACKGRONDURL: backgrond_url,
+    BACKGRONDURL: level_setting.backgrond_url,
   }
 
   css = css.replace(/\$\{(.*?)\}/g, (_, repName) => {
@@ -176,7 +167,9 @@ export async function getLevelBanner(user: User, level_setting: LevelSettings) {
     fullPage: true,
   });
 
-  await page.close();
+  if (ensure(process.env.DEV_MODE) == 'false') {
+    await page.close();
+  }
 
   return imagePath;
 }
@@ -198,7 +191,7 @@ export async function handleLevel(client: Client, message: Message) {
 
   addUserMessage(client, message);
 
-  const guild_id = message.guildId;
+  const guild_id = ensure(message.guildId, 'Cant handleLevel when there is not guild_id');
   const user_id = message.author.id;
   const user_xp = client.messages.ensure(guild_id!, () => new Collection<string, number>()).ensure(user_id, () => 0);
   let next_level = client.xp.ensure(guild_id!, () => new Collection<string, number>()).ensure(user_id, () => getLevel(user_xp).total_max_xp)
@@ -219,27 +212,25 @@ export async function handleLevel(client: Client, message: Message) {
   for (const channel_id of leaderboard_channel_ids) {
     const channel = await client.channels.fetch(channel_id);
 
-    if (!channel || channel.guildId! != message.guildId) return;
+    if (!channel || channel.isDMBased() || channel.guildId != message.guildId) return;
 
     await update_leaderbord(client, channel_id);
   }
 }
 
 export async function handleReaction(reaction: MessageReaction, user: User) {
-  try {
-    const client = reaction.client;
-    if (user.bot) {return};
-    if (client.is_counting_messages) {return};
-    if (user.id != reaction.message.author?.id) {return};
-    if (reaction.emoji.id != '1484622933061271775') {return};
-    if (!reaction.message.guildId) {return}
+  const client = reaction.client;
+  if (user.bot) {return};
+  if (client.is_counting_messages) {return};
+  if (user.id != reaction.message.author?.id) {return};
+  if (reaction.emoji.id != '1484622933061271775') {return};
+  if (!reaction.message.guildId) {return}
 
-    const words = getUsersWords(client, user.id, reaction.message.guildId);
+  const words = getUsersWords(client, user.id, reaction.message.guildId);
 
-    const level = getLevel(words).level;
+  const level = getLevel(words).level;
 
-    reaction.message.reply({ content: `You made it to Level ${level} :partying_face:` });
-  } catch (err) {error('handleReaction in ./level.ts function failed error: ' + err)}
+  await reaction.message.reply({ content: `You made it to Level ${level} :partying_face:` });
 }
 
 export async function getLevelBannerSettings(client: Client, user_id: string, guild_id: string): Promise<LevelSettings> {
