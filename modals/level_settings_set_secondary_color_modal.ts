@@ -13,7 +13,7 @@ export default {
     const color_match = /^#([0-f]{6})$/.exec(color);
     const trans_match = /^[0-9]+(\.[0-9]+)?$/.test(trans);
 
-    if (color_match!.length < 1) {
+    if (!color_match || color_match!.length < 1) {
       interaction.reply({ content: "Improperly formatted color. Try again", flags: [ MessageFlags.Ephemeral ] });
       return
     }
