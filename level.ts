@@ -200,12 +200,14 @@ export async function handleLevel(client: Client, message: Message) {
 
   if (user_xp >= next_level) {
     const level = getLevel(user_xp).level;
-    if (level % 10 === 0) {
-      await message.react('<:Click_to_see_level:1484691165281255457>')
-    } else {
-      await message.react('<:Click_to_see_level:1484622933061271775>');
-    }
-    client.xp.get(guild_id!)?.set(user_id, getLevel(user_xp).total_max_xp); // Sets new milestone
+    try {
+      if (level % 10 === 0) {
+        await message.react('<:Click_to_see_level:1484691165281255457>')
+      } else {
+        await message.react('<:Click_to_see_level:1484622933061271775>');
+      }
+      client.xp.get(guild_id!)?.set(user_id, getLevel(user_xp).total_max_xp); // Sets new milestone
+    } catch (_) {}     
   }
 
   const leaderboard_channel_ids = JSON.parse(ensure(process.env.LEADERBOARD_CHANNEL_ID, "No LEADERBOARD_CHANNEL_ID ENV"));
