@@ -1,4 +1,4 @@
-import { Client, Events, GatewayIntentBits, Collection, MessageFlags} from "discord.js";
+import { Client, Events, GatewayIntentBits, Collection, MessageFlags, ContainerBuilder} from "discord.js";
 import type { Command, Button, Modal, SelectionMenu } from "./deploy";
 import deploy from "./deploy";
 import { error, log } from "node:console";
@@ -37,47 +37,61 @@ const client = new Client({ intents: [
 ]});
 
 client.once(Events.ClientReady, async readyClient => {
-  await deploy(client);
-  console.log(`Ready! Logged in as ${readyClient.user.tag}`);
+  try {
+    await deploy(client);
+    console.log(`Ready! Logged in as ${readyClient.user.tag}`);
 
-  client.on(Events.MessageCreate, async (message) => {
-    await handleOwsMessage(message);
-    await handleLevel(client, message);
-  });
+    client.on(Events.MessageCreate, async (message) => {
+      await handleOwsMessage(message);
+      await handleLevel(client, message);
+    });
 
-  client.on(Events.MessageReactionAdd, async (reaction, user) => {
-    await handleReaction(reaction, user);
-  })
+    client.on(Events.MessageReactionAdd, async (reaction, user) => {
+      await handleReaction(reaction, user);
+    });
 
-  client.on(Events.InteractionCreate, (interaction) => {
-    if (interaction.isChatInputCommand()) {
-      const command = client.commands.get(interaction.commandId);
-      if (!command) return;
-      let script = command.execute;
-      try {
-        script(interaction);
-      } catch (err) {error(err)};
-    } else if (interaction.isButton()) {
-      const button = client.buttons.get(interaction.customId)
-      if (!button) return;
-      try {
-        button.execute(interaction)
-      } catch (err) {error(err)}
-    } else if (interaction.isModalSubmit()) {
-      const modal = client.modals.get(interaction.customId)
-      if (!modal) return;
-      try {
-        modal.execute(interaction)
-      } catch (err) {error(err)}
-    } else if (interaction.isAnySelectMenu()) {
-      const selection_menu = client.selection_menus.get(interaction.customId)
-      if (!selection_menu) return;
-      try {
-        selection_menu.execute(interaction)
-      } catch (err) {error(err)}
-    }; 
-  });
+    client.on(Events.InteractionCreate, (interaction) => {
+      if (interaction.isChatInputCommand()) {
+        const command = client.commands.get(interaction.commandId);
+        if (!command) return;
+        let script = command.execute;
+        try {
+          script(interaction);
+        } catch (err) {error(err)};
+      } else if (interaction.isButton()) {
+        const button = client.buttons.get(interaction.customId)
+        if (!button) return;
+        try {
+          button.execute(interaction)
+        } catch (err) {error(err)}
+      } else if (interaction.isModalSubmit()) {
+        const modal = client.modals.get(interaction.customId)
+        if (!modal) return;
+        try {
+          modal.execute(interaction)
+        } catch (err) {error(err)}
+      } else if (interaction.isAnySelectMenu()) {
+        const selection_menu = client.selection_menus.get(interaction.customId)
+        if (!selection_menu) return;
+        try {
+          selection_menu.execute(interaction)
+        } catch (err) {error(err)}
+      }; 
+    });
+  } catch (error) {
+    await sendErr(client, error as string)
+  }
 });
+
+async function sendErr(client: Client, error: string) {
+  console.log(process.env.ERROR_CHANNEL_ID);
+  const channel = await client.channels.fetch(ensure(process.env.ERROR_CHANNEL_ID, "No ERROR_CHANNEL_ID ENV"))
+  const container = new ContainerBuilder()
+    .setAccentColor(0xff0000)
+    .addTextDisplayComponents((td) => td.setContent(`Bot Had an Error:\n\`\`\`${error}\`\`\``));
+
+  await channel.send({ components: [ container ], flags: [MessageFlags.IsComponentsV2] });
+}
 
 
 client.login(process.env.DISCORD_TOKEN);

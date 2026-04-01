@@ -15,7 +15,6 @@ export async function generateComponents(level_setting: LevelSettings, client: C
   const is_pro = guild_member.roles.cache.hasAny(...pro_roles);
 
   let user_settings: LevelSettings = level_setting
-  console.log(user_settings);
 
   const user = ensure(await client.users.fetch(level_setting.user_id));
 
@@ -26,9 +25,7 @@ export async function generateComponents(level_setting: LevelSettings, client: C
   const message_cache = await cache_channel.send({ files: [image_atachment]});
 
   if (fs.existsSync(image_path)) {
-    try {
-      fs.unlinkSync(image_path);
-    } catch (_) {}
+    fs.unlinkSync(image_path);
   }
 
   const image_url = message_cache.attachments.first()!.url;
@@ -74,12 +71,6 @@ export async function generateComponents(level_setting: LevelSettings, client: C
     .setAccentColor(0x242429)
     .addTextDisplayComponents((td) => td.setContent(backgrond_image_description))
     .addActionRowComponents((ar) => ar.setComponents(new ButtonBuilder().setCustomId('level_settings_background').setLabel('Set Backgrond Image').setStyle(ButtonStyle.Secondary).setDisabled(!is_pro)))
-
-  if (user_settings.has_costome_background) {
-    backgrond_image_container.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(new MediaGalleryItemBuilder().setURL(user_settings.backgrond_url).setDescription("Image 1")));
-  } else {
-    backgrond_image_container.addTextDisplayComponents((td) => td.setContent('Style Transparent, No Backgrond Image'));
-  }
 
   const size_container = new ContainerBuilder()
     .setAccentColor(0x242429)
