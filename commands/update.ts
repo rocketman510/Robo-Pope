@@ -72,21 +72,13 @@ async function getLatestVersion() {
 }
 
 async function getVersion() {
-  try {
-    return execSync('git describe --tags --exact-match 2>/dev/null || git rev-parse --short HEAD')
-      .toString()
-      .trim();
-  } catch {
-    return 'unknown';
-  }
+  return execSync('git describe --tags --exact-match 2>/dev/null || git rev-parse --short HEAD')
+    .toString()
+    .trim();
 }
 
 function getLatestTagMessage(): string {
-  try {
-    const latestTag = execSync('git describe --tags --abbrev=0').toString().trim();
-    const message = execSync(`git tag -l --format='%(contents)' ${latestTag}`).toString().trim();
-    return message || 'No tag message';
-  } catch {
-    return 'No tags found';
-  }
+  const latestTag = execSync('git describe --tags --abbrev=0').toString().trim();
+  const message = execSync(`git tag -l --format='%(contents)' ${latestTag}`).toString().trim();
+  return message || 'No tag message';
 }

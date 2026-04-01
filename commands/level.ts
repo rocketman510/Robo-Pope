@@ -41,9 +41,7 @@ export default {
       await interaction.editReply({ components: [action_row], files: [attachment] });
 
       if (fs.existsSync(imagePath)) {
-        try {
-          fs.unlinkSync(imagePath);
-        } catch (err) {}
+        fs.unlinkSync(imagePath);
       }
     },
 } as Command;
