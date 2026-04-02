@@ -1,6 +1,6 @@
 import { Client, Events, GatewayIntentBits, Collection, MessageFlags, ContainerBuilder} from "discord.js";
 import type { Command, Button, Modal, SelectionMenu } from "./deploy";
-import deploy from "./deploy";
+import deploy, { deply_member_count } from "./deploy";
 import { error, log } from "node:console";
 import { Browser } from 'puppeteer';
 import { handleLevel, handleReaction } from "./level";
@@ -50,6 +50,14 @@ client.once(Events.ClientReady, async readyClient => {
 
     client.on(Events.MessageReactionAdd, async (reaction, user) => {
       await handleReaction(reaction, user);
+    });
+
+    client.on(Events.GuildMemberAdd, async () => {
+      await deply_member_count(client);
+    });
+
+    client.on(Events.GuildMemberRemove, async () => {
+      await deply_member_count(client);
     });
 
     client.on(Events.InteractionCreate, (interaction) => {
