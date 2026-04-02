@@ -19,7 +19,6 @@ declare module "discord.js" {
         is_counting_messages: boolean;
         browser: Browser;
         db: Db;
-        member_count: Collection<string, string>;
     }
 }
 
