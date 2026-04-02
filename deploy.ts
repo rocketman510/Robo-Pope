@@ -1,4 +1,4 @@
-import { Collection, SlashCommandBuilder, ChatInputCommandInteraction, Client, type ButtonInteraction, ModalSubmitInteraction, UserSelectMenuInteraction, ChannelSelectMenuInteraction, MentionableSelectMenuInteraction, RoleSelectMenuInteraction, StringSelectMenuInteraction, MessageFlags, type GuildTextBasedChannel } from "discord.js";
+import { Collection, SlashCommandBuilder, ChatInputCommandInteraction, Client, type ButtonInteraction, ModalSubmitInteraction, UserSelectMenuInteraction, ChannelSelectMenuInteraction, MentionableSelectMenuInteraction, RoleSelectMenuInteraction, StringSelectMenuInteraction, MessageFlags, type GuildTextBasedChannel, PermissionsBitField } from "discord.js";
 import { REST, Routes } from 'discord.js';
 import { error, log } from "node:console";
 import { readdir } from "node:fs/promises";
@@ -54,6 +54,8 @@ export default async function(client: Client) {
   await deply_selection_menus(client.selection_menus)
   console.log("Loading Browser...");
   client.browser = await puppeteer.launch({headless: ensure(process.env.DEV_MODE, "No DEV_MODE ENV") == 'false', executablePath: process.env.PUPPETEEREXECUTABLEPATH});
+  console.log("Loading Member Count...");
+  await deply_member_count(client)
   console.log("Fetching Messages...");
   await get_user_messages_for_all(client);
   console.log("Clearing leaderbord Channel");
@@ -195,5 +197,28 @@ function clear_cache(cacheDir: string) {
 async function clear_leaderbord(client: Client) {
   for (const channel_id of JSON.parse(ensure(process.env.LEADERBOARD_CHANNEL_ID, "No LEADERBOARD_CHANNEL_ID Environment variable."))) {
     await update_leaderbord(client, channel_id);
+  }
+}
+
+export async function deply_member_count(client: Client) {
+  const channes = JSON.parse(ensure(process.env.MEMBER_COUNT,"No MEMBER_COUNT ENV"));
+  for (const channel_id of channes) {
+    const channel = await client.channels.fetch(channel_id);
+    if (!channel) {console.error(`${channel_id} is a not accessible by the bot`); continue;};
+    if (!channel.isVoiceBased()) {continue};
+    const everyone = channel.guild.roles.everyone;
+    if (!channel.permissionsFor(everyone).has(PermissionsBitField.Flags.ViewChannel)) {
+      channel.permissionOverwrites.create(everyone, { ViewChannel: true } );
+    }
+    if (channel.permissionsFor(everyone).has(PermissionsBitField.Flags.Connect)) {
+      channel.permissionOverwrites.create(everyone, { Connect: false } );
+    }
+    channel.guild.members.fetch();
+    const members = channel.guild.memberCount;
+    const online = channel.guild.members.cache.filter(m => {
+      const status = m.presence?.status;
+      return status && status !== "offline";
+    });
+    await channel.setName(`●${online.size} — ○${members}`).catch();
   }
 }

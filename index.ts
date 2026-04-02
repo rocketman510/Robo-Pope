@@ -19,6 +19,7 @@ declare module "discord.js" {
         is_counting_messages: boolean;
         browser: Browser;
         db: Db;
+        member_count: Collection<string, string>;
     }
 }
 
@@ -33,7 +34,8 @@ const client = new Client({ intents: [
   GatewayIntentBits.DirectMessages,
   GatewayIntentBits.GuildMembers,
   GatewayIntentBits.MessageContent,
-  GatewayIntentBits.GuildMessageReactions
+  GatewayIntentBits.GuildMessageReactions,
+  GatewayIntentBits.GuildPresences
 ]});
 
 client.once(Events.ClientReady, async readyClient => {
