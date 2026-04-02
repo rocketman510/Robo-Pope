@@ -208,17 +208,12 @@ export async function deply_member_count(client: Client) {
     if (!channel.isVoiceBased()) {continue};
     const everyone = channel.guild.roles.everyone;
     if (!channel.permissionsFor(everyone).has(PermissionsBitField.Flags.ViewChannel)) {
-      channel.permissionOverwrites.create(everyone, { ViewChannel: true } );
+      await channel.permissionOverwrites.create(everyone, { ViewChannel: true } );
     }
     if (channel.permissionsFor(everyone).has(PermissionsBitField.Flags.Connect)) {
-      channel.permissionOverwrites.create(everyone, { Connect: false } );
+      await channel.permissionOverwrites.create(everyone, { Connect: false } );
     }
-    channel.guild.members.fetch();
     const members = channel.guild.memberCount;
-    const online = channel.guild.members.cache.filter(m => {
-      const status = m.presence?.status;
-      return status && status !== "offline";
-    });
-    await channel.setName(`●${online.size} — ○${members}`).catch();
+    await channel.setName(`● ${members}`);
   }
 }
