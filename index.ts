@@ -19,6 +19,8 @@ declare module "discord.js" {
         is_counting_messages: boolean;
         browser: Browser;
         db: Db;
+        ows_last_bot_message: Collection<string, string>;
+        ows_sentence_history: Collection<string, string[]>;
     }
 }
 
