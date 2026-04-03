@@ -88,10 +88,10 @@ export function getLevel(xp: number) {
   let xp_pool = xp;
   let xp_to_next_lvl = 200;
 
-  while (xp_pool > xp_to_next_lvl) {
+  while (xp_pool >= xp_to_next_lvl) {
     level++;
-    xp_to_next_lvl += 10;
     xp_pool -= xp_to_next_lvl;
+    xp_to_next_lvl += 10;
   }
 
   return {
