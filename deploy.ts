@@ -39,6 +39,7 @@ export default async function(client: Client) {
   client.messages = new Collection<string, Collection<string, number>>();
   client.xp = new Collection<string, Collection<string, number>>();
   client.ows_sentence_history = new Collection<string, string[]>();
+  client.ows_last_bot_message = new Collection<string, string>();
 
   client.shouldStopSpam = false;
   client.is_counting_messages = true;
@@ -226,6 +227,7 @@ export async function deply_member_count(client: Client) {
 */
 async function get_ows_history(client: Client) {
   for (const channel_id of JSON.parse(ensure(process.env.ONE_WORD_STORY_IDS, "No ONE_WORD_STORY_IDS ENV"))) {
+    client.ows_last_bot_message.set(channel_id, '');
     const channel = await client.channels.fetch(channel_id);
 
     if (!channel?.isTextBased()) continue;
