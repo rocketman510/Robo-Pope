@@ -274,7 +274,7 @@ function push_to_ows_history(collection: Collection<string, string[]>, message_b
     if (message.author.bot) continue;
     if (/[.!?]/g.test(message.content)) {// If the next word is the end of the sentence before, ship this sentence off and start recording the new one.
       collection
-        .ensure(ensure(message.guildId, "No guild id when getting a message in a ows channel"), (): string[] => [])
+        .ensure(ensure(message.channelId, "No guild id when getting a message in a ows channel"), (): string[] => [])
         .unshift(sentence_buffer)
 
       if (/[^.!?]/g.test(message.content)) {// If the message has text then punctuation there needs to be a space befor the word
@@ -288,7 +288,7 @@ function push_to_ows_history(collection: Collection<string, string[]>, message_b
   }
   if (is_last_run) {
     collection
-      .ensure(ensure(message_buffer.first()!.guildId, "No guild id when getting a message in a ows channel"), (): string[] => [])
+      .ensure(ensure(message_buffer.first()!.channelId, "No guild id when getting a message in a ows channel"), (): string[] => [])
       .unshift(sentence_buffer)
   }
   return sentence_buffer;
