@@ -1,4 +1,4 @@
-import { Collection, ContainerBuilder, MessageFlags, type Client, type Message } from "discord.js";
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ContainerBuilder, MessageFlags, type Client, type Message } from "discord.js";
 import { ensure } from "..";
 
 export async function handleOwsMessage(message: Message) {
@@ -26,9 +26,19 @@ export async function handleOwsMessage(message: Message) {
 
     console.log(sentence);
 
+    const button = new ButtonBuilder()
+      .setCustomId('ows_show_full_story')
+      .setLabel('Show Full Story')
+      .setStyle(ButtonStyle.Primary);
+
+    const row = new ActionRowBuilder()
+      .addComponents([button])
+
     const component = new ContainerBuilder()
       .setAccentColor(0x242429)
-      .addTextDisplayComponents((td) => td.setContent(`${sentence}`))
+      .addTextDisplayComponents((td) => td.setContent(`## Sentence:\n${sentence}`))
+      .addSeparatorComponents((s) => s)
+      .addActionRowComponents((ar) => ar.addComponents(button))
 
     message.channel.send({ components: [ component ], flags: MessageFlags.IsComponentsV2 })
   }
@@ -40,7 +50,7 @@ async function get_sentence_till_last_punctuation(client: Client, channel_id: st
   let before_message = message.id;
   let sentence = message.content
 
-  while (true) {
+while (true) {
     let messages = await channel.messages.fetch({ limit: 100, before: before_message})
     if (messages.size === 0) break;
     before_message = messages.last()!.id;
