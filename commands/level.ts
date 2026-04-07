@@ -16,16 +16,19 @@ export default {
     async execute(interaction: ChatInputCommandInteraction) {
       await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
+      const selected_user = interaction.options.getUser('user') || interaction.user
+      const is_users = interaction.user.id == selected_user.id;
+
       const client = interaction.client
       if (client.is_counting_messages) {fail(interaction, "Come back later, I'm still tallying up the score."); return;}
 
       const messages = client.messages.get(interaction.guildId!);
       if (!messages) {fail(interaction, "Could not get Server's data");return;}
-      const words = messages?.get(interaction.user.id);
-      if (!words) {fail(interaction, "Could not get your data");return;}
-      const level_setting: LevelSettings = await getLevelBannerSettings(client, interaction.user.id, interaction.guildId!);
+      const words = messages?.get(selected_user.id);
+      if (!words) {fail(interaction, "Could not get Users data");return;}
+      const level_setting: LevelSettings = await getLevelBannerSettings(client, selected_user.id, interaction.guildId!);
 
-      let imagePath = await getLevelBanner(interaction.user, level_setting);
+      let imagePath = await getLevelBanner(selected_user, level_setting);
       if (!imagePath) {fail(interaction, "Somthing happend I cant find you data!?"); return;}
 
       const attachment = new AttachmentBuilder(imagePath);
@@ -44,7 +47,11 @@ export default {
         .addComponents(button_share)
         .addComponents(button_settings);
 
-      await interaction.editReply({ components: [action_row], files: [attachment] });
+      if (is_users) {
+        await interaction.editReply({ components: [action_row], files: [attachment] });
+      } else {
+        await interaction.editReply({ files: [attachment] });
+      }
 
       if (fs.existsSync(imagePath)) {
         fs.unlinkSync(imagePath);
