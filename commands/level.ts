@@ -6,7 +6,13 @@ import { getLevelBanner, getLevelBannerSettings, type LevelSettings } from "../l
 export default {
     data: new SlashCommandBuilder()
         .setName('level')
-        .setDescription('Get your level'),
+        .setDescription('Get your level')
+        .addUserOption(
+          option => option
+          .setName('user')
+          .setDescription('The User to get the level of')
+          .setRequired(false)
+        ),
     async execute(interaction: ChatInputCommandInteraction) {
       await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
