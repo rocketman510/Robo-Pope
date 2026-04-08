@@ -1,6 +1,5 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction, PermissionFlagsBits, MessageFlags, messageLink } from "discord.js";
 import type { Command } from "../deploy";
-import { sleep } from "bun";
 
 async function fail(interaction: ChatInputCommandInteraction, message: string) {
   console.error(message);
