@@ -38,9 +38,6 @@ export default {
     if (!member) {fail(interaction, "Failed to get the member"); return;}
     const time_string = interaction.options.getString('time')
     if (!time_string) fail(interaction, "Invalid Time string")
-    const hours = time_string?.match(/(\d+)\s*(?=hours?|h)|(?:hours?|h):\s*(\d+)/gi);
-
-    console.log(hours);
-    
+    const match_form_back = time_string?.match(/(\d+)\s*(?:[mM][iI][lL][lL][iI][sS][eE][cC][oO][nN][dD][sS]?|[mM][sS]|[mM][iI][lL][lL][sS]?)(?![a-zA-Z])|(\d+)\s*(?:[sS][eE][cC][oO][nN][dD][sS]?|[sS]|[sS][eE][cC][sS]?)(?![a-zA-Z])|(\d+)\s*(?:[mM][iI][nN][uU][tT][eE][sS]?|m|[mM][iI][nN][sS]?)(?![a-zA-Z])|(\d+)\s*(?:[hH][oO][uU][rR][sS]?|[hH])(?![a-zA-Z])|(\d+)\s*(?:[dD][aA][yY][sS]?|[dD])(?![a-zA-Z])|(\d+)\s*(?:[wW][eE][eE][kK][sS]?|[wW])(?![a-zA-Z])|(\d+)\s*(?:[mM][oO][nN][tT][hH][sS]?|M)(?![a-zA-Z])|(\d+)\s*(?:[yY][eE][aA][rR][sS]?|[yY])(?![a-zA-Z])/g);
   },
 } as Command;
