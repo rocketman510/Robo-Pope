@@ -50,7 +50,7 @@ async function get_sentence_till_last_punctuation(client: Client, channel_id: st
   let before_message = message.id;
   let sentence = message.content
 
-while (true) {
+  while (true) {
     let messages = await channel.messages.fetch({ limit: 100, before: before_message})
     if (messages.size === 0) break;
     before_message = messages.last()!.id;

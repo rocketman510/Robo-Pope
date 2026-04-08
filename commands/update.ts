@@ -11,39 +11,36 @@ export default {
     console.log(interaction.user.username);
     let developers = process.env.DEVELOPER_IDS || '[]';
 
-    if (developers.includes(interaction.user.id)) {
-      console.log(await getLatestVersion());
-      console.log(await getVersion());
 
-      const version = await getVersion();
-      const latest = await getLatestVersion();
+    if (!developers.includes(interaction.user.id)) return interaction.reply({ content: 'You are not a developer, so you cannot use this command.', flags: MessageFlags.Ephemeral });
 
-      const massage = getLatestTagMessage();
+    const version = await getVersion();
+    const latest = await getLatestVersion();
+    console.log(version, latest);
 
-      const updateSection = new SectionBuilder()
-        .addTextDisplayComponents(
-          (textDisplay) => textDisplay.setContent(`The Bot has an update.\nCurrent: \`${version}\` => \`${latest}\``,),
-          (textDisplay) => textDisplay.setContent(`\`\`\`dif\n${massage}\`\`\``),
-        )
-        .setButtonAccessory(
-          (button) => button.setCustomId('update').setLabel('Update the Bot').setStyle(ButtonStyle.Success),
-        );
+    const massage = getLatestTagMessage();
 
-      const update_message_button = new ButtonBuilder()
-        .setLabel('Send Message')
-        .setStyle(ButtonStyle.Primary)
-        .setCustomId('send_update_massage');
+    const updateSection = new SectionBuilder()
+      .addTextDisplayComponents(
+        (textDisplay) => textDisplay.setContent(`The Bot has an update.\nCurrent: \`${version}\` => \`${latest}\``,),
+        (textDisplay) => textDisplay.setContent(`\`\`\`diff\n${massage}\`\`\``),
+      )
+      .setButtonAccessory(
+        (button) => button.setCustomId('update').setLabel('Update the Bot').setStyle(ButtonStyle.Success),
+      );
 
-      const action_row = new ActionRowBuilder()
-        .addComponents(update_message_button)
+    const update_message_button = new ButtonBuilder()
+      .setLabel('Send Message')
+      .setStyle(ButtonStyle.Primary)
+      .setCustomId('send_update_massage');
 
-      if (version == latest) {
-        interaction.reply({content: `The Bot up-to-date. Version: \`${version}\``, components: [action_row], flags: MessageFlags.Ephemeral})
-      } else {
-        interaction.reply({components: [updateSection], flags: MessageFlags.Ephemeral | MessageFlags.IsComponentsV2})
-      }
+    const action_row = new ActionRowBuilder()
+      .addComponents(update_message_button)
+
+    if (version === latest) {
+      interaction.reply({content: `The Bot is up-to-date. Version: \`${version}\``, components: [action_row], flags: MessageFlags.Ephemeral})
     } else {
-      interaction.reply({ content: 'You are not a developer you can not use this command.', flags: MessageFlags.Ephemeral });
+      interaction.reply({components: [updateSection], flags: MessageFlags.Ephemeral | MessageFlags.IsComponentsV2})
     }
   },
 } as Command;

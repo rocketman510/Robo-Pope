@@ -1,15 +1,11 @@
 import { type Client, type Channel, Collection, Message, User, MessageReaction, MessageFlags } from "discord.js";
 import fs from 'fs';
 import { resolve } from 'path';
-import { error, log } from "console";
-import level_settings from "./button/level_settings";
 import { ensure } from ".";
-import { update_leaderbord } from "./functions/level_leaderboard";
-import sharp from "sharp";
-import level_settings_set_backgrond_modal from "./modals/level_settings_set_backgrond_modal";
+import { update_leaderboard } from "./functions/level_leaderboard";
 
 /**
- * This is for tthe users Level banner display settings.
+ * This is for the user's Level banner display settings.
  * _trans = Transparency 0-100
  * _frost = Frosted glass appearance
 */
@@ -25,8 +21,8 @@ export interface LevelSettings {
   text_color_trans: number;
   shadow_strength: number;
   shadow_color: number;
-  has_costome_background: boolean;
-  backgrond_url: string;
+  has_custom_background: boolean;
+  background_url: string;
   is_large: boolean;
 }
 
@@ -56,7 +52,7 @@ export async function getMessageHistory(client: Client, channel: Channel, guild_
       number_of_messages++;
       addUserMessage(client, value);
       console.log('addUserMessage:');
-      
+
       console.log(value.author.displayName + " with " + value.content);
     }
 
@@ -68,15 +64,13 @@ export async function getMessageHistory(client: Client, channel: Channel, guild_
 }
 
 export function addUserMessage(client: Client, message: Message) {
-  const guild_id = ensure(message.guildId, "Message must be form a guild");
+  const guild_id = ensure(message.guildId, "Message must be from a guild");
   const wordCount = countWords(message.content);
   const userKey = message.author.id;
   let members = client.messages.ensure(guild_id, () => new Collection<string, number>());
-  if (message.author.id == '1410393400892588054') {
-    members.set(userKey, (members.get(userKey) ?? 0) + (wordCount * 10));
-  } else {
-    members.set(userKey, (members.get(userKey) ?? 0) + wordCount);
-  }
+
+  const multiplier = message.author.id == '1410393400892588054' ? 10 : 1;
+  members.set(userKey, (members.get(userKey) ?? 0) + (wordCount * multiplier));
 }
 
 function countWords(str: string): number {
@@ -107,8 +101,8 @@ export async function getLevelBanner(user: User, level_setting: LevelSettings) {
   const cssPath = level_setting.is_large ? resolve('./assets/level_large.css') : resolve('./assets/level_small.css');
   const imagePath = resolve('./cache/level.png')
 
-  const height = level_setting.is_large ? 125 : (level_setting.has_costome_background ? 8 : 0) + 22;
-  const width = level_setting.is_large ? 512 : (level_setting.has_costome_background ? 8 : 0) + 256;
+  const height = level_setting.is_large ? 125 : (level_setting.has_custom_background ? 8 : 0) + 22;
+  const width = level_setting.is_large ? 512 : (level_setting.has_custom_background ? 8 : 0) + 256;
 
   let html = fs.readFileSync(htmlPath, 'utf-8');
   let css = fs.readFileSync(cssPath, 'utf-8');
@@ -122,7 +116,7 @@ export async function getLevelBanner(user: User, level_setting: LevelSettings) {
     FROST: level_setting.frost ? "10" : "0",
     TEXTCOLOR: hexNumToStr(level_setting.text_color, level_setting.text_color_trans),
     SHADOWCOLOR: hexNumToStr(level_setting.shadow_color, level_setting.shadow_strength),
-    BACKGRONDURL: level_setting.backgrond_url,
+    BACKGROUNDURL: level_setting.background_url,
   }
 
   css = css.replace(/\$\{(.*?)\}/g, (_, repName) => {
@@ -137,7 +131,7 @@ export async function getLevelBanner(user: User, level_setting: LevelSettings) {
     LEVEL: level.level,
     MAXXP: level.max_xp,
     MINXP: level.min_xp,
-    HASCOSTOMEBACKGROUND: level_setting.has_costome_background ? "img":"trans",
+    HASCUSTOMBACKGROUND: level_setting.has_custom_background ? "img" : "trans",
   }
 
   html = html.replace(/\$\{(.*?)\}/g, (_, repName) => {
@@ -191,7 +185,7 @@ export async function handleLevel(client: Client, message: Message) {
 
   addUserMessage(client, message);
 
-  const guild_id = ensure(message.guildId, 'Cant handleLevel when there is not guild_id');
+  const guild_id = ensure(message.guildId, 'Can\'t handleLevel when there is no guild_id');
   const user_id = message.author.id;
   const user_xp = client.messages.ensure(guild_id!, () => new Collection<string, number>()).ensure(user_id, () => 0);
   let next_level = client.xp.ensure(guild_id!, () => new Collection<string, number>()).ensure(user_id, () => getLevel(user_xp).total_max_xp)
@@ -216,7 +210,7 @@ export async function handleLevel(client: Client, message: Message) {
 
     if (!channel || channel.isDMBased() || channel.guildId != message.guildId) return;
 
-    await update_leaderbord(client, channel_id);
+    await update_leaderboard(client, channel_id);
   }
 }
 
@@ -248,8 +242,8 @@ export async function getLevelBannerSettings(client: Client, user_id: string, gu
     text_color_trans: 1.0,
     shadow_color: 0x1a1a1a,
     shadow_strength: 1.0,
-    has_costome_background: false,
-    backgrond_url: '',
+    has_custom_background: false,
+    background_url: '',
     is_large: false,
   };
 
@@ -300,6 +294,6 @@ export function hexNumToStr(hex: number, alpha: number): string {
 
 function getUsersWords(client: Client, user_id: string | undefined | null, guild_id: string | undefined | null) {
   const fixed_user = ensure(user_id, "No valid User Id was provided for the function getUserWords");
-  const fixed_guild = ensure(guild_id, "No valid Guild Id was provided for the functoion getUsersWords");
+  const fixed_guild = ensure(guild_id, "No valid Guild Id was provided for the function getUsersWords");
   return client.messages.ensure(fixed_guild, () => new Collection<string, number>()).ensure(fixed_user, () => 0);
 }

@@ -30,7 +30,7 @@ export default {
 
     const color_label = new LabelBuilder()
       .setLabel("Set The Color")
-      .setDescription("Set the color as a Hexadecimal color. Formated formatted as #RRGGBB")
+      .setDescription("Set the color as a Hexadecimal color. Formatted as #RRGGBB")
       .setTextInputComponent(color);
 
     const trans = new TextInputBuilder()
@@ -41,7 +41,7 @@ export default {
       .setRequired(true)
       .setMaxLength(5)
       .setMinLength(3);
-      
+
     const trans_label = new LabelBuilder()
       .setLabel("Set The Transparency")
       .setDescription("Set the Transparency as a number from 1.0 - 0.0")
@@ -54,5 +54,3 @@ export default {
     interaction.showModal(modal);
 },
 } as Button;
-
-
