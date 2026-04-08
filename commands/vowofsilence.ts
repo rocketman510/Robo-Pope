@@ -36,8 +36,26 @@ export default {
     if (!guild) {fail(interaction, "Failed to get guild"); return;}
     const member = guild.members.cache.get(user.id);
     if (!member) {fail(interaction, "Failed to get the member"); return;}
-    const time_string = interaction.options.getString('time')
-    if (!time_string) fail(interaction, "Invalid Time string")
-    const match_form_back = time_string?.match(/(\d+)\s*(?:[mM][iI][lL][lL][iI][sS][eE][cC][oO][nN][dD][sS]?|[mM][sS]|[mM][iI][lL][lL][sS]?)(?![a-zA-Z])|(\d+)\s*(?:[sS][eE][cC][oO][nN][dD][sS]?|[sS]|[sS][eE][cC][sS]?)(?![a-zA-Z])|(\d+)\s*(?:[mM][iI][nN][uU][tT][eE][sS]?|m|[mM][iI][nN][sS]?)(?![a-zA-Z])|(\d+)\s*(?:[hH][oO][uU][rR][sS]?|[hH])(?![a-zA-Z])|(\d+)\s*(?:[dD][aA][yY][sS]?|[dD])(?![a-zA-Z])|(\d+)\s*(?:[wW][eE][eE][kK][sS]?|[wW])(?![a-zA-Z])|(\d+)\s*(?:[mM][oO][nN][tT][hH][sS]?|M)(?![a-zA-Z])|(\d+)\s*(?:[yY][eE][aA][rR][sS]?|[yY])(?![a-zA-Z])/g);
+    const time_string = interaction.options.getString('time');
+    if (!time_string) return fail(interaction, "Invalid Time string");
+
+    const match_form_back = time_string?.matchAll(/(\d+)\s*(?:[mM][iI][lL][lL][iI][sS][eE][cC][oO][nN][dD][sS]?|[mM][sS]|[mM][iI][lL][lL][sS]?)(?![a-zA-Z])|(\d+)\s*(?:[sS][eE][cC][oO][nN][dD][sS]?|[sS]|[sS][eE][cC][sS]?)(?![a-zA-Z])|(\d+)\s*(?:[mM][iI][nN][uU][tT][eE][sS]?|m|[mM][iI][nN][sS]?)(?![a-zA-Z])|(\d+)\s*(?:[hH][oO][uU][rR][sS]?|[hH])(?![a-zA-Z])|(\d+)\s*(?:[dD][aA][yY][sS]?|[dD])(?![a-zA-Z])|(\d+)\s*(?:[wW][eE][eE][kK][sS]?|[wW])(?![a-zA-Z])|(\d+)\s*(?:[mM][oO][nN][tT][hH][sS]?|M)(?![a-zA-Z])|(\d+)\s*(?:[yY][eE][aA][rR][sS]?|[yY])(?![a-zA-Z])/g);
+    const match_form_front = time_string?.matchAll(/(?:[mM][iI][lL][lL][iI][sS][eE][cC][oO][nN][dD][sS]?|[mM][sS]|[mM][iI][lL][lL][sS]?)(?![a-zA-Z]):\s*(\d+)|(?:[sS][eE][cC][oO][nN][dD][sS]?|[sS]|[sS][eE][cC][sS]?)(?![a-zA-Z]):\s*(\d+)|(?:[mM][iI][nN][uU][tT][eE][sS]?|m|[mM][iI][nN][sS]?)(?![a-zA-Z]):\s*(\d+)|(?:[hH][oO][uU][rR][sS]?|[hH])(?![a-zA-Z]):\s*(\d+)|(?:[dD][aA][yY][sS]?|[dD])(?![a-zA-Z]):\s*(\d+)|(?:[wW][eE][eE][kK][sS]?|[wW])(?![a-zA-Z]):\s*(\d+)|(?:[mM][oO][nN][tT][hH][sS]?|M)(?![a-zA-Z]):\s*(\d+)|(?:[yY][eE][aA][rR][sS]?|[yY])(?![a-zA-Z]):\s*(\d+)/g);
+
+    let time = 0
+
+    for (const matchs of match_form_back.toArray()) {
+      for (const [i, value] of matchs.entries()) {
+        const unit = parseInt(value, 10)
+        if (i == 1) time = unit
+        if (i == 2) time = unit*1000
+        if (i == 3) time = unit*6000
+        if (i == 4) time = unit*3600000
+        if (i == 5) time = unit*86400000
+        if (i == 6) time = unit*604800000
+        if (i == 7) time = unit*2592000000
+        if (i == 8) time = unit*31536000000
+      }
+    }
   },
 } as Command;
