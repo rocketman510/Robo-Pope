@@ -23,8 +23,8 @@ export default {
       return
     }
 
-    const finle_color = Number("0x" + color_match![1]);
-    const finle_trans = Math.min(1 ,Number(trans));
+    const final_color = Number("0x" + color_match![1]);
+    const final_trans = Math.min(1 ,Number(trans));
 
     await interaction.deferUpdate()
 
@@ -34,13 +34,13 @@ export default {
       ensure(interaction.guildId)
     );
 
-    level_settings.secondary_color = finle_color;
-    level_settings.secondary_color_trans = finle_trans;
+    level_settings.secondary_color = final_color;
+    level_settings.secondary_color_trans = final_trans;
 
     await setLevelBannerSettings(interaction.client, level_settings);
 
     const components = await generateComponents(level_settings, interaction.client)
-    
+
     await interaction.editReply({
       components,
       flags: [

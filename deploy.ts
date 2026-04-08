@@ -4,12 +4,11 @@ import { error, log } from "node:console";
 import { readdir } from "node:fs/promises";
 import { getMessageHistory, getLevelBanner, getLevel } from "./level";
 import puppeteer from 'puppeteer';
-import { MongoClient, Db } from "mongodb";
-import type { Browser } from "puppeteer";
+import { MongoClient } from "mongodb";
 import fs from "fs";
 import path from "node:path";
 import { ensure } from ".";
-import { generateLeaderbord, update_leaderbord } from "./functions/level_leaderboard";
+import { update_leaderboard } from "./functions/level_leaderboard";
 
 export interface Command {
     data: SlashCommandBuilder;
@@ -47,13 +46,13 @@ export default async function(client: Client) {
   console.log("Clearing Cache");
   clear_cache('./cache/');
   console.log("Loading Commands...");
-  await deply_commands(client.commands);
+  await deploy_commands(client.commands);
   console.log("Loading Buttons...");
-  await deply_buttons(client.buttons);
+  await deploy_buttons(client.buttons);
   console.log("Loading Modals...");
-  await deply_modals(client.modals);
+  await deploy_modals(client.modals);
   console.log('Loading Selection Menus...');
-  await deply_selection_menus(client.selection_menus)
+  await deploy_selection_menus(client.selection_menus)
   console.log("Loading Browser...");
   client.browser = await puppeteer.launch({headless: ensure(process.env.DEV_MODE, "No DEV_MODE ENV") == 'false', executablePath: process.env.PUPPETEEREXECUTABLEPATH});
   console.log("Loading Member Count...");
@@ -62,15 +61,15 @@ export default async function(client: Client) {
   await get_ows_history(client);
   console.log("Fetching Messages...");
   await get_user_messages_for_all(client);
-  console.log("Clearing leaderbord Channel");
-  await clear_leaderbord(client);
+  console.log("Clearing leaderboard Channel");
+  await clear_leaderboard(client);
   console.log("Calculating Level Data..");
-  deply_xp(client);
-  console.log("Connecteing to DB");
-  client.db = await deply_db();
+  deploy_xp(client);
+  console.log("Connecting to DB");
+  client.db = await deploy_db();
 }
 
-async function deply_commands(client_commands: Collection<string,Command>) {
+async function deploy_commands(client_commands: Collection<string,Command>) {
   const path = './commands/'
   const files = await readdir(path);
 
@@ -102,10 +101,10 @@ async function deply_commands(client_commands: Collection<string,Command>) {
     }
 
     client_commands.set(element.id, script);
-  } 
+  }
 }
 
-async function deply_buttons(buttons: Collection<string, Button>) {
+async function deploy_buttons(buttons: Collection<string, Button>) {
   const path = './button/'
   const files = await readdir(path);
 
@@ -115,11 +114,11 @@ async function deply_buttons(buttons: Collection<string, Button>) {
     const module = await import(file);
     const button = module.default as Button;
 
-   buttons.set(button.data, button); 
+   buttons.set(button.data, button);
   }
 }
 
-async function deply_modals(modals: Collection<string, Modal>) {
+async function deploy_modals(modals: Collection<string, Modal>) {
   const path = './modals/'
   const files = await readdir(path);
 
@@ -128,11 +127,11 @@ async function deply_modals(modals: Collection<string, Modal>) {
 
     const module = await import(file);
     const modal = module.default as Modal;
-    modals.set(modal.data, modal); 
+    modals.set(modal.data, modal);
   }
 }
 
-async function deply_selection_menus(selection_menus: Collection<string, SelectionMenu>) {
+async function deploy_selection_menus(selection_menus: Collection<string, SelectionMenu>) {
   const path = './selection_menus/'
   const files = await readdir(path);
 
@@ -160,10 +159,10 @@ async function get_user_messages_for_all(client: Client) {
 }
 
 /**
- * Sets the client.xp witch is a Map of Maps that hold the users next level milestone per guild.
+ * Sets the client.xp which is a Map of Maps that holds the users next level milestone per guild.
  * @param {Client} client - Takes the client obj where .xp and .messages are.
  * */
-function deply_xp(client: Client) {
+function deploy_xp(client: Client) {
   const words = client.messages;
   let xp = client.xp;
 
@@ -175,7 +174,7 @@ function deply_xp(client: Client) {
   }
 }
 
-export async function deply_db() {
+export async function deploy_db() {
   const uri = `mongodb://admin:${process.env.DB_PASSWORD}@${process.env.DB_DOMAIN}`;
   const client = new MongoClient(uri);
   await client.connect();
@@ -184,23 +183,23 @@ export async function deply_db() {
 }
 
 function clear_cache(cacheDir: string) {
-  if (fs.existsSync(cacheDir)) {
-    fs.readdirSync(cacheDir).forEach(item => {
-      const itemPath = path.join(cacheDir, item);
-      if (fs.lstatSync(itemPath).isFile()) {
-        fs.unlinkSync(itemPath); // delete file
-        console.log(`Deleted file: ${item}`);
-      } else if (fs.lstatSync(itemPath).isDirectory()) {
-        fs.rmSync(itemPath, { recursive: true, force: true }); // delete folder
-        console.log(`Deleted folder: ${item}`);
-      }
-    });
-  }
+  if (!fs.existsSync(cacheDir)) return;
+
+  fs.readdirSync(cacheDir).forEach(item => {
+    const itemPath = path.join(cacheDir, item);
+    if (fs.lstatSync(itemPath).isFile()) {
+      fs.unlinkSync(itemPath); // delete file
+      console.log(`Deleted file: ${item}`);
+    } else if (fs.lstatSync(itemPath).isDirectory()) {
+      fs.rmSync(itemPath, { recursive: true, force: true }); // delete folder
+      console.log(`Deleted folder: ${item}`);
+    }
+  });
 }
 
-async function clear_leaderbord(client: Client) {
+async function clear_leaderboard(client: Client) {
   for (const channel_id of JSON.parse(ensure(process.env.LEADERBOARD_CHANNEL_ID, "No LEADERBOARD_CHANNEL_ID Environment variable."))) {
-    await update_leaderbord(client, channel_id);
+    await update_leaderboard(client, channel_id);
   }
 }
 
@@ -208,7 +207,7 @@ export async function deply_member_count(client: Client) {
   const channes = JSON.parse(ensure(process.env.MEMBER_COUNT,"No MEMBER_COUNT ENV"));
   for (const channel_id of channes) {
     const channel = await client.channels.fetch(channel_id);
-    if (!channel) {console.error(`${channel_id} is a not accessible by the bot`); continue;};
+    if (!channel) {console.error(`${channel_id} is not accessible by the bot`); continue;};
     if (!channel.isVoiceBased()) {continue};
     const everyone = channel.guild.roles.everyone;
     if (!channel.permissionsFor(everyone).has(PermissionsBitField.Flags.ViewChannel)) {
@@ -236,7 +235,7 @@ async function get_ows_history(client: Client) {
 
     if (last_message == undefined || last_message.size == 0) continue;
 
-    let before_message = last_message.first()!.id;// This is the message that the bot last looked at in a bach. This is so that bot can pull another 100 messages that happen before this one.
+    let before_message = last_message.first()!.id;// This is the message that the bot last looked at in a batch. This is so that bot can pull another 100 messages that happen before this one.
     let message_buffer = await channel.messages.fetch({limit: 100})// This is the buffer of messages the bot gets.
     let sentence_buffer = ""// This is the buffer that the sentence is built up in before being added to the client.ows_sentence_history collection.
     let first_punctuation = false
@@ -277,7 +276,7 @@ function push_to_ows_history(collection: Collection<string, string[]>, message_b
         .ensure(ensure(message.channelId, "No guild id when getting a message in a ows channel"), (): string[] => [])
         .unshift(sentence_buffer)
 
-      if (/[^.!?]/g.test(message.content)) {// If the message has text then punctuation there needs to be a space befor the word
+      if (/[^.!?]/g.test(message.content)) {// If the message has text then punctuation there needs to be a space before the word
         sentence_buffer = ` ${message.content}`;
       } else {
         sentence_buffer = `${message.content}`;
@@ -297,7 +296,7 @@ function push_to_ows_history(collection: Collection<string, string[]>, message_b
 function test_for_first_punctuation(message_buffer: Collection<string, Message>) {
   for (const [_, message] of message_buffer) {
     if (/[.!?]/g.test(message.content)) {
-      if (/[^.!?]/g.test(message.content)) {// If the message has text then punctuation there needs to be a space befor the word
+      if (/[^.!?]/g.test(message.content)) {// If the message has text then punctuation there needs to be a space before the word
         return [message.id, ' ' + message.content];
       } else {
         return [message.id, message.content];

@@ -8,7 +8,7 @@ export default {
     async execute(interaction: ChatInputCommandInteraction) {
         if ('rocketman510 jorby_official'.includes(interaction.user.username)) {
           interaction.client.shouldStopSpam = true;
-          interaction.reply({content: "Stoped Spaming", flags: MessageFlags.Ephemeral})
+          interaction.reply({content: "Stopped Spaming", flags: MessageFlags.Ephemeral})
           console.log(interaction.client.shouldStopSpam);
         } else {
           interaction.reply({content: " you have no perms to run this D:", flags: MessageFlags.Ephemeral});

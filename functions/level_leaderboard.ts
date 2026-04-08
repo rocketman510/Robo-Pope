@@ -2,7 +2,7 @@ import { ContainerBuilder, ContainerComponent, Message, MessageFlags, TextDispla
 import { getLevel } from "../level";
 import { ensure } from "..";
 
-export async function generateLeaderbord(client: Client, guild_id: string, old_message?: Message) {
+export async function generateLeaderboard(client: Client, guild_id: string, old_message?: Message) {
   const c = new ContainerBuilder()
     .setAccentColor(0x242429)
     .addTextDisplayComponents(t => t.setContent("# Leaderboard"));
@@ -34,15 +34,15 @@ export async function generateLeaderbord(client: Client, guild_id: string, old_m
   return [c];
 }
 
-export async function update_leaderbord(client: Client, channel_id: string) {
+export async function update_leaderboard(client: Client, channel_id: string) {
   const channel = await client.channels.fetch(channel_id) as GuildTextBasedChannel;
-  if (!channel || !channel.isTextBased()) {throw `Not a valid channel at ID: ${channel_id}`}
+  if (!channel || !channel.isTextBased()) throw `Not a valid channel at ID: ${channel_id}`;
   const message = await channel.messages.fetch({ limit: 1 })
   if (message.size != 1) {
-    const components = await generateLeaderbord(client, channel.guild.id)
+    const components = await generateLeaderboard(client, channel.guild.id)
     channel.send({ components, flags: MessageFlags.IsComponentsV2, });
   } else if (message.first()?.author.id == ensure(process.env.CLIENT_ID, "No CLIENT_ID environment variable")) {
-    const components = await generateLeaderbord(client, channel.guild.id, message.first())
+    const components = await generateLeaderboard(client, channel.guild.id, message.first())
     await message.first()?.edit({ components, flags: MessageFlags.IsComponentsV2});
   }
 }

@@ -12,8 +12,8 @@ export default {
       ensure(interaction.message.guildId)
     );
 
-    const curent_color = hexNumToStr(level_settings.secondary_color & 0xffffff, 0).slice(0,7);
-    const curent_trans = level_settings.secondary_color_trans.toFixed(1).toString().slice(0,5);
+    const current_color = hexNumToStr(level_settings.secondary_color & 0xffffff, 0).slice(0,7);
+    const current_trans = level_settings.secondary_color_trans.toFixed(1).toString().slice(0,5);
 
     const modal = new ModalBuilder()
       .setCustomId('level_settings_set_secondary_color_modal')
@@ -23,25 +23,25 @@ export default {
       .setCustomId('level_settings_set_secondary_color_modal_color')
       .setStyle(TextInputStyle.Short)
       .setPlaceholder('#RRGGBB')
-      .setValue(curent_color)
+      .setValue(current_color)
       .setRequired(true)
       .setMaxLength(7)
       .setMinLength(7);
 
     const color_label = new LabelBuilder()
       .setLabel("Set The Color")
-      .setDescription("Set the color as a Hexadecimal color. Formated formatted as #RRGGBB")
+      .setDescription("Set the color as a Hexadecimal color. Formatted as #RRGGBB")
       .setTextInputComponent(color);
 
     const trans = new TextInputBuilder()
       .setCustomId('level_settings_set_secondary_color_modal_trans')
       .setStyle(TextInputStyle.Short)
       .setPlaceholder('1.0 for fully opaque')
-      .setValue(curent_trans)
+      .setValue(current_trans)
       .setRequired(true)
       .setMaxLength(5)
       .setMinLength(3);
-      
+
     const trans_label = new LabelBuilder()
       .setLabel("Set The Transparency")
       .setDescription("Set the Transparency as a number from 1.0 - 0.0")
@@ -52,6 +52,5 @@ export default {
       .addLabelComponents(trans_label);
 
     interaction.showModal(modal);
-},
+  },
 } as Button;
-
