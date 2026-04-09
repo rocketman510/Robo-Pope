@@ -16,27 +16,33 @@ export default {
         .addStringOption((option) => option.setName('number').setDescription('Number of message (-1 for nonstop)').setRequired(true)),
     async execute(interaction: ChatInputCommandInteraction) {
       console.log(interaction.user.username);
-      const authorized = 'rocketman510 jorby_official'.includes(interaction.user.username);
+      const authorized = 'rocketman510 jorbiathan'.includes(interaction.user.username);
       if (!authorized) return interaction.reply({content: "you have no perms to run this D:", flags: MessageFlags.Ephemeral});
 
       let user = interaction.options.getUser('user');
       let number = parseInt(interaction.options.getString('number') || "", 10);
 
       if (isNaN(number)) {
-        interaction.reply({content:"Invalid Number", flags:MessageFlags.Ephemeral});
+        interaction.reply({content: "Invalid Number", flags: MessageFlags.Ephemeral});
       }
 
-      interaction.reply({content:"Started to Spam", flags:MessageFlags.Ephemeral});
+      interaction.reply({content: "Started to Spam", flags: MessageFlags.Ephemeral});
 
-      console.log(interaction.client.shouldStopSpam);
+      // console.log(interaction.client.shouldStopSpam);
 
       let i = 0;
       while (!interaction.client.shouldStopSpam && i !== number) {
         i++
-        console.log(interaction.client.shouldStopSpam);
+        // console.log(interaction.client.shouldStopSpam);
 
         await sleep(1000)
-        await user?.send(interaction.options.getString('message')!);
+        try  {
+          await user?.send(interaction.options.getString('message')!);
+        } catch (_) {
+          interaction.editReply("Spamming stopped: could not send message to victim")
+          interaction.client.shouldStopSpam = true;
+          break;
+        }
       }
 
       if (interaction.client.shouldStopSpam) {

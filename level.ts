@@ -33,7 +33,7 @@ async function getMessages(before: string, channel: Channel) {
 }
 
 export async function getMessageHistory(client: Client, channel: Channel, guild_id: string) {
-  if (!channel.isTextBased()) {return}
+  if (!channel.isTextBased()) return
   const firstMessage = await channel.messages.fetch({ limit: 1 });
 
   const before_message = firstMessage.first();
@@ -180,8 +180,8 @@ async function waitForFileDeletion(filePath: string) {
  * @param {Message} message
  */
 export async function handleLevel(client: Client, message: Message) {
-  if (message.author.bot) {return};
-  if (client.is_counting_messages) {return};
+  if (message.author.bot) return;
+  if (client.is_counting_messages) return;
 
   addUserMessage(client, message);
 
@@ -190,7 +190,7 @@ export async function handleLevel(client: Client, message: Message) {
   const user_xp = client.messages.ensure(guild_id!, () => new Collection<string, number>()).ensure(user_id, () => 0);
   let next_level = client.xp.ensure(guild_id!, () => new Collection<string, number>()).ensure(user_id, () => getLevel(user_xp).total_max_xp)
 
-  if (!user_xp) {return};
+  if (!user_xp) return;
 
   if (user_xp >= next_level) {
     const level = getLevel(user_xp).level;
@@ -201,7 +201,7 @@ export async function handleLevel(client: Client, message: Message) {
         await message.react('<:Click_to_see_level:1484622933061271775>');
       }
       client.xp.get(guild_id!)?.set(user_id, getLevel(user_xp).total_max_xp); // Sets new milestone
-    } catch (_) {}     
+    } catch (_) {}
   }
 
   const leaderboard_channel_ids = JSON.parse(ensure(process.env.LEADERBOARD_CHANNEL_ID, "No LEADERBOARD_CHANNEL_ID ENV"));
@@ -216,11 +216,11 @@ export async function handleLevel(client: Client, message: Message) {
 
 export async function handleReaction(reaction: MessageReaction, user: User) {
   const client = reaction.client;
-  if (user.bot) {return};
-  if (client.is_counting_messages) {return};
-  if (user.id != reaction.message.author?.id) {return};
-  if (reaction.emoji.id != '1484622933061271775') {return};
-  if (!reaction.message.guildId) {return}
+  if (user.bot) return;
+  if (client.is_counting_messages) return;
+  if (user.id != reaction.message.author?.id) return;
+  if (reaction.emoji.id != '1484622933061271775') return;
+  if (!reaction.message.guildId) return
 
   const words = getUsersWords(client, user.id, reaction.message.guildId);
 

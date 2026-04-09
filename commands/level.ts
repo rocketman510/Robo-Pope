@@ -23,9 +23,9 @@ export default {
       if (client.is_counting_messages) {fail(interaction, "Come back later, I'm still tallying up the score."); return;}
 
       const messages = client.messages.get(interaction.guildId!);
-      if (!messages) {fail(interaction, "Could not get Server's data");return;}
+      if (!messages) return fail(interaction, "Could not get Server's data");
       const words = messages?.get(selected_user.id);
-      if (!words) {fail(interaction, "Could not get Users data");return;}
+      if (!words) return fail(interaction, "Could not get User's data");
       const level_setting: LevelSettings = await getLevelBannerSettings(client, selected_user.id, interaction.guildId!);
 
       let imagePath = await getLevelBanner(selected_user, level_setting);

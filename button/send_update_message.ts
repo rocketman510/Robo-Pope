@@ -3,7 +3,7 @@ import type { Button } from "../deploy";
 import { ensure } from "..";
 
 export default {
-    data: "send_update_massage",
+    data: "send_update_message",
     async execute(interaction: ButtonInteraction) {
       const client = interaction.client;
       const announcement_channel_ids = JSON.parse(ensure(process.env.ANNOUNCEMENT_CHANNAL_IDS, "No ANNOUNCEMENT_CHANNAL_IDS ENV"))
@@ -16,7 +16,7 @@ Dear,\n@everyone\nWelcome one and all to all new Robo-Pope version 0.2.0. In thi
 
       for (const id of announcement_channel_ids) {
         const channel = await client.channels.fetch(id);
-        if (!channel?.isSendable()) {return};
+        if (!channel?.isSendable()) return;
         channel.send({ embeds: [embed] })
       }
     },
