@@ -18,12 +18,12 @@ export default {
     const latest = await getLatestVersion();
     console.log(version, latest);
 
-    const massage = getLatestTagMessage();
+    const message = getLatestTagMessage();
 
     const updateSection = new SectionBuilder()
       .addTextDisplayComponents(
         (textDisplay) => textDisplay.setContent(`The Bot has an update.\nCurrent: \`${version}\` => \`${latest}\``,),
-        (textDisplay) => textDisplay.setContent(`\`\`\`diff\n${massage}\`\`\``),
+        (textDisplay) => textDisplay.setContent(`\`\`\`diff\n${message}\`\`\``),
       )
       .setButtonAccessory(
         (button) => button.setCustomId('update').setLabel('Update the Bot').setStyle(ButtonStyle.Success),
@@ -32,7 +32,7 @@ export default {
     const update_message_button = new ButtonBuilder()
       .setLabel('Send Message')
       .setStyle(ButtonStyle.Primary)
-      .setCustomId('send_update_massage');
+      .setCustomId('send_update_message');
 
     const action_row = new ActionRowBuilder()
       .addComponents(update_message_button)

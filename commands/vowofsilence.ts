@@ -50,7 +50,7 @@ export default {
         if (!value) continue;
         const unit = parseInt(value, 10)
         const durations = [1, 1000, 60_000, 3600000, 86400000, 604800000, 2592000000, 31536000000];
-        time = unit * (durations[i - 2] || 1); // = durations[0] when i === 1
+        time = unit * (durations[i - 1] || 1); // = durations[0] when i === 1
       }
     }
 
