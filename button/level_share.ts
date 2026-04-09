@@ -4,7 +4,7 @@ import type { Button } from "../deploy";
 export default {
   data: "level_share",
   async execute(interaction: ButtonInteraction) {
-    if (!interaction.channel?.isSendable()) {return};
+    if (!interaction.channel?.isSendable()) return;
     const attachment = interaction.message.attachments.first()!;
     const url = attachment.url;
 

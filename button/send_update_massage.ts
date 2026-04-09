@@ -16,7 +16,7 @@ Dear,\n@everyone\nWelcome one and all to all new Robo-Pope version 0.2.0. In thi
 
       for (const id of announcement_channel_ids) {
         const channel = await client.channels.fetch(id);
-        if (!channel?.isSendable()) {return};
+        if (!channel?.isSendable()) return;
         channel.send({ embeds: [embed] })
       }
     },
