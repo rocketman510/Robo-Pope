@@ -1,5 +1,4 @@
 import { ModalSubmitInteraction, MessageFlags } from "discord.js";
-import type { Modal } from "../deploy";
 import { ensure } from "..";
 import { generateComponents } from "../functions/level_settings";
 import { getLevelBannerSettings, setLevelBannerSettings } from "../level";
