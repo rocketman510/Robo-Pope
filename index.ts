@@ -7,6 +7,11 @@ import { handleLevel, handleReaction } from "./level";
 import type { Db } from "mongodb"
 import { handleOwsMessage } from "./functions/one_word_story";
 
+
+//TODO: Remove
+import { get_welcome_banner } from "./functions/welcome_banner";
+
+
 declare module "discord.js" {
     export interface Client {
         commands: Collection<string, Command>;
@@ -45,6 +50,10 @@ client.once(Events.ClientReady, async readyClient => {
     console.log(`Ready! Logged in as ${readyClient.user.tag}`);
 
     client.on(Events.MessageCreate, async (message) => {
+      //TODO: Remove
+      if (message.content == '!test') {
+        await get_welcome_banner(message.author);
+      }
       await handleOwsMessage(message);
       await handleLevel(client, message);
     });

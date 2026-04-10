@@ -4,9 +4,9 @@ import fs from 'fs';
 import { ensure } from '..';
 
 export async function get_welcome_banner(user: User): Promise<string> {
-  const htmlPath = '../assets/welcome.html';
-  const cssPath = '../assets/welcome.css';
-  const imagePath = resolve('../cache/welcome.png')
+  const htmlPath = resolve('./assets/welcome.html');
+  const cssPath = resolve('./assets/welcome.css');
+  const imagePath = resolve('./cache/welcome.png')
 
   let html = fs.readFileSync(htmlPath, 'utf-8');
   let css = fs.readFileSync(cssPath, 'utf-8');
@@ -35,7 +35,7 @@ export async function get_welcome_banner(user: User): Promise<string> {
 
   await page.setViewport({width: 512, height: 128})
 
-  await page.goto('file://' + process.env.CACHE_PATH! + 'html.html')
+  await page.goto('file://' + process.env.CACHE_PATH! + 'welcome.html')
 
   await page.evaluate(async () => {
     await document.fonts.ready;
