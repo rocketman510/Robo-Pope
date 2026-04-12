@@ -72,11 +72,7 @@ export function addUserMessage(client: Client, message: Message) {
   const wordCount = countWords(message.content);
   const userKey = message.author.id;
   let members = client.messages.ensure(guild_id, () => new Collection<string, number>());
-  if (message.author.id == '1410393400892588054') {
-    members.set(userKey, (members.get(userKey) ?? 0) + (wordCount * 10));
-  } else {
-    members.set(userKey, (members.get(userKey) ?? 0) + wordCount);
-  }
+  members.set(userKey, (members.get(userKey) ?? 0) + wordCount);
 }
 
 function countWords(str: string): number {
