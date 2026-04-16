@@ -39,6 +39,7 @@ export default async function(client: Client) {
   client.xp = new Collection<string, Collection<string, number>>();
   client.ows_sentence_history = new Collection<string, string[]>();
   client.ows_last_bot_message = new Collection<string, string>();
+  client.dyn_vc = new Collection<string, string[]>();
 
   client.shouldStopSpam = false;
   client.is_counting_messages = true;

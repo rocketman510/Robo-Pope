@@ -22,6 +22,7 @@ declare module "discord.js" {
         db: Db;
         ows_last_bot_message: Collection<string, string>;
         ows_sentence_history: Collection<string, string[]>;
+        dyn_vc: Collection<string, string[]>;
     }
 }
 
