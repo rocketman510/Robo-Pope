@@ -64,7 +64,7 @@ client.once(Events.ClientReady, async readyClient => {
     });
 
     client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
-      await handle_join(oldState: newState)
+      await handle_join(oldState, newState)
     })
 
     client.on(Events.InteractionCreate, (interaction) => {
