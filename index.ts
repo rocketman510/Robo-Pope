@@ -6,6 +6,7 @@ import { Browser } from 'puppeteer';
 import { handleLevel, handleReaction } from "./level";
 import type { Db } from "mongodb"
 import { handleOwsMessage } from "./functions/one_word_story";
+import { handle_join } from "./functions/dyn_voice_channel";
 
 declare module "discord.js" {
     export interface Client {
@@ -21,6 +22,7 @@ declare module "discord.js" {
         db: Db;
         ows_last_bot_message: Collection<string, string>;
         ows_sentence_history: Collection<string, string[]>;
+        dyn_vc: Collection<string, string[]>;
     }
 }
 
@@ -36,7 +38,8 @@ const client = new Client({ intents: [
   GatewayIntentBits.GuildMembers,
   GatewayIntentBits.MessageContent,
   GatewayIntentBits.GuildMessageReactions,
-  GatewayIntentBits.GuildPresences
+  GatewayIntentBits.GuildPresences,
+  GatewayIntentBits.GuildVoiceStates
 ]});
 
 client.once(Events.ClientReady, async readyClient => {
@@ -60,6 +63,10 @@ client.once(Events.ClientReady, async readyClient => {
     client.on(Events.GuildMemberRemove, async () => {
       await deply_member_count(client);
     });
+
+    client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
+      await handle_join(oldState, newState)
+    })
 
     client.on(Events.InteractionCreate, (interaction) => {
       if (interaction.isChatInputCommand()) {
