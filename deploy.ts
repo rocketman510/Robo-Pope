@@ -40,7 +40,7 @@ export default async function(client: Client) {
   client.ows_sentence_history = new Collection<string, string[]>();
   client.ows_last_bot_message = new Collection<string, string>();
   client.dyn_vc = new Collection<string, string[]>();
-  client.interaction_edit_timestamp = new Collection<string, number>();
+  client.interaction_queue = new Collection<string, number>();
 
   client.shouldStopSpam = false;
   client.is_counting_messages = true;

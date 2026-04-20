@@ -197,21 +197,23 @@ function progress_message(title:string, description: string | null, value: numbe
 }
 
 async function update_progress_bar(interaction: ChatInputCommandInteraction, title: string, value: number, max: number) {
-  const now_timestamp = Date.now()
-  const is_first = interaction.client.interaction_edit_timestamp.get(interaction.id) == undefined;
+  const queue = interaction.client.interaction_queue.ensure(interaction.id, () => 0)
+  const is_first = queue == 0
 
-  interaction.client.interaction_edit_timestamp.set(interaction.id, now_timestamp)
+  interaction.client.interaction_queue.set(interaction.id, queue + 1)
   await sleep(100);
 
-  const interaction_edit_timestamp = interaction.client.interaction_edit_timestamp.get(interaction.id);
-  if (!interaction_edit_timestamp) return;
+  const interaction_queue = interaction.client.interaction_queue.get(interaction.id);
+  if (!interaction_queue) return;
 
-  const is_ready = now_timestamp == interaction_edit_timestamp;
+  const is_ready = queue + 1 == interaction_queue;
   if (!is_first && !is_ready) return
 
   const progres_percent = Math.round((value / max) * 100);
   await interaction.editReply({ components: [progress_message(title, `${progres_percent}% • ${value}/${max}`, value, max)], flags:MessageFlags.IsComponentsV2})
-  interaction.client.interaction_edit_timestamp.set(interaction.id, Date.now())
+  if (value == max) {
+    interaction.client.interaction_queue.delete(interaction.id)
+  }
 }
 
 async function dyn_fetch(interaction: ChatInputCommandInteraction, predicate: (message: Message) => boolean, progress_message_data?: {max: number, pre_value: number}): Promise<Message[]> {
@@ -227,7 +229,6 @@ async function dyn_fetch(interaction: ChatInputCommandInteraction, predicate: (m
 
         if (progress_message_data) {
           update_progress_bar(interaction, 'Fetching, Messages', progress_message_data.pre_value + messages.length, progress_message_data.max)
-          await sleep(1)
         }
         if (messages.length == max) break;
       }
