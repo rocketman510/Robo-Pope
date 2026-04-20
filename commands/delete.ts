@@ -169,14 +169,14 @@ async function user(interaction:ChatInputCommandInteraction) {
     }
     for (const [index, message] of messages.entries()) {
       await message.delete()
-      await update_progress_bar(interaction, 'Deleteing Messages', index+1, messages.length)
+      update_progress_bar(interaction, 'Deleteing Messages', index+1, messages.length)
     }
   } else {
     let messages: Message[] = await dyn_fetch(interaction, (message) => message.author.id == (interaction.options.getUser('target')?.id || 0), {max: interaction.options.getInteger('number_of_messages') || 1, pre_value: 0})
 
     for (const [index, message] of messages.entries()) {
       await message.delete();
-      await update_progress_bar(interaction, 'Deleteing Messages', index+1, messages.length)
+      update_progress_bar(interaction, 'Deleteing Messages', index+1, messages.length)
     }
   }
 }
@@ -197,15 +197,18 @@ function progress_message(title:string, description: string | null, value: numbe
 }
 
 async function update_progress_bar(interaction: ChatInputCommandInteraction, title: string, value: number, max: number) {
-  await sleep(1)
   const now_timestamp = Date.now()
-  const edit_timestamp = interaction.client.interaction_edit_timestamp.ensure(interaction.id, () => now_timestamp)
+  const is_first = interaction.client.interaction_edit_timestamp.get(interaction.id) == undefined;
 
-  const is_first = edit_timestamp == now_timestamp
-  const is_right_time = (now_timestamp - edit_timestamp) >= 1000
-  const is_last = value == max
+  interaction.client.interaction_edit_timestamp.set(interaction.id, now_timestamp)
+  await sleep(100);
 
-  if (!is_first && !is_last && !is_right_time) return// can't skip update on the last progress update
+  const interaction_edit_timestamp = interaction.client.interaction_edit_timestamp.get(interaction.id);
+  if (!interaction_edit_timestamp) return;
+
+  const is_ready = now_timestamp == interaction_edit_timestamp;
+  if (!is_first && !is_ready) return
+
   const progres_percent = Math.round((value / max) * 100);
   await interaction.editReply({ components: [progress_message(title, `${progres_percent}% • ${value}/${max}`, value, max)], flags:MessageFlags.IsComponentsV2})
   interaction.client.interaction_edit_timestamp.set(interaction.id, Date.now())
@@ -223,7 +226,8 @@ async function dyn_fetch(interaction: ChatInputCommandInteraction, predicate: (m
         messages.push(message);
 
         if (progress_message_data) {
-          await update_progress_bar(interaction, 'Fetching, Messages', progress_message_data.pre_value + messages.length, progress_message_data.max)
+          update_progress_bar(interaction, 'Fetching, Messages', progress_message_data.pre_value + messages.length, progress_message_data.max)
+          await sleep(1)
         }
         if (messages.length == max) break;
       }
