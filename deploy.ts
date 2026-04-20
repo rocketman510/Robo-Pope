@@ -242,8 +242,9 @@ async function get_ows_history(client: Client) {
     let first_punctuation = false
 
     while (!first_punctuation) {// This looks for the first punctuation.
-      const [result, content]= test_for_first_punctuation(message_buffer);
+      const [result, content] = test_for_first_punctuation(message_buffer);
       if (!result) {
+        if (message_buffer.last() == undefined) break;
         before_message = message_buffer.last()!.id;
         message_buffer = await channel.messages.fetch({limit: 100, before: before_message})
       } else {
@@ -255,6 +256,7 @@ async function get_ows_history(client: Client) {
     }
 
     while (message_buffer.size == 100) {// This handle the chunks of 100 messages.
+      if (message_buffer.last() == undefined) break;
       before_message = message_buffer.last()!.id;
       const next_chunk = await channel.messages.fetch({limit: 100, before: before_message});
       const is_last_chunck = next_chunk.size == 0;
