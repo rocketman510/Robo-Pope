@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction, PermissionFlagsBits, ContainerBuilder, MessageFlags, ButtonBuilder, ButtonStyle, Message, ChannelType, type TextBasedChannel } from "discord.js";
+import { SlashCommandBuilder, ChatInputCommandInteraction, PermissionFlagsBits, ContainerBuilder, MessageFlags, ButtonBuilder, ButtonStyle, Message, ChannelType, type TextBasedChannel, ComponentBuilder } from "discord.js";
 import type { Command } from "../deploy";
 import { channel, type Channel } from "node:diagnostics_channel";
 import { log } from "node:console";
@@ -150,6 +150,8 @@ async function user(interaction:ChatInputCommandInteraction) {
   const user = options.getUser('target');
   const all_channels = interaction.options.getString('channels') == 'all_channels';
 
+  await interaction.deferReply({flags: MessageFlags.Ephemeral})
+
   if (!user) return;
   if (!guild) return;
   if (!interaction.channel) return;
@@ -166,10 +168,26 @@ async function user(interaction:ChatInputCommandInteraction) {
   } else {
     let messages: Message[] = await dyn_fetch(interaction.channel, interaction.options.getInteger('number_of_messages') || 1, (message) => message.author.id == (interaction.options.getUser('target') || {id:0}).id)
 
-    for (const message of messages) {
-      await message.delete()
+    for (const [index, message] of messages.entries()) {
+      await message.delete();
+      interaction.editReply({ components: [progress_message('Delete Progres', 'Percent progress of deleting qualifying messages.', index + 1, messages.length)], flags: [MessageFlags.IsComponentsV2] });
     }
   }
+}
+
+function progress_message(title:string, description: string | null, value: number, max: number): ContainerBuilder {
+  const progres_bar_length = Math.round((value/max)*15);
+  let progres_bar = progres_bar_length >= 1 ? '<:progress_bar_start_full:1495868845989040268>':'<:progress_bar_start_empty:1495868840339439836>'
+  const middle_full = Math.max(0, progres_bar_length - 2);
+  const middle_empty = Math.max(0, 13 - middle_full);
+  progres_bar += '<:progress_bar_full:1495868805589504261>'.repeat(middle_full) + '<:progress_bar_empty:1495868817648255107>'.repeat(middle_empty)
+  progres_bar += progres_bar_length >= 15 ? '<:progress_bar_end_full:1495868834215755988>':'<:progress_bar_end_empty:1495868823075688670>'
+
+  const component = new ContainerBuilder()
+    .setAccentColor(0x242429)
+    .addTextDisplayComponents((e) => e.setContent(`## ${title}${description == null ? '':'\n-# ' + description}\n${progres_bar}`))
+
+  return component
 }
 
 async function dyn_fetch(channel: TextBasedChannel, max: number, predicate: (message: Message) => boolean): Promise<Message[]> {
