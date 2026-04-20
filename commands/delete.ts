@@ -164,19 +164,19 @@ async function user(interaction:ChatInputCommandInteraction) {
       if (!channel || !channel.isTextBased()) continue;
       const pre_value = messages.length;
       const max = (interaction.options.getInteger('number_of_messages') || 1) * channels.size;
-      const message_form_pass = await dyn_fetch(interaction, (message) => message.author.id == (interaction.options.getUser('target')?.id || 0), {max, pre_value});
+      const message_form_pass = await dyn_fetch(interaction, channel, (message) => message.author.id == (interaction.options.getUser('target')?.id || 0), {max, pre_value});
       messages = messages.concat(message_form_pass);
     }
     for (const [index, message] of messages.entries()) {
       await message.delete().catch(() => {});
-      update_progress_bar(interaction, 'Deleteing Messages', index+1, messages.length);
+      update_progress_bar(interaction, message.channel.id,'Deleteing Messages', index+1, messages.length);
     }
   } else {
-    let messages: Message[] = await dyn_fetch(interaction, (message) => message.author.id == (interaction.options.getUser('target')?.id || 0), {max: interaction.options.getInteger('number_of_messages') || 1, pre_value: 0})
+    let messages: Message[] = await dyn_fetch(interaction, interaction.channel, (message) => message.author.id == (interaction.options.getUser('target')?.id || 0), {max: interaction.options.getInteger('number_of_messages') || 1, pre_value: 0})
 
     for (const [index, message] of messages.entries()) {
       await message.delete().catch(() => {});
-      update_progress_bar(interaction, 'Deleteing Messages', index+1, messages.length);
+      update_progress_bar(interaction, message.channel.id,'Deleteing Messages', index+1, messages.length);
     }
   }
 }
@@ -196,7 +196,7 @@ function progress_message(title:string, description: string | null, value: numbe
   return component
 }
 
-async function update_progress_bar(interaction: ChatInputCommandInteraction, title: string, value: number, max: number) {
+async function update_progress_bar(interaction: ChatInputCommandInteraction, channel_id: string, title: string, value: number, max: number) {
   const queue = interaction.client.interaction_queue.ensure(interaction.id, () => 0)
   const is_first = queue == 0
 
@@ -210,17 +210,17 @@ async function update_progress_bar(interaction: ChatInputCommandInteraction, tit
   if (!is_first && !is_ready) return
 
   const progres_percent = Math.round((value / max) * 100);
-  await interaction.editReply({ components: [progress_message(title, `${progres_percent}% • ${value}/${max}`, value, max)], flags:MessageFlags.IsComponentsV2})
+  await interaction.editReply({ components: [progress_message(title, `${progres_percent}% • ${value}/${max} • <#${channel_id}>`, value, max)], flags:MessageFlags.IsComponentsV2})
   if (value == max) {
     interaction.client.interaction_queue.delete(interaction.id)
   }
 }
 
-async function dyn_fetch(interaction: ChatInputCommandInteraction, predicate: (message: Message) => boolean, progress_message_data?: {max: number, pre_value: number}): Promise<Message[]> {
+async function dyn_fetch(interaction: ChatInputCommandInteraction, channel: TextBasedChannel, predicate: (message: Message) => boolean, progress_message_data?: {max: number, pre_value: number}): Promise<Message[]> {
   const max = interaction.options.getInteger('number_of_messages') || 1;
   let messages: Message[] = []
-  if (!interaction.channel) throw new Error("dyn_fetch: invalid argument. Expected TextBasedChannel. " + "Do NOT pass ChatInputCommandInteraction. Pass interaction.channel instead.");
-  let working_messages = await interaction.channel!.messages.fetch({limit: 100 });
+  if (!channel) throw new Error("dyn_fetch: invalid argument. Expected TextBasedChannel. ");
+  let working_messages = await channel!.messages.fetch({limit: 100 });
 
   while (messages.length != max) {
     for (const [_, message] of working_messages) {
@@ -228,13 +228,13 @@ async function dyn_fetch(interaction: ChatInputCommandInteraction, predicate: (m
         messages.push(message);
 
         if (progress_message_data) {
-          update_progress_bar(interaction, 'Fetching Messages', progress_message_data.pre_value + messages.length, progress_message_data.max)
+          update_progress_bar(interaction, channel.id, 'Fetching Messages', progress_message_data.pre_value + messages.length, progress_message_data.max)
         }
         if (messages.length == max) break;
       }
     }
     if (working_messages.last() == undefined) break;
-    working_messages = await interaction.channel.messages.fetch({ limit: 100, before: working_messages.last()!.id })
+    working_messages = await channel.messages.fetch({ limit: 100, before: working_messages.last()!.id })
   }
 
   return messages
