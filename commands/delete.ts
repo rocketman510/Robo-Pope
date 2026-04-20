@@ -1,5 +1,6 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction, PermissionFlagsBits, ContainerBuilder, MessageFlags, ButtonBuilder, ButtonStyle } from "discord.js";
+import { SlashCommandBuilder, ChatInputCommandInteraction, PermissionFlagsBits, ContainerBuilder, MessageFlags, ButtonBuilder, ButtonStyle, Message, ChannelType, type TextBasedChannel } from "discord.js";
 import type { Command } from "../deploy";
+import type { Channel } from "node:diagnostics_channel";
 
 export default {
   data: new SlashCommandBuilder()
@@ -11,7 +12,7 @@ export default {
         .setDescription('Delete messages form a user.')
         .addUserOption((option) => option.setName('target').setDescription('The user to target').setRequired(true))
         .addIntegerOption((option) => option.setName('number_of_messages').setDescription('The number of messages to delete').setRequired(true).setMaxValue(100).setMinValue(1))
-        .addStringOption((option) => option.setName('channels').setDescription('For all channels or only for the current channel').setRequired(true).addChoices({ name: 'All channels', value: 'all_channels' }, { name: 'Current channels', value: 'current_channel' }))
+        .addStringOption((option) => option.setName('channels').setDescription('For all channels or only for the current channel').setRequired(true).addChoices({ name: 'All channels', value: 'all_channels' }, { name: 'Current channel', value: 'current_channel' }))
         .addStringOption((option) => option.setName('after').setDescription('Filter for messages that were sent after a time. Format as: MM/DD/YY HH:MM AM or PM TIMEZONE').setRequired(false))
         .addStringOption((option) => option.setName('before').setDescription('Filter for messages that were sent before a time. Format as: MM/DD/YY HH:MM AM or PM TIMEZONE').setRequired(false))
         .addBooleanOption((option) => option.setName('attachments').setDescription('Filter for messages that have Attachments').setRequired(false))
@@ -32,7 +33,7 @@ export default {
       subcommand
         .setName('server')
         .setDescription('Delete messages form all channels.')
-        .addIntegerOption((option) => option.setName('number_of_messages').setDescription('The number of messages to delete').setRequired(true).setMaxValue(100).setMinValue(1))
+        .addIntegerOption((option) => option.setName('number_of_messages').setDescription('The number of messages to delete THIS IS PER-CHANNEL and not the total.').setRequired(true).setMaxValue(100).setMinValue(1))
         .addStringOption((option) => option.setName('after').setDescription('Filter for messages that were sent after a time. Format as: MM/DD/YY HH:MM AM or PM TIMEZONE').setRequired(false))
         .addStringOption((option) => option.setName('before').setDescription('Filter for messages that were sent before a time. Format as: MM/DD/YY HH:MM AM or PM TIMEZONE').setRequired(false))
         .addRoleOption((option) => option.setName('role').setDescription('Filter by role').setRequired(false))
@@ -47,6 +48,7 @@ export default {
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
   async execute(interaction: ChatInputCommandInteraction) {
     if (interaction.options.getSubcommand() == 'help') await help(interaction);
+    if (interaction.options.getSubcommand() == 'user') await user(interaction);
 },
 } as Command;
 
@@ -138,4 +140,42 @@ The channel subcommand is used to delete messages in the specified channel regar
 ## Server Subcommand
 The server subcommand is used to delete messages in everything channel of the server.`))
     interaction.reply({ components: [ component ], flags: [ MessageFlags.Ephemeral, MessageFlags.IsComponentsV2 ]})
+}
+
+async function user(interaction:ChatInputCommandInteraction) {
+  const client = interaction.client;
+  const guild = interaction.guild;
+  const options = interaction.options
+  const user = options.getUser('target');
+  const all_channels = interaction.options.getString('channels') == 'all_channels';
+
+  if (!user) return;
+  if (!interaction.channel) return;
+
+  if (all_channels) {
+  } else {
+    let messages: Message[] = await dyn_fetch(interaction.channel, interaction.options.getInteger('number_of_messages') || 1, (message) => message.author.id == (interaction.options.getUser('target') || {id:0}).id)
+
+    for (const message of messages) {
+      await message.delete()
+    }
+  }
+}
+
+async function dyn_fetch(channel: TextBasedChannel, max: number, predicate: (message: Message) => boolean): Promise<Message[]> {
+  let messages: Message[] = []
+  let working_messages = await channel.messages.fetch({limit: 100 });
+
+  while (messages.length != max) {
+    for (const [_, message] of working_messages) {
+      if (predicate(message)) {
+        messages.push(message);
+        if (messages.length == max) break;
+      }
+    }
+    if (working_messages.last() == undefined) break;
+    working_messages = await channel.messages.fetch({ limit: 100, before: working_messages.last()!.id })
+  }
+
+  return messages
 }
