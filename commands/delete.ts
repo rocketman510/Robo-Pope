@@ -170,7 +170,8 @@ async function user(interaction:ChatInputCommandInteraction) {
 
     for (const [index, message] of messages.entries()) {
       await message.delete();
-      interaction.editReply({ components: [progress_message('Delete Progres', 'Percent progress of deleting qualifying messages.', index + 1, messages.length)], flags: [MessageFlags.IsComponentsV2] });
+      const progres_percent = Math.round(((index + 1) / messages.length) * 100);
+      interaction.editReply({ components: [progress_message('Delete Progres', `${progres_percent}% • ${index+1}/${messages.length}`, index + 1, messages.length)], flags: [MessageFlags.IsComponentsV2] });
     }
   }
 }
