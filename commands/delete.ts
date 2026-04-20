@@ -1,6 +1,7 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction, PermissionFlagsBits, ContainerBuilder, MessageFlags, ButtonBuilder, ButtonStyle, Message, ChannelType, type TextBasedChannel } from "discord.js";
 import type { Command } from "../deploy";
-import type { Channel } from "node:diagnostics_channel";
+import { channel, type Channel } from "node:diagnostics_channel";
+import { log } from "node:console";
 
 export default {
   data: new SlashCommandBuilder()
@@ -150,9 +151,18 @@ async function user(interaction:ChatInputCommandInteraction) {
   const all_channels = interaction.options.getString('channels') == 'all_channels';
 
   if (!user) return;
+  if (!guild) return;
   if (!interaction.channel) return;
 
   if (all_channels) {
+    for (const [_, channel] of await guild.channels.fetch()) {
+      if (!channel || !channel.isTextBased()) continue;
+      let messages: Message[] = await dyn_fetch(channel, interaction.options.getInteger('number_of_messages') || 1, (message) => message.author.id == (interaction.options.getUser('target') || {id:0}).id)
+
+      for (const message of messages) {
+        await message.delete()
+      }
+    }
   } else {
     let messages: Message[] = await dyn_fetch(interaction.channel, interaction.options.getInteger('number_of_messages') || 1, (message) => message.author.id == (interaction.options.getUser('target') || {id:0}).id)
 
