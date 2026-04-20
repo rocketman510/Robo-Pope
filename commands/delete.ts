@@ -1,7 +1,7 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction, PermissionFlagsBits, ContainerBuilder, MessageFlags, ButtonBuilder, ButtonStyle, Message, ChannelType, type TextBasedChannel, ComponentBuilder } from "discord.js";
 import type { Command } from "../deploy";
 import { channel, type Channel } from "node:diagnostics_channel";
-import { log } from "node:console";
+import { error, log } from "node:console";
 import { sleep } from "bun";
 
 export default {
@@ -160,7 +160,7 @@ async function user(interaction:ChatInputCommandInteraction) {
   if (all_channels) {
     let messages: Message[] = []
     const channels = await guild.channels.fetch()
-    for (const [index, channel] of channels.entries()) {
+    for (const [_, channel] of channels) {
       if (!channel || !channel.isTextBased()) continue;
       const pre_value = messages.length;
       const max = (interaction.options.getInteger('number_of_messages') || 1) * channels.size;
@@ -168,15 +168,15 @@ async function user(interaction:ChatInputCommandInteraction) {
       messages = messages.concat(message_form_pass);
     }
     for (const [index, message] of messages.entries()) {
-      await message.delete()
-      update_progress_bar(interaction, 'Deleteing Messages', index+1, messages.length)
+      await message.delete().catch(() => {});
+      update_progress_bar(interaction, 'Deleteing Messages', index+1, messages.length);
     }
   } else {
     let messages: Message[] = await dyn_fetch(interaction, (message) => message.author.id == (interaction.options.getUser('target')?.id || 0), {max: interaction.options.getInteger('number_of_messages') || 1, pre_value: 0})
 
     for (const [index, message] of messages.entries()) {
-      await message.delete();
-      update_progress_bar(interaction, 'Deleteing Messages', index+1, messages.length)
+      await message.delete().catch(() => {});
+      update_progress_bar(interaction, 'Deleteing Messages', index+1, messages.length);
     }
   }
 }
@@ -224,11 +224,11 @@ async function dyn_fetch(interaction: ChatInputCommandInteraction, predicate: (m
 
   while (messages.length != max) {
     for (const [_, message] of working_messages) {
-      if (predicate(message)) {
+      if (predicate(message) && message.deletable) {
         messages.push(message);
 
         if (progress_message_data) {
-          update_progress_bar(interaction, 'Fetching, Messages', progress_message_data.pre_value + messages.length, progress_message_data.max)
+          update_progress_bar(interaction, 'Fetching Messages', progress_message_data.pre_value + messages.length, progress_message_data.max)
         }
         if (messages.length == max) break;
       }
