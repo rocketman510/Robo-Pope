@@ -52,7 +52,7 @@ client.once(Events.ClientReady, async readyClient => {
       await handleOwsMessage(message);
       await handleLevel(client, message);
       if (message.content == '?test') {
-        for (let i = 0; i < 100; i++) {
+        for (let i = 0; i < 50; i++) {
           await message.channel.send(i.toString())
         }
       }

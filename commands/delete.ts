@@ -207,7 +207,7 @@ async function update_progress_bar(interaction: ChatInputCommandInteraction, cha
 
   if (queue == 0) return;
 
-  if (now_timestamp - queue < 100 && value != max && !is_first) return;
+  if (now_timestamp - queue < 1000 && value != max && !is_first) return;
 
   const progres_percent = Math.round((value / max) * 100);
   await interaction.editReply({ components: [progress_message(title, `${progres_percent}% • ${value}/${max} • <#${channel_id}>`, value, max)], flags:MessageFlags.IsComponentsV2})
