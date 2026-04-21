@@ -14,7 +14,7 @@ export default {
         .setDescription('Delete messages form a user.')
         .addUserOption((option) => option.setName('target').setDescription('The user to target').setRequired(true))
         .addIntegerOption((option) => option.setName('number_of_messages').setDescription('The number of messages to delete').setRequired(true).setMaxValue(100).setMinValue(1))
-        .addStringOption((option) => option.setName('channels').setDescription('For all channels or only for the current channel').setRequired(true).addChoices({ name: 'All channels', value: 'all_channels' }, { name: 'Current channel', value: 'current_channel' }))
+        .addStringOption((option) => option.setName('channels').setDescription('For all channels or only for the current channel').setRequired(true).addChoices({ name: 'Current channel', value: 'current_channel' }, { name: 'All channels', value: 'all_channels' }))
         .addStringOption((option) => option.setName('after').setDescription('Filter for messages that were sent after a time. Format as: MM/DD/YY HH:MM AM or PM TIMEZONE').setRequired(false))
         .addStringOption((option) => option.setName('before').setDescription('Filter for messages that were sent before a time. Format as: MM/DD/YY HH:MM AM or PM TIMEZONE').setRequired(false))
         .addBooleanOption((option) => option.setName('attachments').setDescription('Filter for messages that have Attachments').setRequired(false))
