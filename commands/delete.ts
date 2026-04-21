@@ -197,22 +197,24 @@ function progress_message(title:string, description: string | null, value: numbe
 }
 
 async function update_progress_bar(interaction: ChatInputCommandInteraction, channel_id: string, title: string, value: number, max: number) {
-  const queue = interaction.client.interaction_queue.ensure(interaction.id, () => 0)
-  const is_first = queue == 0
+  const interaction_queue = interaction.client.interaction_queue;
+  const now_timestamp = Date.now()
+  const is_first = !interaction_queue.get(interaction.id);
 
-  interaction.client.interaction_queue.set(interaction.id, queue + 1)
-  await sleep(100);
+  if (is_first) interaction_queue.set(interaction.id, now_timestamp);
 
-  const interaction_queue = interaction.client.interaction_queue.get(interaction.id);
-  if (!interaction_queue) return;
+  const queue = interaction_queue.get(interaction.id) || 0;
 
-  const is_ready = queue + 1 == interaction_queue;
-  if (!is_first && !is_ready) return
+  if (queue == 0) return;
+
+  if (now_timestamp - queue < 100 && value != max && !is_first) return;
 
   const progres_percent = Math.round((value / max) * 100);
   await interaction.editReply({ components: [progress_message(title, `${progres_percent}% • ${value}/${max} • <#${channel_id}>`, value, max)], flags:MessageFlags.IsComponentsV2})
   if (value == max) {
     interaction.client.interaction_queue.delete(interaction.id)
+  } else {
+    interaction_queue.set(interaction.id, Date.now())
   }
 }
 
@@ -239,5 +241,3 @@ async function dyn_fetch(interaction: ChatInputCommandInteraction, channel: Text
 
   return messages
 }
-
-

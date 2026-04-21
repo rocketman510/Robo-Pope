@@ -51,6 +51,11 @@ client.once(Events.ClientReady, async readyClient => {
     client.on(Events.MessageCreate, async (message) => {
       await handleOwsMessage(message);
       await handleLevel(client, message);
+      if (message.content == '?test') {
+        for (let i = 0; i < 100; i++) {
+          await message.channel.send(i.toString())
+        }
+      }
     });
 
     client.on(Events.MessageReactionAdd, async (reaction, user) => {
