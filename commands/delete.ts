@@ -1,10 +1,5 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction, PermissionFlagsBits, ContainerBuilder, MessageFlags, ButtonBuilder, ButtonStyle, Message, ChannelType, type TextBasedChannel, ComponentBuilder } from "discord.js";
 import type { Command } from "../deploy";
-import { channel, type Channel } from "node:diagnostics_channel";
-import { error, log } from "node:console";
-import { sleep } from "bun";
-import { after } from "node:test";
-import { isRegExp } from "node:util/types";
 
 export default {
   data: new SlashCommandBuilder()
