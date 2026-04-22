@@ -19,7 +19,7 @@ export default {
         .addStringOption((option) => option.setName('channels').setDescription('For all channels or only for the current channel').setRequired(true).addChoices({ name: 'Current channel', value: 'current_channel' }, { name: 'All channels', value: 'all_channels' }))
         .addStringOption((option) => option.setName('after').setDescription('Filter for messages that were sent after a time. Format as: MM/DD/YY HH:MM AM or PM TIMEZONE').setRequired(false))
         .addStringOption((option) => option.setName('before').setDescription('Filter for messages that were sent before a time. Format as: MM/DD/YY HH:MM AM or PM TIMEZONE').setRequired(false))
-        .addBooleanOption((option) => option.setName('attachments').setDescription('Filter for messages that have Attachments').setRequired(false))
+        .addBooleanOption((option) => option.setName('attachments').setDescription('True filters for attachments, false filters without attachments.').setRequired(false))
         .addStringOption((option) => option.setName('regex').setDescription('Filter messages by regex').setRequired(false))
     )
     .addSubcommand((subcommand) => 
@@ -122,7 +122,9 @@ This filters for messages that pass the regex pastern that is provided in the Fi
         .setButtonAccessory(new ButtonBuilder().setURL('https://regexr.com/').setLabel('regexr').setStyle(ButtonStyle.Link))
       )
       .addTextDisplayComponents((td) => td.setContent(`When inputting regex you must use the full formatting: \`/(REGEX)/(FLAGS)\` eg: \`/clare/gi\`.
-### Regex Basics
+### attachments Field
+This field filters for messages that have attachment if true, if false it will only filter messages that don't have a attachment, and if left blank it we'll ignore whether it does or doesn't have an attachment.
+## Regex Basics
 Regular expressions (regex) are patterns used to match text. They are useful for filtering messages based on their content.
 
 **Core Syntax:**
@@ -205,6 +207,7 @@ async function user(interaction:ChatInputCommandInteraction) {
       if (!regex_parts[1]) return undefined;
       return new RegExp(regex_parts[1], regex_parts[2] ?? '')
     })()
+    const attachments = interaction.options.getBoolean('attachments');
 
     if (before_timestamp === undefined) return interaction.editReply(":warning: **WRONG BEFORE TIME FORMAT**\nTry: `MM/DD/YYYY HH:MM:SS AM or PM TIMEZONE` or `ut: UNIX TIMESTAMP`")
     if (after_timestamp === undefined) return interaction.editReply(":warning: **WRONG AFTER TIME FORMAT**\nTry: `MM/DD/YYYY HH:MM:SS AM or PM TIMEZONE` or `ut: UNIX TIMESTAMP`")
@@ -214,6 +217,7 @@ async function user(interaction:ChatInputCommandInteraction) {
       if (before_timestamp !== null && message.createdTimestamp > before_timestamp) return false;
       if (after_timestamp !== null && message.createdTimestamp < after_timestamp) return false;
       if (regex_pattern !== null && !regex_pattern.test(message.content)) return false;
+      if (attachments !== null && (message.attachments.size > 0) !== attachments) return false;
       return message.author.id == (interaction.options.getUser('target')?.id || 0)
     }, {max: interaction.options.getInteger('number_of_messages') || 1, pre_value: 0})
 
