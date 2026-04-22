@@ -63,35 +63,55 @@ The delete command is separated into 3 subcommands:
 - User
 - Channel
 - Server
+
 All of these have the same 5 filters:
-- number\_of\_messages
+- number_of_messages
 - after
 - before
 - attachments
 - regex
-Both *after* and *before* take the same input of either: a point in time, or a message ID.
+
+Both *after* and *before* take the same input of a point in time.
+
 ## Time Formatting
 You can format the time by:
 - Unix Timestamp:
   - \`UT: 1000213380\`
   - \`1000213380ut\`
-- Time Formatting
-  - Formatted as: **MM/DD/YYYY HH:MM AM or PM TIMEZONE**
-  - \`1/6/26 12:45 pm pst\`
+
+- Time Formatting:
+  - Formatted as: **MM/DD/YYYY HH:MM:SS AM or PM TIMEZONE**
+  - \`1/6/26 12:45:30 pm pst\`
   - \`01 03 2026 12:45am utc\`
   - \`12,29,2020 18:45 gmt\`
-For Time Formatting if no timezone is provided the default is PST (Pacific Standard Time) and if no time is provided then the default is 0:00 or 12:00 am both being the same time. formatting is lose for the date however the time must be: HH:MM and all of the units must be in the order: **Date, Time, Timezone**
-## Message ID's
-Message ID's are a precise tool for identifying a message to get a message ID you need to go into setting of your discord account enable developer mode. This setting can be found by opening settings and going to: **Developer -> Developer Mode.** Now when you right click a message you can copy the message's ID. The bot can accept this in the *before* and *after* fields but you must format it as: \`id: (MESSAGE ID HERE)\` eg: \`id: 1494863721342828704\`.
-## Fields
-The fields of the commands
 
-### number\_of\_messages Field
-The number of messages is how many messages the bot will delete the max is 100 and the min is 1.
+### Optional Time Rule
+The time portion is optional. If no time is provided, it defaults to the start of the day:
+- Default time: **00:00:00 (midnight)**
+- Seconds are always included in the time system, even if not specified (defaulting to 00)
+
+For example:
+- \`1/6/26\` = \`1/6/26 12:00:00 am pst\`
+
+If no timezone is provided the default is PST (Pacific Standard Time).
+
+Date formatting is flexible, but when time is included it must follow:
+**HH:MM:SS**
+
+Order must always be:
+**Date, Time, Timezone**
+
+## Fields
+
+### number_of_messages Field
+The number of messages is how many messages the bot will delete. The max is 100 and the min is 1.
+
 ### after Field
-The after field will delete all qualifying messages that happen after the time or message ID that is provided in the field. This field takes the same patern defined above **Time Formatting** and **Message ID's**.
+The after field will delete all qualifying messages that happen after the time provided in the field. This field takes the same pattern defined above under **Time Formatting**.
+
 ### before Field
-The before field will delete all qualifying messages that happen before the time or message ID that is provided in the field. This field takes the same patern defined above **Time Formatting** and **Message ID's**.`))
+The before field will delete all qualifying messages that happen before the time provided in the field. This field takes the same pattern defined above under **Time Formatting**.
+`))
       .addTextDisplayComponents((td) => td.setContent(`### attachments Field
 This filters only messages that have a attachment.
 ### regex Field
