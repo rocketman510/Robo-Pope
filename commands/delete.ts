@@ -612,7 +612,8 @@ function get_uts_form_string(string:string | null): number | undefined | null {
     const match = string.match(regex_for_date)!;
     const months = Number(match[1] ?? 0);
     const day = Number(match[2] ?? 0);
-    const year = Number(match[3] ?? 0);
+    const pre_year = Number(match[3] ?? 0)
+    const year = pre_year < 999 ? pre_year + 2000 : pre_year;
     const hour = Number(match[4] ?? 0);
     const minute = Number(match[5] ?? 0);
     const seconds = Number(match[6] ?? 0);
