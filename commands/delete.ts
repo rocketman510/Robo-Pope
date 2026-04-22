@@ -625,7 +625,7 @@ function get_uts_form_string(string:string | null): number | undefined | null {
 
     const hour24 = is_pm ? (hour == 12 ? 12 : hour + 12) : (hour == 12 && match[7] == 'am' ? 0 : hour);
 
-    const time = Date.UTC(year, months-1, day, hour24 + timezone_hour, minute + timezone_minute, seconds)
+    const time = Date.UTC(year, months-1, day, hour24 - timezone_hour, minute - timezone_minute, seconds)
 
     return time
   } else if (regex_for_ut.test(string)) {
