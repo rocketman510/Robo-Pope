@@ -207,7 +207,7 @@ async function user(interaction:ChatInputCommandInteraction) {
         if (after_timestamp !== null && message.createdTimestamp < after_timestamp) return false;
         if (regex_pattern !== null && !regex_pattern.test(message.content)) return false;
         if (attachments !== null && (message.attachments.size > 0) !== attachments) return false;
-        return message.author.id == (interaction.options.getUser('target')?.id || 0)
+        return message.author.id == (interaction.options.getUser('target')?.id || '')
       }, {max, pre_value});
 
       messages = messages.concat(message_from_pass);
@@ -224,7 +224,7 @@ async function user(interaction:ChatInputCommandInteraction) {
       if (after_timestamp !== null && message.createdTimestamp < after_timestamp) return false;
       if (regex_pattern !== null && !regex_pattern.test(message.content)) return false;
       if (attachments !== null && (message.attachments.size > 0) !== attachments) return false;
-      return message.author.id == (interaction.options.getUser('target')?.id || 0)
+      return message.author.id == (interaction.options.getUser('target')?.id || '')
     }, {max: interaction.options.getInteger('number_of_messages') || 1, pre_value: 0})
 
     for (const [index, message] of messages.entries()) {//Delete Messages
