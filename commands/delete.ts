@@ -8,22 +8,22 @@ export default {
     .addSubcommand((subcommand) => 
       subcommand
         .setName('user')
-        .setDescription('Delete messages form a user.')
+        .setDescription('Delete messages from a user.')
         .addUserOption((option) => option.setName('target').setDescription('The user to target').setRequired(true))
         .addIntegerOption((option) => option.setName('number_of_messages').setDescription('The number of messages to delete').setRequired(true).setMaxValue(100).setMinValue(1))
         .addStringOption((option) => option.setName('channels').setDescription('For all channels or only for the current channel').setRequired(true).addChoices({ name: 'Current channel', value: 'current_channel' }, { name: 'All channels', value: 'all_channels' }))
-        .addStringOption((option) => option.setName('after').setDescription('Filter for messages that were sent after a time. Format as: MM/DD/YY HH:MM AM or PM TIMEZONE').setRequired(false))
-        .addStringOption((option) => option.setName('before').setDescription('Filter for messages that were sent before a time. Format as: MM/DD/YY HH:MM AM or PM TIMEZONE').setRequired(false))
+        .addStringOption((option) => option.setName('after').setDescription('Filter for messages that were sent after a time. fromat as: MM/DD/YY HH:MM AM or PM TIMEZONE').setRequired(false))
+        .addStringOption((option) => option.setName('before').setDescription('Filter for messages that were sent before a time. fromat as: MM/DD/YY HH:MM AM or PM TIMEZONE').setRequired(false))
         .addBooleanOption((option) => option.setName('attachments').setDescription('True filters for attachments, false filters without attachments.').setRequired(false))
         .addStringOption((option) => option.setName('regex').setDescription('Filter messages by regex').setRequired(false))
     )
     .addSubcommand((subcommand) => 
       subcommand
         .setName('channel')
-        .setDescription('Delete messages form this channel.')
+        .setDescription('Delete messages from this channel.')
         .addIntegerOption((option) => option.setName('number_of_messages').setDescription('The number of messages to delete').setRequired(true).setMaxValue(100).setMinValue(1))
-        .addStringOption((option) => option.setName('after').setDescription('Filter for messages that were sent after a time. Format as: MM/DD/YY HH:MM AM or PM TIMEZONE').setRequired(false))
-        .addStringOption((option) => option.setName('before').setDescription('Filter for messages that were sent before a time. Format as: MM/DD/YY HH:MM AM or PM TIMEZONE').setRequired(false))
+        .addStringOption((option) => option.setName('after').setDescription('Filter for messages that were sent after a time. fromat as: MM/DD/YY HH:MM AM or PM TIMEZONE').setRequired(false))
+        .addStringOption((option) => option.setName('before').setDescription('Filter for messages that were sent before a time. fromat as: MM/DD/YY HH:MM AM or PM TIMEZONE').setRequired(false))
         .addRoleOption((option) => option.setName('role').setDescription('Filter by role').setRequired(false))
         .addBooleanOption((option) => option.setName('attachments').setDescription('Filter for messages that have Attachments').setRequired(false))
         .addStringOption((option) => option.setName('regex').setDescription('Filter messages by regex').setRequired(false))
@@ -31,10 +31,10 @@ export default {
     .addSubcommand((subcommand) => 
       subcommand
         .setName('server')
-        .setDescription('Delete messages form all channels.')
+        .setDescription('Delete messages from all channels.')
         .addIntegerOption((option) => option.setName('number_of_messages').setDescription('The number of messages to delete THIS IS PER-CHANNEL and not the total.').setRequired(true).setMaxValue(100).setMinValue(1))
-        .addStringOption((option) => option.setName('after').setDescription('Filter for messages that were sent after a time. Format as: MM/DD/YY HH:MM AM or PM TIMEZONE').setRequired(false))
-        .addStringOption((option) => option.setName('before').setDescription('Filter for messages that were sent before a time. Format as: MM/DD/YY HH:MM AM or PM TIMEZONE').setRequired(false))
+        .addStringOption((option) => option.setName('after').setDescription('Filter for messages that were sent after a time. fromat as: MM/DD/YY HH:MM AM or PM TIMEZONE').setRequired(false))
+        .addStringOption((option) => option.setName('before').setDescription('Filter for messages that were sent before a time. fromat as: MM/DD/YY HH:MM AM or PM TIMEZONE').setRequired(false))
         .addRoleOption((option) => option.setName('role').setDescription('Filter by role').setRequired(false))
         .addBooleanOption((option) => option.setName('attachments').setDescription('Filter for messages that have Attachments').setRequired(false))
         .addStringOption((option) => option.setName('regex').setDescription('Filter messages by regex').setRequired(false))
@@ -71,14 +71,14 @@ All of these have the same 5 filters:
 
 Both *after* and *before* take the same input of a point in time.
 
-## Time Formatting
-You can format the time by:
+## Time fromatting
+You can fromat the time by:
 - Unix Timestamp:
   - \`UT: 1000213380\`
   - \`1000213380ut\`
 
-- Time Formatting:
-  - Formatted as: **MM/DD/YYYY HH:MM:SS AM or PM TIMEZONE**
+- Time fromatting:
+  - fromatted as: **MM/DD/YYYY HH:MM:SS AM or PM TIMEZONE**
   - \`1/6/26 12:45:30 pm pst\`
   - \`01 03 2026 12:45am utc\`
   - \`12,29,2020 18:45 gmt\`
@@ -93,7 +93,7 @@ For example:
 
 If no timezone is provided the default is PST (Pacific Standard Time).
 
-Date formatting is flexible, but when time is included it must follow:
+Date fromatting is flexible, but when time is included it must follow:
 **HH:MM:SS**
 
 Order must always be:
@@ -105,20 +105,20 @@ Order must always be:
 The number of messages is how many messages the bot will delete. The max is 100 and the min is 1.
 
 ### after Field
-The after field will delete all qualifying messages that happen after the time provided in the field. This field takes the same pattern defined above under **Time Formatting**.
+The after field will delete all qualifying messages that happen after the time provided in the field. This field takes the same pattern defined above under **Time fromatting**.
 
 ### before Field
-The before field will delete all qualifying messages that happen before the time provided in the field. This field takes the same pattern defined above under **Time Formatting**.
+The before field will delete all qualifying messages that happen before the time provided in the field. This field takes the same pattern defined above under **Time fromatting**.
 `))
       .addTextDisplayComponents((td) => td.setContent(`### attachments Field
 This filters only messages that have a attachment.
 ### regex Field
 This filters for messages that pass the regex pastern that is provided in the Field. This is a powerful tool that enables a mod to remove messages by there content.`))
       .addSectionComponents((s) => s
-        .addTextDisplayComponents((td) => td.setContent('For more Information and testing go to:'))
+        .addTextDisplayComponents((td) => td.setContent('For more Infromation and testing go to:'))
         .setButtonAccessory(new ButtonBuilder().setURL('https://regexr.com/').setLabel('regexr').setStyle(ButtonStyle.Link))
       )
-      .addTextDisplayComponents((td) => td.setContent(`When inputting regex you must use the full formatting: \`/(REGEX)/(FLAGS)\` eg: \`/clare/gi\`.
+      .addTextDisplayComponents((td) => td.setContent(`When inputting regex you must use the full fromatting: \`/(REGEX)/(FLAGS)\` eg: \`/clare/gi\`.
 ### attachments Field
 This field filters for messages that have attachment if true, if false it will only filter messages that don't have a attachment, and if left blank it we'll ignore whether it does or doesn't have an attachment.
 ## Regex Basics
@@ -178,8 +178,8 @@ async function user(interaction:ChatInputCommandInteraction) {
   if (!interaction.channel) return;
 
 
-  const before_timestamp = get_uts_form_string(interaction.options.getString('before'));
-  const after_timestamp = get_uts_form_string(interaction.options.getString('after'));
+  const before_timestamp = get_uts_from_string(interaction.options.getString('before'));
+  const after_timestamp = get_uts_from_string(interaction.options.getString('after'));
   const regex_string = interaction.options.getString('regex');
   const regex_parts = regex_string?.match(/\/(.+)\/(.*)/);
   const regex_pattern: RegExp | null | undefined = (() => {
@@ -190,8 +190,8 @@ async function user(interaction:ChatInputCommandInteraction) {
   })()
   const attachments = interaction.options.getBoolean('attachments');
 
-  if (before_timestamp === undefined) return interaction.editReply(":warning: **WRONG BEFORE TIME FORMAT**\nTry: `MM/DD/YYYY HH:MM:SS AM or PM TIMEZONE` or `ut: UNIX TIMESTAMP`")
-  if (after_timestamp === undefined) return interaction.editReply(":warning: **WRONG AFTER TIME FORMAT**\nTry: `MM/DD/YYYY HH:MM:SS AM or PM TIMEZONE` or `ut: UNIX TIMESTAMP`")
+  if (before_timestamp === undefined) return interaction.editReply(":warning: **WRONG BEFORE TIME fromAT**\nTry: `MM/DD/YYYY HH:MM:SS AM or PM TIMEZONE` or `ut: UNIX TIMESTAMP`")
+  if (after_timestamp === undefined) return interaction.editReply(":warning: **WRONG AFTER TIME fromAT**\nTry: `MM/DD/YYYY HH:MM:SS AM or PM TIMEZONE` or `ut: UNIX TIMESTAMP`")
   if (regex_pattern === undefined) return interaction.editReply(":warning: **WRONG REGEX PATTERN**\nTry: `/PATTERN/FLAGS`\n[regexr](https://regexr.com/)");
 
   if (all_channels) {
@@ -202,7 +202,7 @@ async function user(interaction:ChatInputCommandInteraction) {
       if (!channel || !channel.isTextBased()) continue;
       const pre_value = messages.length;
       const max = (interaction.options.getInteger('number_of_messages') || 1) * channels.size;
-      const message_form_pass = await dyn_fetch(interaction, channel, (message) => {// Get Messages
+      const message_from_pass = await dyn_fetch(interaction, channel, (message) => {// Get Messages
         if (before_timestamp !== null && message.createdTimestamp > before_timestamp) return false;
         if (after_timestamp !== null && message.createdTimestamp < after_timestamp) return false;
         if (regex_pattern !== null && !regex_pattern.test(message.content)) return false;
@@ -210,7 +210,7 @@ async function user(interaction:ChatInputCommandInteraction) {
         return message.author.id == (interaction.options.getUser('target')?.id || 0)
       }, {max, pre_value});
 
-      messages = messages.concat(message_form_pass);
+      messages = messages.concat(message_from_pass);
     }
 
     for (const [index, message] of messages.entries()) {//Delete Messages
@@ -242,8 +242,8 @@ async function channel(interaction:ChatInputCommandInteraction) {
   if (!guild) return;
   if (!interaction.channel) return;
 
-  const before_timestamp = get_uts_form_string(interaction.options.getString('before'));
-  const after_timestamp = get_uts_form_string(interaction.options.getString('after'));
+  const before_timestamp = get_uts_from_string(interaction.options.getString('before'));
+  const after_timestamp = get_uts_from_string(interaction.options.getString('after'));
   const regex_string = interaction.options.getString('regex');
   const regex_parts = regex_string?.match(/\/(.+)\/(.*)/);
   const regex_pattern: RegExp | null | undefined = (() => {
@@ -255,8 +255,8 @@ async function channel(interaction:ChatInputCommandInteraction) {
   const attachments = options.getBoolean('attachments');
   const role = options.getRole('role');
 
-  if (before_timestamp === undefined) return interaction.editReply(":warning: **WRONG BEFORE TIME FORMAT**\nTry: `MM/DD/YYYY HH:MM:SS AM or PM TIMEZONE` or `ut: UNIX TIMESTAMP`")
-  if (after_timestamp === undefined) return interaction.editReply(":warning: **WRONG AFTER TIME FORMAT**\nTry: `MM/DD/YYYY HH:MM:SS AM or PM TIMEZONE` or `ut: UNIX TIMESTAMP`")
+  if (before_timestamp === undefined) return interaction.editReply(":warning: **WRONG BEFORE TIME fromAT**\nTry: `MM/DD/YYYY HH:MM:SS AM or PM TIMEZONE` or `ut: UNIX TIMESTAMP`")
+  if (after_timestamp === undefined) return interaction.editReply(":warning: **WRONG AFTER TIME fromAT**\nTry: `MM/DD/YYYY HH:MM:SS AM or PM TIMEZONE` or `ut: UNIX TIMESTAMP`")
   if (regex_pattern === undefined) return interaction.editReply(":warning: **WRONG REGEX PATTERN**\nTry: `/PATTERN/FLAGS`\n[regexr](https://regexr.com/)");
 
   let messages: Message[] = await dyn_fetch(interaction, interaction.channel, (message) => {// Get Messages
@@ -283,8 +283,8 @@ async function server(interaction:ChatInputCommandInteraction) {
   if (!guild) return;
   if (!interaction.channel) return;
 
-  const before_timestamp = get_uts_form_string(interaction.options.getString('before'));
-  const after_timestamp = get_uts_form_string(interaction.options.getString('after'));
+  const before_timestamp = get_uts_from_string(interaction.options.getString('before'));
+  const after_timestamp = get_uts_from_string(interaction.options.getString('after'));
   const regex_string = interaction.options.getString('regex');
   const regex_parts = regex_string?.match(/\/(.+)\/(.*)/);
   const regex_pattern: RegExp | null | undefined = (() => {
@@ -296,8 +296,8 @@ async function server(interaction:ChatInputCommandInteraction) {
   const attachments = interaction.options.getBoolean('attachments');
   const role = options.getRole('role');
 
-  if (before_timestamp === undefined) return interaction.editReply(":warning: **WRONG BEFORE TIME FORMAT**\nTry: `MM/DD/YYYY HH:MM:SS AM or PM TIMEZONE` or `ut: UNIX TIMESTAMP`")
-  if (after_timestamp === undefined) return interaction.editReply(":warning: **WRONG AFTER TIME FORMAT**\nTry: `MM/DD/YYYY HH:MM:SS AM or PM TIMEZONE` or `ut: UNIX TIMESTAMP`")
+  if (before_timestamp === undefined) return interaction.editReply(":warning: **WRONG BEFORE TIME fromAT**\nTry: `MM/DD/YYYY HH:MM:SS AM or PM TIMEZONE` or `ut: UNIX TIMESTAMP`")
+  if (after_timestamp === undefined) return interaction.editReply(":warning: **WRONG AFTER TIME fromAT**\nTry: `MM/DD/YYYY HH:MM:SS AM or PM TIMEZONE` or `ut: UNIX TIMESTAMP`")
   if (regex_pattern === undefined) return interaction.editReply(":warning: **WRONG REGEX PATTERN**\nTry: `/PATTERN/FLAGS`\n[regexr](https://regexr.com/)");
 
   let messages: Message[] = []
@@ -307,7 +307,7 @@ async function server(interaction:ChatInputCommandInteraction) {
     if (!channel || !channel.isTextBased()) continue;
     const pre_value = messages.length;
     const max = (interaction.options.getInteger('number_of_messages') || 1) * channels.size;
-    const message_form_pass = await dyn_fetch(interaction, channel, (message) => {// Get Messages
+    const message_from_pass = await dyn_fetch(interaction, channel, (message) => {// Get Messages
       if (before_timestamp !== null && message.createdTimestamp > before_timestamp) return false;
       if (after_timestamp !== null && message.createdTimestamp < after_timestamp) return false;
       if (regex_pattern !== null && !regex_pattern.test(message.content)) return false;
@@ -316,7 +316,7 @@ async function server(interaction:ChatInputCommandInteraction) {
       return true
     }, {max, pre_value});
 
-    messages = messages.concat(message_form_pass);
+    messages = messages.concat(message_from_pass);
   }
 
   for (const [index, message] of messages.entries()) {//Delete Messages
@@ -386,7 +386,7 @@ async function dyn_fetch(interaction: ChatInputCommandInteraction, channel: Text
   return messages
 }
 
-function get_uts_form_string(string:string | null): number | undefined | null {
+function get_uts_from_string(string:string | null): number | undefined | null {
   if (string == null) return null
   const regex_for_date = /(\d+)[\s./\\,-](\d+)[\s./\\,-](\d+)\s+(\d+)?:?(\d+)?:?(\d+)?\s*(am|pm)?\s*(\w*)/i
   const regex_for_ut = /(?:(?:^uts?|^unix timestamps|^unix time?|^unix)[\s:;,.=]*(\d*))|(?:(\d*)[\s:;,.=]*(?:uts?$|unix$|unix time$|unix timestamps?$))/i
