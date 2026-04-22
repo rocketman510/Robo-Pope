@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction, PermissionFlagsBits, ContainerBuilder, MessageFlags, ButtonBuilder, ButtonStyle, Message, ChannelType, type TextBasedChannel, ComponentBuilder } from "discord.js";
+import { SlashCommandBuilder, ChatInputCommandInteraction, PermissionFlagsBits, ContainerBuilder, MessageFlags, ButtonBuilder, ButtonStyle, Message, type TextBasedChannel } from "discord.js";
 import type { Command } from "../deploy";
 
 export default {
@@ -215,7 +215,7 @@ async function user(interaction:ChatInputCommandInteraction) {
 
     for (const [index, message] of messages.entries()) {//Delete Messages
       await message.delete().catch(() => {});
-      update_progress_bar(interaction, message.channel.id,'Deleteing Messages', index+1, messages.length);
+      update_progress_bar(interaction, message.channel.id,'Deleting Messages', index+1, messages.length);
     }
   } else {
 
@@ -229,7 +229,7 @@ async function user(interaction:ChatInputCommandInteraction) {
 
     for (const [index, message] of messages.entries()) {//Delete Messages
       await message.delete().catch(() => {});
-      update_progress_bar(interaction, message.channel.id,'Deleteing Messages', index+1, messages.length);
+      update_progress_bar(interaction, message.channel.id,'Deleting Messages', index+1, messages.length);
     }
   }
 }
@@ -270,7 +270,7 @@ async function channel(interaction:ChatInputCommandInteraction) {
 
   for (const [index, message] of messages.entries()) {//Delete Messages
     await message.delete().catch(() => {});
-    update_progress_bar(interaction, message.channel.id,'Deleteing Messages', index+1, messages.length);
+    update_progress_bar(interaction, message.channel.id,'Deleting Messages', index+1, messages.length);
   }
 }
 
@@ -321,7 +321,7 @@ async function server(interaction:ChatInputCommandInteraction) {
 
   for (const [index, message] of messages.entries()) {//Delete Messages
     await message.delete().catch(() => {});
-    update_progress_bar(interaction, message.channel.id,'Deleteing Messages', index+1, messages.length);
+    update_progress_bar(interaction, message.channel.id,'Deleting Messages', index+1, messages.length);
   }
 }
 
