@@ -607,9 +607,6 @@ function get_uts_form_string(string:string | null): number | undefined | null {
 
   type TimezoneKey = keyof typeof timezones;
 
-  console.log(string);
-  console.log(regex_for_date.test(string));
-  
 
   if (regex_for_date.test(string)) {
     const match = string.match(regex_for_date)!;
@@ -630,8 +627,6 @@ function get_uts_form_string(string:string | null): number | undefined | null {
 
     const time = Date.UTC(year, months-1, day, hour24 + timezone_hour, minute + timezone_minute, seconds)
 
-    console.log(time, Date.now(), Date.now() - time);
-    
     return time
   } else if (regex_for_ut.test(string)) {
     const match = string.match(regex_for_ut)!;
