@@ -49,6 +49,7 @@ export default {
     if (interaction.options.getSubcommand() == 'help') await help(interaction);
     if (interaction.options.getSubcommand() == 'user') await user(interaction);
     if (interaction.options.getSubcommand() == 'channel') await channel(interaction);
+    if (interaction.options.getSubcommand() == 'server') await server(interaction);
 },
 } as Command;
 
@@ -238,10 +239,8 @@ async function channel(interaction:ChatInputCommandInteraction) {
 
   await interaction.deferReply({flags: MessageFlags.Ephemeral})
 
-  if (!user) return;
   if (!guild) return;
   if (!interaction.channel) return;
-
 
   const before_timestamp = get_uts_form_string(interaction.options.getString('before'));
   const after_timestamp = get_uts_form_string(interaction.options.getString('after'));
@@ -268,6 +267,57 @@ async function channel(interaction:ChatInputCommandInteraction) {
     if (role !== null && !!message.member && !message.member.roles.cache.hasAny(role.id)) return false;
     return true;
   }, {max: options.getInteger('number_of_messages') || 1, pre_value: 0})
+
+  for (const [index, message] of messages.entries()) {//Delete Messages
+    await message.delete().catch(() => {});
+    update_progress_bar(interaction, message.channel.id,'Deleteing Messages', index+1, messages.length);
+  }
+}
+
+async function server(interaction:ChatInputCommandInteraction) {
+  const guild = interaction.guild;
+  const options = interaction.options
+
+  await interaction.deferReply({flags: MessageFlags.Ephemeral})
+
+  if (!guild) return;
+  if (!interaction.channel) return;
+
+  const before_timestamp = get_uts_form_string(interaction.options.getString('before'));
+  const after_timestamp = get_uts_form_string(interaction.options.getString('after'));
+  const regex_string = interaction.options.getString('regex');
+  const regex_parts = regex_string?.match(/\/(.+)\/(.*)/);
+  const regex_pattern: RegExp | null | undefined = (() => {
+    if (regex_string === null) return null;
+    if (!regex_parts) return undefined;
+    if (!regex_parts[1]) return undefined;
+    return new RegExp(regex_parts[1], regex_parts[2] ?? '')
+  })()
+  const attachments = interaction.options.getBoolean('attachments');
+  const role = options.getRole('role');
+
+  if (before_timestamp === undefined) return interaction.editReply(":warning: **WRONG BEFORE TIME FORMAT**\nTry: `MM/DD/YYYY HH:MM:SS AM or PM TIMEZONE` or `ut: UNIX TIMESTAMP`")
+  if (after_timestamp === undefined) return interaction.editReply(":warning: **WRONG AFTER TIME FORMAT**\nTry: `MM/DD/YYYY HH:MM:SS AM or PM TIMEZONE` or `ut: UNIX TIMESTAMP`")
+  if (regex_pattern === undefined) return interaction.editReply(":warning: **WRONG REGEX PATTERN**\nTry: `/PATTERN/FLAGS`\n[regexr](https://regexr.com/)");
+
+  let messages: Message[] = []
+  const channels = await guild.channels.fetch()
+
+  for (const [_, channel] of channels) {//Get messages
+    if (!channel || !channel.isTextBased()) continue;
+    const pre_value = messages.length;
+    const max = (interaction.options.getInteger('number_of_messages') || 1) * channels.size;
+    const message_form_pass = await dyn_fetch(interaction, channel, (message) => {// Get Messages
+      if (before_timestamp !== null && message.createdTimestamp > before_timestamp) return false;
+      if (after_timestamp !== null && message.createdTimestamp < after_timestamp) return false;
+      if (regex_pattern !== null && !regex_pattern.test(message.content)) return false;
+      if (attachments !== null && (message.attachments.size > 0) !== attachments) return false;
+      if (role !== null && !!message.member && !message.member.roles.cache.hasAny(role.id)) return false;
+      return true
+    }, {max, pre_value});
+
+    messages = messages.concat(message_form_pass);
+  }
 
   for (const [index, message] of messages.entries()) {//Delete Messages
     await message.delete().catch(() => {});
