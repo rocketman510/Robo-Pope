@@ -4,6 +4,7 @@ import { channel, type Channel } from "node:diagnostics_channel";
 import { error, log } from "node:console";
 import { sleep } from "bun";
 import { after } from "node:test";
+import { isRegExp } from "node:util/types";
 
 export default {
   data: new SlashCommandBuilder()
@@ -180,31 +181,46 @@ async function user(interaction:ChatInputCommandInteraction) {
   if (all_channels) {
     let messages: Message[] = []
     const channels = await guild.channels.fetch()
-    for (const [_, channel] of channels) {
+
+    for (const [_, channel] of channels) {//Get messages
       if (!channel || !channel.isTextBased()) continue;
       const pre_value = messages.length;
       const max = (interaction.options.getInteger('number_of_messages') || 1) * channels.size;
       const message_form_pass = await dyn_fetch(interaction, channel, (message) => message.author.id == (interaction.options.getUser('target')?.id || 0), {max, pre_value});
       messages = messages.concat(message_form_pass);
     }
-    for (const [index, message] of messages.entries()) {
+
+    for (const [index, message] of messages.entries()) {//Delete Messages
       await message.delete().catch(() => {});
       update_progress_bar(interaction, message.channel.id,'Deleteing Messages', index+1, messages.length);
     }
   } else {
     const before_timestamp = get_uts_form_string(interaction.options.getString('before'));
     const after_timestamp = get_uts_form_string(interaction.options.getString('after'));
+    const regex_string = interaction.options.getString('regex');
+    const regex_parts = regex_string?.match(/\/(.+)\/(.*)/);
+    const regex_pattern: RegExp | null | undefined = (() => {
+      if (regex_string === null) return null;
+      if (!regex_parts) return undefined;
+      if (!regex_parts[1]) return undefined;
+      return new RegExp(regex_parts[1], regex_parts[2] ?? '')
+    })()
+
+    console.log(regex_pattern);
+    
 
     if (before_timestamp === undefined) return interaction.editReply(":warning: **WRONG BEFORE TIME FORMAT**\nTry: `MM/DD/YYYY HH:MM:SS AM or PM TIMEZONE` or `ut: UNIX TIMESTAMP`")
     if (after_timestamp === undefined) return interaction.editReply(":warning: **WRONG AFTER TIME FORMAT**\nTry: `MM/DD/YYYY HH:MM:SS AM or PM TIMEZONE` or `ut: UNIX TIMESTAMP`")
+    if (regex_pattern === undefined) return interaction.editReply(":warning: **WRONG REGEX PATTERN**\nTry: `/PATTERN/FLAGS`\n[regexr](https://regexr.com/)");
 
-    let messages: Message[] = await dyn_fetch(interaction, interaction.channel, (message) => {
+    let messages: Message[] = await dyn_fetch(interaction, interaction.channel, (message) => {// Get Messages
       if (before_timestamp !== null && message.createdTimestamp > before_timestamp) return false;
       if (after_timestamp !== null && message.createdTimestamp < after_timestamp) return false;
+      if (regex_pattern !== null && !regex_pattern.test(message.content)) return false;
       return message.author.id == (interaction.options.getUser('target')?.id || 0)
     }, {max: interaction.options.getInteger('number_of_messages') || 1, pre_value: 0})
 
-    for (const [index, message] of messages.entries()) {
+    for (const [index, message] of messages.entries()) {//Delete Messages
       await message.delete().catch(() => {});
       update_progress_bar(interaction, message.channel.id,'Deleteing Messages', index+1, messages.length);
     }
