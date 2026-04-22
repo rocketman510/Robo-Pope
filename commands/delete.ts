@@ -146,7 +146,6 @@ The server subcommand is used to delete messages in everything channel of the se
 }
 
 async function user(interaction:ChatInputCommandInteraction) {
-  const client = interaction.client;
   const guild = interaction.guild;
   const options = interaction.options
   const user = options.getUser('target');
@@ -176,8 +175,8 @@ async function user(interaction:ChatInputCommandInteraction) {
     const before_timestamp = get_uts_form_string(interaction.options.getString('before'));
     const after_timestamp = get_uts_form_string(interaction.options.getString('after'));
 
-    if (before_timestamp === undefined) return interaction.editReply(":warning: **WRONG BEFORE TIME FORMAT**\nTry: `MM/DD/YYYY HH:MM:SS AM or PM TIMEZONE`")
-    if (after_timestamp === undefined) return interaction.editReply(":warning: **WRONG AFTER TIME FORMAT**\nTry: `MM/DD/YYYY HH:MM:SS AM or PM TIMEZONE`")
+    if (before_timestamp === undefined) return interaction.editReply(":warning: **WRONG BEFORE TIME FORMAT**\nTry: `MM/DD/YYYY HH:MM:SS AM or PM TIMEZONE` or `ut: UNIX TIMESTAMP`")
+    if (after_timestamp === undefined) return interaction.editReply(":warning: **WRONG AFTER TIME FORMAT**\nTry: `MM/DD/YYYY HH:MM:SS AM or PM TIMEZONE` or `ut: UNIX TIMESTAMP`")
 
     let messages: Message[] = await dyn_fetch(interaction, interaction.channel, (message) => {
       if (before_timestamp !== null && message.createdTimestamp > before_timestamp) return false;
@@ -256,7 +255,7 @@ async function dyn_fetch(interaction: ChatInputCommandInteraction, channel: Text
 function get_uts_form_string(string:string | null): number | undefined | null {
   if (string == null) return null
   const regex_for_date = /(\d+)[\s./\\,-](\d+)[\s./\\,-](\d+)\s+(\d+)?:?(\d+)?:?(\d+)?\s*(am|pm)?\s*(\w*)/i
-  const regex_for_ut = /uts?[\s:;,.=]*(\d*)/i
+  const regex_for_ut = /(?:(?:^uts?|^unix timestamps|^unix time?|^unix)[\s:;,.=]*(\d*))|(?:(\d*)[\s:;,.=]*(?:uts?$|unix$|unix time$|unix timestamps?$))/i
 
   const timezones = {
     "a": 1,
@@ -502,7 +501,8 @@ function get_uts_form_string(string:string | null): number | undefined | null {
     return time
   } else if (regex_for_ut.test(string)) {
     const match = string.match(regex_for_ut)!;
-    const time = Number(match[1]) * 1000;
+    if (match[1] === undefined && match[2] == undefined) return undefined;
+    const time = Number(match[1] ?? match[2]) * 1000;
     return time
   } else {
     return undefined;
