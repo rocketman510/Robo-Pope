@@ -3,6 +3,7 @@ import type { Command } from "../deploy";
 import { channel, type Channel } from "node:diagnostics_channel";
 import { error, log } from "node:console";
 import { sleep } from "bun";
+import { after } from "node:test";
 
 export default {
   data: new SlashCommandBuilder()
@@ -172,7 +173,17 @@ async function user(interaction:ChatInputCommandInteraction) {
       update_progress_bar(interaction, message.channel.id,'Deleteing Messages', index+1, messages.length);
     }
   } else {
-    let messages: Message[] = await dyn_fetch(interaction, interaction.channel, (message) => message.author.id == (interaction.options.getUser('target')?.id || 0), {max: interaction.options.getInteger('number_of_messages') || 1, pre_value: 0})
+    const before_timestamp = get_uts_form_string(interaction.options.getString('before'));
+    const after_timestamp = get_uts_form_string(interaction.options.getString('after'));
+
+    if (before_timestamp === undefined) return interaction.editReply(":warning: **WRONG BEFORE TIME FORMAT**\nTry: `MM/DD/YYYY HH:MM:SS AM or PM TIMEZONE`")
+    if (after_timestamp === undefined) return interaction.editReply(":warning: **WRONG AFTER TIME FORMAT**\nTry: `MM/DD/YYYY HH:MM:SS AM or PM TIMEZONE`")
+
+    let messages: Message[] = await dyn_fetch(interaction, interaction.channel, (message) => {
+      if (before_timestamp !== null && message.createdTimestamp > before_timestamp) return false;
+      if (after_timestamp !== null && message.createdTimestamp < after_timestamp) return false;
+      return message.author.id == (interaction.options.getUser('target')?.id || 0)
+    }, {max: interaction.options.getInteger('number_of_messages') || 1, pre_value: 0})
 
     for (const [index, message] of messages.entries()) {
       await message.delete().catch(() => {});
@@ -242,10 +253,10 @@ async function dyn_fetch(interaction: ChatInputCommandInteraction, channel: Text
   return messages
 }
 
-function get_uts_form_string(string:string): number | undefined {
-  const regex_for_date = /(\d+)[\s./\\,-](\d+)[\s./\\,-](\d+)\s+(\d+):(\d+)\s*(am|pm|)\s+(\w*)/i
-  const regex_for_id = /a/i
-  const regex_for_ut = /b/i
+function get_uts_form_string(string:string | null): number | undefined | null {
+  if (string == null) return null
+  const regex_for_date = /(\d+)[\s./\\,-](\d+)[\s./\\,-](\d+)\s+(\d+)?:?(\d+)?:?(\d+)?\s*(am|pm)?\s*(\w*)/i
+  const regex_for_ut = /uts?[\s:;,.=]*(\d*)/i
 
   const timezones = {
     "a": 1,
@@ -461,19 +472,38 @@ function get_uts_form_string(string:string): number | undefined {
     "z": 0
   }
 
+  type TimezoneKey = keyof typeof timezones;
+
+  console.log(string);
+  console.log(regex_for_date.test(string));
+  
+
   if (regex_for_date.test(string)) {
     const match = string.match(regex_for_date)!;
-    const months = match[1];
-    const day = match[2];
-    const year = match[3];
-    const hour = match[4];
-    const minute = match[5];
-    const is_pm = match[6] == 'pm';
-    const timezone = match[7];
-  } else if (regex_for_id.test(string)) {
-    const match = string.match(regex_for_id);
+    const months = Number(match[1] ?? 0);
+    const day = Number(match[2] ?? 0);
+    const year = Number(match[3] ?? 0);
+    const hour = Number(match[4] ?? 0);
+    const minute = Number(match[5] ?? 0);
+    const seconds = Number(match[6] ?? 0);
+    const is_pm = match[7] == 'pm';
+    const timezone_key = (match[8] ?? 'pst').toLowerCase() as TimezoneKey
+    const timezone = timezones[timezone_key] || -8;
+
+    const timezone_hour = Math.floor(timezone);
+    const timezone_minute = (timezone - timezone_hour) * 60;
+
+    const hour24 = is_pm ? (hour == 12 ? 12 : hour + 12) : (hour == 12 ? 0 : hour);
+
+    const time = Date.UTC(year, months-1, day, hour24 + timezone_hour, minute + timezone_minute, seconds)
+
+    console.log(time, Date.now(), Date.now() - time);
+    
+    return time
   } else if (regex_for_ut.test(string)) {
-    const match = string.match(regex_for_ut);
+    const match = string.match(regex_for_ut)!;
+    const time = Number(match[1]) * 1000;
+    return time
   } else {
     return undefined;
   }
