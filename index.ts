@@ -23,6 +23,7 @@ declare module "discord.js" {
         ows_last_bot_message: Collection<string, string>;
         ows_sentence_history: Collection<string, string[]>;
         dyn_vc: Collection<string, string[]>;
+        interaction_queue: Collection<string, number>;
     }
 }
 
@@ -50,6 +51,11 @@ client.once(Events.ClientReady, async readyClient => {
     client.on(Events.MessageCreate, async (message) => {
       await handleOwsMessage(message);
       await handleLevel(client, message);
+      if (message.content == '?test') {
+        for (let i = 0; i < 50; i++) {
+          await message.channel.send(i.toString())
+        }
+      }
     });
 
     client.on(Events.MessageReactionAdd, async (reaction, user) => {
