@@ -206,9 +206,6 @@ async function user(interaction:ChatInputCommandInteraction) {
       return new RegExp(regex_parts[1], regex_parts[2] ?? '')
     })()
 
-    console.log(regex_pattern);
-    
-
     if (before_timestamp === undefined) return interaction.editReply(":warning: **WRONG BEFORE TIME FORMAT**\nTry: `MM/DD/YYYY HH:MM:SS AM or PM TIMEZONE` or `ut: UNIX TIMESTAMP`")
     if (after_timestamp === undefined) return interaction.editReply(":warning: **WRONG AFTER TIME FORMAT**\nTry: `MM/DD/YYYY HH:MM:SS AM or PM TIMEZONE` or `ut: UNIX TIMESTAMP`")
     if (regex_pattern === undefined) return interaction.editReply(":warning: **WRONG REGEX PATTERN**\nTry: `/PATTERN/FLAGS`\n[regexr](https://regexr.com/)");
