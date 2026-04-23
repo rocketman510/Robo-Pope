@@ -1,0 +1,55 @@
+{
+  "name": "Example",
+  "id": "example",
+  "children": [
+    {
+      "name": null,
+      "id": 0,
+      "type": "book",
+      "children": [
+        {
+          "name": "Chapter 1",
+          "id": 0,
+          "type": "chapter",
+          "children": [
+            {
+              "name": "Section 1: How to make an example",
+              "id": 0,
+              "type": "section",
+              "children": [
+                {
+                  "name": null,
+                  "id": 0,
+                  "type": "paragraph",
+                  "children": [
+                    {
+                      "name": null,
+                      "id": 0,
+                      "type": "sentence",
+                      "content": "The quick brown fox jumped over the lazy dog.",
+                      "foot_note": "This is an example sentence that uses every letter in the alphabet."
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Chapter 2",
+          "id": 1,
+          "type": "chapter",
+          "children": [
+            {
+              "name": null,
+              "id": 0,
+              "type": "verse",
+              "content": "In the beginning was the Word, and the Word was with God, and the Word was God.",
+              "foot_note": null
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
