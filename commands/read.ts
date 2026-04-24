@@ -87,14 +87,15 @@ function render_chapter(book_data: Book, book_id: number, chapter: number, range
   const chapter_data: BookPart | undefined  = chapters.children.find((i): i is BookPart => i.id === chapter && !is_sentence(i));
   if (chapter_data === undefined) return "No chapter data";
 
-  const sentence_buffer = get_children(chapter_data);
+  let sentence_buffer: {type: string, content: string}[] = (() => !!chapter_data.name ? [{type: chapter_data.type, content: chapters.name + " " + chapter_data.name}]:[])();
+  sentence_buffer.push(...get_children(chapter_data));
 
   let text_display_buffer = ""
 
-  for (const sentence of sentence_buffer) {
+  for (const [index, sentence] of sentence_buffer.entries()) {
     const type = sentence.type;
     const content = sentence.content;
-    if (text_display_buffer.length + (type == "sentence" || type == "verse" ? content.length + 1 : content.length + 6) > 4000) {
+    if (text_display_buffer.length + (type == "sentence" || type == "verse" ? content.length + 5 : content.length + 6) > 4000) {
       buffer.push([new ContainerBuilder()
         .setAccentColor(0x242429)
         .addTextDisplayComponents(o => o.setContent(text_display_buffer))
@@ -103,7 +104,9 @@ function render_chapter(book_data: Book, book_id: number, chapter: number, range
     }
 
     if (type == "sentence" || type == "verse") {
-      text_display_buffer += content + " "
+      text_display_buffer += "  " + to_superscript(get_position(sentence_buffer, index) + 1) + content + "\n"
+    } else if (type == "chapter") {
+      text_display_buffer += "# " + content + "\n"
     } else {
       text_display_buffer += "### " + content + "\n"
     }
@@ -136,4 +139,41 @@ function get_children(children_data: BookPart): {type: string, content: string}[
 
 function is_sentence(child: BookPart | Sentence): child is Sentence {
   return child.type === "sentence" || child.type === "verse";
+}
+
+const superscriptMap: Record<string, string> = {
+  "0": "⁰",
+  "1": "¹",
+  "2": "²",
+  "3": "³",
+  "4": "⁴",
+  "5": "⁵",
+  "6": "⁶",
+  "7": "⁷",
+  "8": "⁸",
+  "9": "⁹",
+};
+
+function to_superscript(num: number): string {
+  return num
+    .toString()
+    .split("")
+    .map(d => superscriptMap[d])
+    .join("");
+}
+
+function get_position(items: {type: string, content: string}[], index: number): number {
+  const targetType = items[index]?.type;
+  if (!targetType) return -1;
+
+  let count = 0;
+
+  for (let i = 0; i < items.length; i++) {
+    if (items[i]!.type === targetType) {
+      if (i === index) return count;
+      count++;
+    }
+  }
+
+  return -1; // index not found (shouldn't happen if valid input)
 }
