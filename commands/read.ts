@@ -1,28 +1,41 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction, type ApplicationCommandOptionChoiceData, MessageFlags, ContainerBuilder } from "discord.js";
+import { SlashCommandBuilder, ChatInputCommandInteraction, type ApplicationCommandOptionChoiceData, MessageFlags, ContainerBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 import type { Command } from "../deploy";
 import { readdirSync, readFileSync } from "fs";
 import path from "path";
+import type { Collection } from "mongodb";
 
-type BookPart = {
-  name: string | null;
-  id: number;
-  type: "chapter" | "section" | "paragraph";
-  children: (BookPart | Sentence)[];
-}
-
-type Sentence = {
-  name: string | null;
-  id: number;
-  type: "sentence" | "verse";
+type BookPrimitive = {
+  _id: string;
+  book_id: string;
+  absolute_index: number;
   content: string;
-  foot_note: string | null;
-}
+  type: string;
+  reference_number: number;
+  is_image: boolean;
+  image_path: string;
+  foot_note: string[];
+  next: string;
+  previous: string;
+  reference: {
+    book: string;
+    chapter: string;
+    primitive: string;
+    section: string;
+  };
+};
 
 type Book = {
-  name: string;
-  id: string;
-  children: BookPart[];
-};
+  _id: string;
+  title: string;
+  translation: string;
+  language: string;
+  thumbnail: string;
+  author: string;
+  books: Record<string, string>;
+  chapters: Record<string, string>;
+  primitives: Record<string, string>;
+}
+
 
 export default {
   data: new SlashCommandBuilder()
@@ -36,26 +49,17 @@ export default {
         .setRequired(true)
     ),
   async execute(interaction: ChatInputCommandInteraction) {
-    const book_id = interaction.options.getString('book');
-    const book_raw = readFileSync("./books/" + book_id + ".json", "utf-8");
-    if (book_raw === null) return interaction.reply({ content: "No Book of that name", flags: MessageFlags.Ephemeral });
-    const book_data = JSON.parse(book_raw) as Book;
+    const db = interaction.client.db;
 
-    const components = render_chapter(book_data, 0, 0, [0, 32])
+    const books = db.collection<Book>('books');
+    const primitives = db.collection<BookPrimitive>('book_primitives');
 
-    if (components === typeof "") return await interaction.reply({content: components, flags: [MessageFlags.Ephemeral]})
+    const container = await render_page("nrsv-ci", "gen001001", 4000, primitives);
 
-    for (const [i, component] of components.entries()) {
-      console.log(component, i);
-      if (i == 0) {
-        await interaction.reply({ components: component, flags: [MessageFlags.IsComponentsV2] })
-      } else {
-        await interaction.followUp({components: component, flags: [MessageFlags.IsComponentsV2] })
-      }
-    }
-
+    interaction.reply({components: container, flags: [MessageFlags.Ephemeral, MessageFlags.IsComponentsV2]})
   },
 } as Command;
+
 
 function get_choices(dir_path: string): ApplicationCommandOptionChoiceData<string>[] {
   let buffer = []
@@ -72,73 +76,37 @@ function get_choices(dir_path: string): ApplicationCommandOptionChoiceData<strin
     const file_data = readFileSync(dir_path + file, "utf-8");
     const file_json = JSON.parse(file_data);
 
-    buffer.push({name: file_json.name, value: file_json.id})
+    buffer.push({name: file_json.metadata.title, value: file_json.metadata._id})
   }
 
   return buffer
 }
 
-function render_chapter(book_data: Book, book_id: number, chapter: number, range: [number, number]): [ContainerBuilder[]] | string {
-  let buffer: any = [];
+async function render_page(book_id: string, start_id: string, max_caharacters: number, primitives: Collection<BookPrimitive>): Promise<ContainerBuilder[]> {
+  const error = new ContainerBuilder().setAccentColor(0x242429).addTextDisplayComponents(t => t.setContent("Error Could not find that part of the book"));
+  let entry = await primitives.findOne({_id: start_id, book_id: book_id });
 
-  const chapters = book_data.children.find(i => i.id === book_id);
-  if (chapters === undefined) return "No Chapters";
-  if (chapters.children === undefined) return "No chapter data";
-  const chapter_data: BookPart | undefined  = chapters.children.find((i): i is BookPart => i.id === chapter && !is_sentence(i));
-  if (chapter_data === undefined) return "No chapter data";
+  if (entry === null) return [error];
 
-  let sentence_buffer: {type: string, content: string}[] = (() => !!chapter_data.name ? [{type: chapter_data.type, content: chapters.name + " " + chapter_data.name}]:[])();
-  sentence_buffer.push(...get_children(chapter_data));
+  let text_buffer = "# " + entry.reference.book + " " + entry.reference.chapter + "\n";
 
-  let text_display_buffer = ""
+  while (text_buffer.length + entry.content.length < max_caharacters) {
+    text_buffer += entry.type == "title" ? "### " : ""
+    text_buffer += entry.reference_number != 0 ? to_superscript(entry.reference_number) : "";
+    text_buffer += entry.content + '\n';
 
-  for (const [index, sentence] of sentence_buffer.entries()) {
-    const type = sentence.type;
-    const content = sentence.content;
-    if (text_display_buffer.length + (type == "sentence" || type == "verse" ? content.length + 5 : content.length + 6) > 4000) {
-      buffer.push([new ContainerBuilder()
-        .setAccentColor(0x242429)
-        .addTextDisplayComponents(o => o.setContent(text_display_buffer))
-      ])
-      text_display_buffer = ""
-    }
-
-    if (type == "sentence" || type == "verse") {
-      text_display_buffer += "  " + to_superscript(get_position(sentence_buffer, index) + 1) + content + "\n"
-    } else if (type == "chapter") {
-      text_display_buffer += "# " + content + "\n"
-    } else {
-      text_display_buffer += "### " + content + "\n"
-    }
+    entry = await primitives.findOne({_id: entry.next, book_id: book_id});
+    if (entry === null) return [error];
   }
 
-  if (text_display_buffer.length > 0) {
-    buffer.push([new ContainerBuilder()
-      .setAccentColor(0x242429)
-      .addTextDisplayComponents(o => o.setContent(text_display_buffer))
-    ])
-  }
+  const container = new ContainerBuilder()
+    .setAccentColor(0x242429)
+    .addTextDisplayComponents(t => t.setContent(text_buffer))
+    .addActionRowComponents(ar => ar
+      .addComponents(new ButtonBuilder().setEmoji('').setLabel("Test").setStyle(ButtonStyle.Secondary).setCustomId("test"))
+    )
 
-  return buffer;
-}
-
-function get_children(children_data: BookPart): {type: string, content: string}[] {
-  let buffer: {type: string, content: string}[]  = []
-
-  for (const [index, child] of children_data.children.entries()) {
-    if (is_sentence(child)) {
-      buffer.push({ type: child.type, content: child.content })
-    } else {
-      if (!!child.name) buffer.push({ type: child.type, content: child.name });
-      buffer.push(...get_children(child))
-    }
-  }
-
-  return buffer;
-}
-
-function is_sentence(child: BookPart | Sentence): child is Sentence {
-  return child.type === "sentence" || child.type === "verse";
+  return [container]
 }
 
 const superscriptMap: Record<string, string> = {
@@ -160,20 +128,4 @@ function to_superscript(num: number): string {
     .split("")
     .map(d => superscriptMap[d])
     .join("");
-}
-
-function get_position(items: {type: string, content: string}[], index: number): number {
-  const targetType = items[index]?.type;
-  if (!targetType) return -1;
-
-  let count = 0;
-
-  for (let i = 0; i < items.length; i++) {
-    if (items[i]!.type === targetType) {
-      if (i === index) return count;
-      count++;
-    }
-  }
-
-  return -1; // index not found (shouldn't happen if valid input)
 }

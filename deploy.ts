@@ -9,6 +9,7 @@ import fs from "fs";
 import path from "node:path";
 import { ensure } from ".";
 import { update_leaderboard } from "./functions/level_leaderboard";
+import { readdirSync, readFileSync } from "node:fs";
 
 export interface Command {
     data: SlashCommandBuilder;
@@ -69,6 +70,8 @@ export default async function(client: Client) {
   deploy_xp(client);
   console.log("Connecting to DB");
   client.db = await deploy_db();
+  console.log("Deploy Books");
+  await deploy_books(client);
 }
 
 async function deploy_commands(client_commands: Collection<string,Command>) {
@@ -308,4 +311,24 @@ function test_for_first_punctuation(message_buffer: Collection<string, Message>)
     }
   }
   return [null, null]
+}
+
+async function deploy_books(client: Client) {
+  const dir = readdirSync("./books/");
+  
+  for (const file of dir) {
+    const file_name = path.parse(file).name;
+    const file_ext = path.parse(file).ext;
+
+    if (file_name.startsWith('.')) continue;
+    if (file_ext != ".json") continue;
+
+    const file_data = readFileSync("./books/" + file, "utf-8");
+    const file_json = JSON.parse(file_data);
+
+    await client.db.collection("books").drop()
+    await client.db.collection("books").insertOne(file_json.metadata);
+    await client.db.collection("book_primitives").drop()
+    await client.db.collection("book_primitives").insertMany(file_json.primitives);
+  }
 }
