@@ -83,7 +83,12 @@ client.once(Events.ClientReady, async readyClient => {
           script(interaction);
         } catch (err) {error(err)};
       } else if (interaction.isButton()) {
-        const button = client.buttons.get(interaction.customId)
+        let button: any = {};
+        if (/^\w.-\w*$/.test(interaction.customId)) {
+          button = client.buttons.get(interaction.customId.slice(0,2))
+        } else {
+          button = client.buttons.get(interaction.customId)
+        }
         if (!button) return;
         try {
           button.execute(interaction)
