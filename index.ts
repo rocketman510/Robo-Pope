@@ -84,7 +84,7 @@ client.once(Events.ClientReady, async readyClient => {
         } catch (err) {error(err)};
       } else if (interaction.isButton()) {
         let button: any = {};
-        if (/^\w.-\w*$/.test(interaction.customId)) {
+        if (/^\w.-[\w-]*$/.test(interaction.customId)) {
           button = client.buttons.get(interaction.customId.slice(0,2))
         } else {
           button = client.buttons.get(interaction.customId)

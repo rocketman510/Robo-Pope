@@ -32,8 +32,7 @@ export type Book = {
   thumbnail: string;
   author: string;
   books: Record<string, string>;
-  chapters: Record<string, string>;
-  primitives: Record<string, string>;
+  chapters: Record<string, number>;
 }
 
 
@@ -54,7 +53,7 @@ export default {
     const books = db.collection<Book>('books');
     const primitives = db.collection<BookPrimitive>('book_primitives');
 
-    const container = await render_page("nrsv-ci", "gen001001", 4000, primitives);
+    const container = await render_page("nrsv_ci", "gen001001", 3999, primitives);
 
     interaction.reply({components: container, flags: [MessageFlags.Ephemeral, MessageFlags.IsComponentsV2]})
   },
