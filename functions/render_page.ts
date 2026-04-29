@@ -28,8 +28,14 @@ export async function render_page(book_id: string, start_id: string, max_caharac
 
   const previous_id = await find_previous_page_start(book_id, start_id, max_caharacters, primitives);
 
+  const chapter_text = text_buffer.shift() ?? "IDK";
+
   const container = new ContainerBuilder()
     .setAccentColor(0x242429)
+    .addSectionComponents(t => t
+      .addTextDisplayComponents(t => t.setContent(chapter_text))
+      .setButtonAccessory(new ButtonBuilder().setEmoji("<:back:1499176748909330482>").setLabel("Back").setCustomId("test").setStyle(ButtonStyle.Secondary))
+    )
     .addTextDisplayComponents(t => t.setContent(make_string(text_buffer)))
     .addActionRowComponents(ar => ar
       .addComponents(new ButtonBuilder().setEmoji("<:previous_button:1499160154828963940>").setStyle(ButtonStyle.Secondary).setCustomId("rn-" + entry.book_id + "-" + previous_id).setDisabled(previous_id == ""))
