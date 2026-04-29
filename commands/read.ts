@@ -53,7 +53,7 @@ export default {
     const books = db.collection<Book>('books');
     const primitives = db.collection<BookPrimitive>('book_primitives');
 
-    const container = await render_page("nrsv_ci", "gen001001", 3999, primitives);
+    const container = await render_page("nrsv_ci", "gen001001", 1500, primitives);
 
     interaction.reply({components: container, flags: [MessageFlags.Ephemeral, MessageFlags.IsComponentsV2]})
   },

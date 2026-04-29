@@ -19,7 +19,6 @@ export async function render_page(book_id: string, start_id: string, max_caharac
     text_buffer.push(buffer)
 
     if (make_string(text_buffer).length + buffer.length > max_caharacters) break;
-    console.log("it is braking:", entry.next.slice(0, 6) != entry._id.slice(0, 6) && entry.next != "" && entry._id != "", entry.next.slice(0, 6), entry._id.slice(0, 6), entry.next != "", entry._id != "");
     if (entry.next.slice(0, 6) != entry._id.slice(0, 6) && entry.next != "" && entry._id != "") break;
 
     const pre_entry: BookPrimitive | null = await primitives.findOne({_id: entry.next, book_id: book_id});
