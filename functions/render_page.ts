@@ -32,9 +32,14 @@ export async function render_page(book_id: string, start_id: string, max_caharac
     .setAccentColor(0x242429)
     .addTextDisplayComponents(t => t.setContent(make_string(text_buffer)))
     .addActionRowComponents(ar => ar
-      .addComponents(new ButtonBuilder().setLabel("Previous").setStyle(ButtonStyle.Secondary).setCustomId("rn-" + entry.book_id + "-" + previous_id).setDisabled(previous_id == ""))
-      .addComponents(new ButtonBuilder().setLabel("Share").setStyle(ButtonStyle.Secondary).setCustomId("rs-" + entry.book_id + "-" + start_id).setDisabled(start_id == ""))
-      .addComponents(new ButtonBuilder().setLabel("Next").setStyle(ButtonStyle.Secondary).setCustomId("rn-" + entry.book_id + "-" + entry.next).setDisabled(entry.next == ""))
+      .addComponents(new ButtonBuilder().setEmoji("<:previous_button:1499160154828963940>").setStyle(ButtonStyle.Secondary).setCustomId("rn-" + entry.book_id + "-" + previous_id).setDisabled(previous_id == ""))
+      .addComponents(new ButtonBuilder().setEmoji("<:share_to_channel:1499153256935592067>").setStyle(ButtonStyle.Secondary).setCustomId("rs-" + entry.book_id + "-" + start_id).setDisabled(start_id == ""))
+      .addComponents(new ButtonBuilder().setEmoji("<:next_button:1499159772258242600>").setStyle(ButtonStyle.Secondary).setCustomId("rn-" + entry.book_id + "-" + entry.next).setDisabled(entry.next == ""))
+    )
+    .addActionRowComponents(ar => ar
+      .addComponents(new ButtonBuilder().setEmoji("<:previous_button_stop:1499162066236211350>").setStyle(ButtonStyle.Secondary).setCustomId("1").setDisabled(previous_id == ""))
+      .addComponents(new ButtonBuilder().setEmoji("<:highlighter:1499170569818734642>").setStyle(ButtonStyle.Secondary).setCustomId("2").setDisabled(start_id == ""))
+      .addComponents(new ButtonBuilder().setEmoji("<:next_button_stop:1499162049375240262>").setStyle(ButtonStyle.Secondary).setCustomId("3").setDisabled(entry.next == ""))
     )
 
   return [container]
