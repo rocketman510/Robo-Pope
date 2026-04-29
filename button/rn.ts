@@ -1,4 +1,4 @@
-import { ButtonInteraction, MessageFlags } from "discord.js";
+import { ButtonInteraction, ContainerComponent, MessageFlags } from "discord.js";
 import type { Button } from "../deploy";
 import { render_page } from "../functions/render_page";
 
