@@ -1,14 +1,16 @@
 import { ButtonBuilder, ButtonStyle, ContainerBuilder } from "discord.js";
 import type { Collection } from "mongodb";
-import type { BookPrimitive } from "../commands/read";
+import type { BookPrimitive, Book } from "../commands/read";
+import { log } from "node:console";
 
 
-export async function render_page(book_id: string, start_id: string, max_caharacters: number, primitives: Collection<BookPrimitive>): Promise<ContainerBuilder[]> {
+export async function render_page(book_id: string, start_id: string, max_caharacters: number, primitives: Collection<BookPrimitive>, book: Collection<Book>): Promise<ContainerBuilder[]> {
   const error = new ContainerBuilder().setAccentColor(0x242429).addTextDisplayComponents(t => t.setContent("Error Could not find that part of the book"));
   let entry = await primitives.findOne({_id: start_id, book_id: book_id });
 
   if (entry === null) return [error];
 
+  const this_book_start = get_previous_chapter(entry);
   let text_buffer: string[] = ["# " + entry.reference.book + " " + entry.reference.chapter + "\n"];
 
   while (true) {
@@ -30,6 +32,8 @@ export async function render_page(book_id: string, start_id: string, max_caharac
 
   const chapter_text = text_buffer.shift() ?? "IDK";
 
+  const next_chapter = await get_next_chapter(start_id, book_id, book);
+
   const container = new ContainerBuilder()
     .setAccentColor(0x242429)
     .addSectionComponents(t => t
@@ -43,9 +47,9 @@ export async function render_page(book_id: string, start_id: string, max_caharac
       .addComponents(new ButtonBuilder().setEmoji("<:next_button:1499159772258242600>").setStyle(ButtonStyle.Secondary).setCustomId("rn-" + entry.book_id + "-" + entry.next).setDisabled(entry.next == ""))
     )
     .addActionRowComponents(ar => ar
-      .addComponents(new ButtonBuilder().setEmoji("<:previous_button_stop:1499162066236211350>").setStyle(ButtonStyle.Secondary).setCustomId("1").setDisabled(previous_id == ""))
+      .addComponents(new ButtonBuilder().setEmoji("<:previous_button_stop:1499162066236211350>").setStyle(ButtonStyle.Secondary).setCustomId("rn--" + entry.book_id + "-" + this_book_start).setDisabled(previous_id == ""))
       .addComponents(new ButtonBuilder().setEmoji("<:highlighter:1499170569818734642>").setStyle(ButtonStyle.Secondary).setCustomId("2").setDisabled(start_id == ""))
-      .addComponents(new ButtonBuilder().setEmoji("<:next_button_stop:1499162049375240262>").setStyle(ButtonStyle.Secondary).setCustomId("3").setDisabled(entry.next == ""))
+      .addComponents(new ButtonBuilder().setEmoji("<:next_button_stop:1499162049375240262>").setStyle(ButtonStyle.Secondary).setCustomId("rn--" + entry.book_id + "-" + next_chapter).setDisabled(entry.next == ""))
     )
 
   return [container]
@@ -107,6 +111,26 @@ export async function find_previous_page_start(book_id: string, start_id: string
   return chunks[0]!;
 }
 
+async function get_next_chapter(start_id: string, book_id: string, book_db: Collection<Book>) {
+  const book = await book_db.findOne({_id: book_id});
+  if (book === null) return "";
+
+  const this_book_id = start_id.slice(0,3);
+
+  const entries = Object.entries(book.books);
+
+  const this_book_index = entries.findIndex(([key]) => key === this_book_id);
+  
+  const next = this_book_index !== -1 ? entries[this_book_index + 1] : undefined;
+
+  return next?.[0]! + "001001";
+}
+
+function get_previous_chapter(primitive: BookPrimitive) {
+  console.log(primitive.previous.slice(0,3) + "001001", primitive);
+  
+  return primitive.previous.slice(0,3) + "001001"
+}
 
 function make_string(arry:string[]): string {
   let result = ""

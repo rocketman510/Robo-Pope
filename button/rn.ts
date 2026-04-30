@@ -7,11 +7,11 @@ export default {
     async execute(interaction: ButtonInteraction) {
       console.log(interaction.customId);
 
-      const match = interaction.customId.match(/^\w.(?:-)([\w]*)(?:-)([\w]*)$/)
+      const match = interaction.customId.match(/^\w.(?:-+)([\w]*)(?:-+)([\w]*)$/)
       
       if (!match || !match[1] || !match[2]) return;
 
-      const container = await render_page(match[1], match[2], 1500, interaction.client.db.collection("book_primitives"));
+      const container = await render_page(match[1], match[2], 1500, interaction.client.db.collection("book_primitives"), interaction.client.db.collection("books"));
 
       await interaction.update({ components: container, flags: MessageFlags.IsComponentsV2 })
     },
