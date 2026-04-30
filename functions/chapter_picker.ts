@@ -19,7 +19,7 @@ export function render(book: Book, chapter: string, starting_chapter: number) {
     buffer.push(new ButtonBuilder().setCustomId("rn-" + book._id + "-" + chapter + format(i) + "001").setLabel(i.toString()).setStyle(ButtonStyle.Secondary));
 
     if (i >= book.chapters[chapter]) {
-      next_button_id = books[books.findIndex(([key]) => key === chapter) + 1]![0] + "001";
+      next_button_id = books[books.findIndex(([key]) => key === chapter) + 1]?.[0] + "001";
     } else {
       next_button_id = chapter + format(i+1);
     }
@@ -48,9 +48,21 @@ export function render(book: Book, chapter: string, starting_chapter: number) {
     container.addActionRowComponents(ar => ar.addComponents(e))
   }
 
+  const next_chapter_id = books[books.findIndex(([key]) => key === chapter) + 1]?.[0] ?? null
+
+  const previous_chapter_id = (() => {
+    if (starting_chapter == 1) {
+      return books[books.findIndex(([key]) => key === chapter) - 1]?.[0] ?? null
+    } else {
+      return chapter;
+    }
+  })()
+
   container.addActionRowComponents(ar => ar.addComponents([
-    new ButtonBuilder().setStyle(ButtonStyle.Secondary).setEmoji("<:previous_button:1499160154828963940>").setCustomId("cp-" + book._id + "-" + (previous_button_id ?? "")).setDisabled(previous_button_id === null),
-    new ButtonBuilder().setStyle(ButtonStyle.Secondary).setEmoji("<:next_button:1499159772258242600>").setCustomId("cp-" + book._id + "-" + next_button_id)
+    new ButtonBuilder().setStyle(ButtonStyle.Secondary).setEmoji("<:previous_button_stop:1499162066236211350>").setCustomId("cp-" + book._id + "--" + previous_chapter_id + "001").setDisabled(previous_chapter_id === null),
+    new ButtonBuilder().setStyle(ButtonStyle.Secondary).setEmoji("<:previous_button:1499160154828963940>").setCustomId("cp-" + book._id + "-" + previous_button_id).setDisabled(previous_button_id === null),
+    new ButtonBuilder().setStyle(ButtonStyle.Secondary).setEmoji("<:next_button:1499159772258242600>").setCustomId("cp-" + book._id + "-" + next_button_id).setDisabled(next_button_id === null),
+    new ButtonBuilder().setStyle(ButtonStyle.Secondary).setEmoji("<:next_button_stop:1499162049375240262>").setCustomId("cp-" + book._id + "--" + next_chapter_id + "001").setDisabled(next_chapter_id === null),
   ]))
 
   return [container]
