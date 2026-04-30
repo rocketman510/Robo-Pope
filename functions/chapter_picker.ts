@@ -60,3 +60,24 @@ function format(n: number): string {
   const clamped = Math.min(n, 999);
   return clamped.toString().padStart(3, '0');
 }
+
+/**
+ * Returns the custom_id that corresponds to the screen containing a chapter. Chat GPT wrote idk how it works
+ */
+export function get_chapter_screen_id(book: Book, chapter: string, chapter_number: number): string | null {
+  const chapters_in_book = book.chapters[chapter];
+  if (!chapters_in_book) return null;
+
+  const safe_chapter = Math.max(1, Math.min(chapter_number, chapters_in_book));
+
+  const starting_chapter =
+    Math.floor((safe_chapter - 1) / 25) * 25 + 1;
+
+  return (
+    "cp-" +
+    book._id +
+    "-" +
+    chapter +
+    format(starting_chapter)
+  );
+}

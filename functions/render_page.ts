@@ -1,10 +1,10 @@
 import { ButtonBuilder, ButtonStyle, ContainerBuilder } from "discord.js";
 import type { Collection } from "mongodb";
 import type { BookPrimitive, Book } from "../commands/read";
-import { log } from "node:console";
+import { get_chapter_screen_id } from "./chapter_picker";
 
 
-export async function render_page(book_id: string, start_id: string, max_caharacters: number, primitives: Collection<BookPrimitive>, book: Collection<Book>): Promise<ContainerBuilder[]> {
+export async function render_page(book_id: string, start_id: string, max_caharacters: number, primitives: Collection<BookPrimitive>, documents: Collection<Book>): Promise<ContainerBuilder[]> {
   const error = new ContainerBuilder().setAccentColor(0x242429).addTextDisplayComponents(t => t.setContent("Error Could not find that part of the book"));
   let entry = await primitives.findOne({_id: start_id, book_id: book_id });
 
@@ -32,13 +32,16 @@ export async function render_page(book_id: string, start_id: string, max_caharac
 
   const chapter_text = text_buffer.shift() ?? "IDK";
 
-  const next_chapter = await get_next_chapter(start_id, book_id, book);
+  const next_chapter = await get_next_chapter(start_id, book_id, documents);
+
+  const book = await documents.findOne({_id: book_id})
+  const back_custom_id = book ? get_chapter_screen_id(book, start_id.slice(0,3), Number(start_id.slice(3,6))) : null;
 
   const container = new ContainerBuilder()
     .setAccentColor(0x242429)
     .addSectionComponents(t => t
       .addTextDisplayComponents(t => t.setContent(chapter_text))
-      .setButtonAccessory(new ButtonBuilder().setEmoji("<:back:1499176748909330482>").setLabel("Back").setCustomId("test").setStyle(ButtonStyle.Secondary))
+      .setButtonAccessory(new ButtonBuilder().setEmoji("<:back:1499176748909330482>").setLabel("Back").setCustomId(back_custom_id ?? "").setStyle(ButtonStyle.Secondary).setDisabled(back_custom_id === null))
     )
     .addTextDisplayComponents(t => t.setContent(make_string(text_buffer)))
     .addActionRowComponents(ar => ar
@@ -127,8 +130,6 @@ async function get_next_chapter(start_id: string, book_id: string, book_db: Coll
 }
 
 function get_previous_chapter(primitive: BookPrimitive) {
-  console.log(primitive.previous.slice(0,3) + "001001", primitive);
-  
   return primitive.previous.slice(0,3) + "001001"
 }
 
