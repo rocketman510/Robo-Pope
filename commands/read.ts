@@ -4,6 +4,7 @@ import { readdirSync, readFileSync } from "fs";
 import path from "path";
 import { render_page } from "../functions/render_page";
 import { render } from "../functions/chapter_picker";
+import { parse } from "../functions/read_string_parsing";
 
 export type BookPrimitive = {
   _id: string;
@@ -61,15 +62,23 @@ export default {
     const primitives = db.collection<BookPrimitive>('book_primitives');
 
     const document_id = interaction.options.getString("document")
-    const book_id = interaction.options.getString("book")
-
-    if (!book_id) return;
     if (!document_id) return;
     const this_book = await books.findOne({_id: document_id})
     if (!this_book) return;
+    const book_id = parse(interaction.options.getString("book") ?? "", this_book);
+    if (!book_id) return;
 
-    //const container = await render_page("nrsv_ci", "gen001001", 1500, primitives, books);
-    const container = render(this_book, book_id, 1);
+
+    let container;
+
+    console.log(book_id);
+    
+
+    if (book_id.length <= 3) {
+      container = render(this_book, book_id, 1);
+    } else {
+      container = await render_page(document_id, book_id + "001", 1500, primitives, books);
+    }
 
     interaction.reply({components: container, flags: [MessageFlags.Ephemeral, MessageFlags.IsComponentsV2]})
   },
