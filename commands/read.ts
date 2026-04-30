@@ -3,6 +3,7 @@ import type { Command } from "../deploy";
 import { readdirSync, readFileSync } from "fs";
 import path from "path";
 import { render_page } from "../functions/render_page";
+import { render } from "../functions/chapter_picker";
 
 export type BookPrimitive = {
   _id: string;
@@ -42,10 +43,16 @@ export default {
     .setDescription('Read form a selection of books.')
     .addStringOption(
       option => option
-        .setName('book')
-        .setDescription('The book to read')
+        .setName('document')
+        .setDescription('The document to read')
         .addChoices(...get_choices('./books/'))
         .setRequired(true)
+    )
+    .addStringOption(
+      option => option
+        .setName('book')
+        .setDescription('This is the book you would like to read')
+        .setRequired(false)
     ),
   async execute(interaction: ChatInputCommandInteraction) {
     const db = interaction.client.db;
@@ -53,7 +60,16 @@ export default {
     const books = db.collection<Book>('books');
     const primitives = db.collection<BookPrimitive>('book_primitives');
 
-    const container = await render_page("nrsv_ci", "gen001001", 1500, primitives, books);
+    const document_id = interaction.options.getString("document")
+    const book_id = interaction.options.getString("book")
+
+    if (!book_id) return;
+    if (!document_id) return;
+    const this_book = await books.findOne({_id: document_id})
+    if (!this_book) return;
+
+    //const container = await render_page("nrsv_ci", "gen001001", 1500, primitives, books);
+    const container = render(this_book, book_id, 1);
 
     interaction.reply({components: container, flags: [MessageFlags.Ephemeral, MessageFlags.IsComponentsV2]})
   },
