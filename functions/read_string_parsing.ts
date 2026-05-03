@@ -8,7 +8,7 @@ export function parse(string: string, document: Book) {
   let book: string | undefined = matches[1];
 
   if (book !== undefined && (book in document.books || Object.values(document.books).includes(book))) {
-    book = Object.entries(document.books).find(([k]) => k == book)?.[0] || book
+    book = Object.entries(document.books).find(([_, v]) => v.toLowerCase() == book?.toLowerCase())?.[0] || book
   } else {
     book = Object.keys(document.books)[0]
   }

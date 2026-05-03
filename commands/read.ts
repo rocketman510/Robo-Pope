@@ -68,11 +68,7 @@ export default {
     const book_id = parse(interaction.options.getString("book") ?? "", this_book);
     if (!book_id) return;
 
-
     let container;
-
-    console.log(book_id);
-    
 
     if (book_id.length <= 3) {
       container = render(this_book, book_id, 1);
