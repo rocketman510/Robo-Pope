@@ -266,8 +266,6 @@ export async function render_share(book_id: string, start_id: string, max_cahara
     next_settings[index] = !next_settings[index]
     next_settings.unshift(chapter_is_selected)
 
-    console.log("rp-" + book_id + "-" + start_id + "-" + boolArrayToBase64(next_settings));
-
     container.addSectionComponents(e => e
       .addTextDisplayComponents(t => t.setContent(value))
       .setButtonAccessory(new ButtonBuilder().setEmoji(get_selection_box(settings[index] ?? false)).setCustomId("rp-" + book_id + "-" + start_id + "-" + boolArrayToBase64(next_settings)).setStyle(ButtonStyle.Secondary).setDisabled(chapter_is_selected))
