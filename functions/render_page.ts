@@ -8,12 +8,17 @@ export async function render_page(book_id: string, start_id: string, max_caharac
   const error = new ContainerBuilder().setAccentColor(0x242429).addTextDisplayComponents(t => t.setContent("Error Could not find that part of the book"));
   let entry = await primitives.findOne({_id: start_id, book_id: book_id });
 
+  let components_accumulator = 2 + 2 + 1
+
   if (entry === null) return [error];
 
   const this_book_start = get_previous_chapter(entry);
   let text_buffer: string[] = ["# " + entry.reference.book + " " + entry.reference.chapter + "\n"];
 
   while (true) {
+    components_accumulator += entry.type == "title" ? 1 : 3;
+    if (components_accumulator > 40) break;
+
     let buffer = entry.type == "title" ? "### " : ""
     buffer += entry.reference_number != 0 ? to_superscript(entry.reference_number) : "";
     buffer += entry.content + '\n';
@@ -46,7 +51,7 @@ export async function render_page(book_id: string, start_id: string, max_caharac
     .addTextDisplayComponents(t => t.setContent(make_string(text_buffer)))
     .addActionRowComponents(ar => ar
       .addComponents(new ButtonBuilder().setEmoji("<:previous_button:1499160154828963940>").setStyle(ButtonStyle.Secondary).setCustomId("rn-" + entry.book_id + "-" + previous_id).setDisabled(previous_id == ""))
-      .addComponents(new ButtonBuilder().setEmoji("<:share_to_channel:1499153256935592067>").setStyle(ButtonStyle.Secondary).setCustomId("rs-" + entry.book_id + "-" + start_id).setDisabled(start_id == ""))
+      .addComponents(new ButtonBuilder().setEmoji("<:share_to_channel:1499153256935592067>").setStyle(ButtonStyle.Secondary).setCustomId("rp-" + entry.book_id + "-" + start_id).setDisabled(start_id == ""))
       .addComponents(new ButtonBuilder().setEmoji("<:next_button:1499159772258242600>").setStyle(ButtonStyle.Secondary).setCustomId("rn-" + entry.book_id + "-" + entry.next).setDisabled(entry.next == ""))
     )
     .addActionRowComponents(ar => ar
@@ -133,12 +138,10 @@ function get_previous_chapter(primitive: BookPrimitive) {
   return primitive.previous.slice(0,3) + "001001"
 }
 
-function make_string(arry:string[]): string {
-  let result = ""
-  for (const string of arry) {
-    result += string;
-  }
-  return result;
+function make_string(arry: string[] | { value: string; id: string }[]): string {
+  return arry
+    .map(item => (typeof item === "string" ? item : item.value))
+    .join("");
 }
 
 const superscriptMap: Record<string, string> = {
@@ -152,12 +155,102 @@ const superscriptMap: Record<string, string> = {
   "7": "⁷",
   "8": "⁸",
   "9": "⁹",
+  "a": "ᵃ",
+  "b": "ᵇ",
+  "c": "ᶜ",
+  "d": "ᵈ",
+  "e": "ᵉ",
+  "f": "ᶠ",
+  "g": "ᵍ",
+  "h": "ʰ",
+  "i": "ⁱ",
+  "j": "ʲ",
+  "k": "ᵏ",
+  "l": "ˡ",
+  "m": "ᵐ",
+  "n": "ⁿ",
+  "o": "ᵒ",
+  "p": "ᵖ",
+  "r": "ʳ",
+  "s": "ˢ",
+  "t": "ᵗ",
+  "u": "ᵘ",
+  "v": "ᵛ",
+  "w": "ʷ",
+  "x": "ˣ",
+  "y": "ʸ",
+  "z": "ᶻ",
 };
 
-function to_superscript(num: number): string {
-  return num
+export function to_superscript(input: string | number): string {
+  return input
     .toString()
     .split("")
-    .map(d => superscriptMap[d])
+    .map(char => superscriptMap[char] ?? char)
     .join("");
+}
+
+export async function render_primitive(primitive: BookPrimitive): Promise<ContainerBuilder[]> {
+  let text = "# " + primitive.reference.book + " " + primitive.reference.chapter
+  text += "\n > "
+  text += primitive.reference_number == 0 ? "" : to_superscript(primitive.reference_number)
+  text += primitive.content
+  text += "\n"
+  text += primitive.foot_note.length > 0 ? "-# " + primitive.foot_note.join(", ") : ""
+
+  const container = new ContainerBuilder()
+    .addTextDisplayComponents(t => t.setContent(text))
+  
+  return [container]
+}
+
+export async function render_share(book_id: string, start_id: string, max_caharacters: number, primitives: Collection<BookPrimitive>, documents: Collection<Book>): Promise<ContainerBuilder[]> {
+  const error = new ContainerBuilder().setAccentColor(0x242429).addTextDisplayComponents(t => t.setContent("Error Could not find that part of the book"));
+  let entry = await primitives.findOne({_id: start_id, book_id: book_id });
+
+  let components_accumulator = 2 + 2 + 1
+
+  if (entry === null) return [error];
+
+  let text_buffer: {value: string, id: string}[] = [{value: "# " + entry.reference.book + " " + entry.reference.chapter + "\n", id: ""}];
+
+  while (true) {
+    components_accumulator += entry.type == "title" ? 1 : 3;
+    if (components_accumulator > 40) break;
+
+    let buffer = entry.type == "title" ? "### " : ""
+    buffer += entry.reference_number != 0 ? to_superscript(entry.reference_number) : "";
+    buffer += entry.content + '\n';
+
+    text_buffer.push({value: buffer, id: entry._id})
+
+    if (make_string(text_buffer).length + buffer.length > max_caharacters) break;
+    if (entry.next.slice(0, 6) != entry._id.slice(0, 6) && entry.next != "" && entry._id != "") break;
+
+    const pre_entry: BookPrimitive | null = await primitives.findOne({_id: entry.next, book_id: book_id});
+    if (pre_entry === null) break;
+    entry = pre_entry;
+  }
+
+  const chapter_text = text_buffer.shift() ?? {value: "IDK", id: ""};
+
+  const container = new ContainerBuilder()
+    .setAccentColor(0x242429)
+    .addSectionComponents(t => t
+      .addTextDisplayComponents(t => t.setContent(chapter_text.value))
+      .setButtonAccessory(new ButtonBuilder().setEmoji("<:share_to_channel:1499153256935592067>").setLabel("Chapter").setCustomId("todo").setStyle(ButtonStyle.Secondary))
+    )
+
+  for (const { value, id } of text_buffer) {
+    if (value.startsWith("#")) {
+      container.addTextDisplayComponents(t => t.setContent(value))
+      continue
+    };
+    container.addSectionComponents(e => e
+      .addTextDisplayComponents(t => t.setContent(value))
+      .setButtonAccessory(new ButtonBuilder().setLabel("todo").setCustomId("rs-" + id).setStyle(ButtonStyle.Secondary))
+    )
+  }
+
+  return [container]
 }

@@ -1,15 +1,17 @@
-import { ButtonInteraction, ContainerComponent, MessageFlags } from "discord.js";
+import { ButtonInteraction, MessageFlags } from "discord.js";
 import type { Button } from "../deploy";
-import { render_page } from "../functions/render_page";
+import { render_share } from "../functions/render_page";
 
 export default {
-    data: "rn",
+    data: "rp",
     async execute(interaction: ButtonInteraction) {
       const match = interaction.customId.match(/^\w.(?:-+)([\w]*)(?:-+)([\w]*)$/)
       
       if (!match || !match[1] || !match[2]) return;
 
-      const container = await render_page(match[1], match[2], 3000, interaction.client.db.collection("book_primitives"), interaction.client.db.collection("books"));
+      const container = await render_share(match[1], match[2], 3000, interaction.client.db.collection("book_primitives"), interaction.client.db.collection("books"))
+
+      console.log(container[0]?.components.length);
 
       await interaction.update({ components: container, flags: MessageFlags.IsComponentsV2 })
     },
