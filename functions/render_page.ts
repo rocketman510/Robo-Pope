@@ -275,7 +275,7 @@ export async function render_share(book_id: string, start_id: string, max_cahara
 
   container.addActionRowComponents(ar => ar.addComponents(
     new ButtonBuilder().setCustomId("todo1").setStyle(ButtonStyle.Success).setLabel("Share").setEmoji("<:share_to_channel_white:1500941470696472836>"),
-    new ButtonBuilder().setCustomId("todo2").setStyle(ButtonStyle.Danger).setLabel("Cancel")
+    new ButtonBuilder().setCustomId("rn-" + book_id + "-" + start_id).setStyle(ButtonStyle.Danger).setLabel("Cancel")
   ))
 
   return [container]
