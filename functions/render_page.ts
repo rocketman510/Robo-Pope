@@ -1,4 +1,4 @@
-import { ButtonBuilder, ButtonStyle, ContainerBuilder } from "discord.js";
+import { ButtonBuilder, ButtonStyle, ContainerBuilder, flatten } from "discord.js";
 import type { Collection } from "mongodb";
 import type { BookPrimitive, Book } from "../commands/read";
 import { get_chapter_screen_id } from "./chapter_picker";
@@ -204,7 +204,7 @@ export async function render_primitive(primitive: BookPrimitive): Promise<Contai
   return [container]
 }
 
-export async function render_share(book_id: string, start_id: string, max_caharacters: number, primitives: Collection<BookPrimitive>, documents: Collection<Book>): Promise<ContainerBuilder[]> {
+export async function render_share(book_id: string, start_id: string, max_caharacters: number, primitives: Collection<BookPrimitive>, settings: boolean[]): Promise<ContainerBuilder[]> {
   const error = new ContainerBuilder().setAccentColor(0x242429).addTextDisplayComponents(t => t.setContent("Error Could not find that part of the book"));
   let entry = await primitives.findOne({_id: start_id, book_id: book_id });
 
@@ -233,24 +233,92 @@ export async function render_share(book_id: string, start_id: string, max_cahara
   }
 
   const chapter_text = text_buffer.shift() ?? {value: "IDK", id: ""};
+  const chapter_is_selected = settings.shift() ?? false;
+
+  let index = 0
+  for (const {value} of text_buffer) {// fulls up settings
+    if (value.startsWith("#")) {
+      continue
+    };
+    if (settings[index] === undefined) {
+      settings[index] = false
+    };
+    index++;
+  }
+
+  let chapter_settings = [...settings]
+  chapter_settings.unshift(!chapter_is_selected);
 
   const container = new ContainerBuilder()
     .setAccentColor(0x242429)
     .addSectionComponents(t => t
       .addTextDisplayComponents(t => t.setContent(chapter_text.value))
-      .setButtonAccessory(new ButtonBuilder().setEmoji("<:share_to_channel:1499153256935592067>").setLabel("Chapter").setCustomId("todo").setStyle(ButtonStyle.Secondary))
+      .setButtonAccessory(new ButtonBuilder().setEmoji(get_selection_box(chapter_is_selected)).setLabel("Chapter").setCustomId("rp-" + book_id + "-" + start_id + "-" + boolArrayToBase64(chapter_settings)).setStyle(ButtonStyle.Secondary))
     )
 
+  index = 0
   for (const { value, id } of text_buffer) {
     if (value.startsWith("#")) {
       container.addTextDisplayComponents(t => t.setContent(value))
       continue
     };
+    let next_settings = [...settings];
+    next_settings[index] = !next_settings[index]
+    next_settings.unshift(chapter_is_selected)
+
     container.addSectionComponents(e => e
       .addTextDisplayComponents(t => t.setContent(value))
-      .setButtonAccessory(new ButtonBuilder().setLabel("todo").setCustomId("rs-" + id).setStyle(ButtonStyle.Secondary))
+      .setButtonAccessory(new ButtonBuilder().setEmoji(get_selection_box(settings[index] ?? false)).setCustomId("rp-" + book_id + "-" + start_id + "-" + boolArrayToBase64(next_settings)).setStyle(ButtonStyle.Secondary).setDisabled(chapter_is_selected))
     )
+    index++;
   }
 
+  container.addActionRowComponents(ar => ar.addComponents(new ButtonBuilder().setCustomId("todo2+/").setStyle(ButtonStyle.Success).setLabel("Share").setEmoji("<:share_to_channel_white:1500941470696472836>")))
+
   return [container]
+}
+
+function get_selection_box(bool: boolean): string {// CHAT-GPT WROTE THIS IDK WHAT ID DOSE
+  return bool ? "<:checkbox_filled:1500939873438404779>" : "<:checkbox_empty:1500939839313281234>";
+}
+
+export function boolArrayToBase64(bits: boolean[]): string {
+  const bitLength = bits.length;
+
+  // 4-byte (32-bit) header
+  const header = new Uint8Array(4);
+  const view = new DataView(header.buffer);
+  view.setUint32(0, bitLength, false); // big-endian
+
+  const byteLength = Math.ceil(bitLength / 8);
+  const data = new Uint8Array(byteLength);
+
+  for (let i = 0; i < bitLength; i++) {
+    if (bits[i]) {
+      data[i >> 3] |= 1 << (7 - (i % 8));
+    }
+  }
+
+  const combined = new Uint8Array(4 + byteLength);
+  combined.set(header, 0);
+  combined.set(data, 4);
+
+  return Buffer.from(combined).toString("base64");
+}
+
+export function base64ToBoolArray(base64: string): boolean[] {// CHAT-GPT WROTE THIS IDK WHAT ID DOSE
+  const bytes = Buffer.from(base64, "base64");
+
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const bitLength = view.getUint32(0, false); // big-endian
+
+  const bits: boolean[] = [];
+
+  for (let i = 0; i < bitLength; i++) {
+    const byte = bytes[4 + (i >> 3)];
+    const bit = (byte & (1 << (7 - (i % 8)))) !== 0;
+    bits.push(bit);
+  }
+
+  return bits;
 }
