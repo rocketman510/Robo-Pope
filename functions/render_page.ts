@@ -266,6 +266,8 @@ export async function render_share(book_id: string, start_id: string, max_cahara
     next_settings[index] = !next_settings[index]
     next_settings.unshift(chapter_is_selected)
 
+    console.log("rp-" + book_id + "-" + start_id + "-" + boolArrayToBase64(next_settings));
+
     container.addSectionComponents(e => e
       .addTextDisplayComponents(t => t.setContent(value))
       .setButtonAccessory(new ButtonBuilder().setEmoji(get_selection_box(settings[index] ?? false)).setCustomId("rp-" + book_id + "-" + start_id + "-" + boolArrayToBase64(next_settings)).setStyle(ButtonStyle.Secondary).setDisabled(chapter_is_selected))
@@ -281,46 +283,36 @@ export async function render_share(book_id: string, start_id: string, max_cahara
   return [container]
 }
 
-function get_selection_box(bool: boolean): string {// CHAT-GPT WROTE THIS IDK WHAT ID DOSE
+function get_selection_box(bool: boolean): string {
   return bool ? "<:checkbox_filled:1500939873438404779>" : "<:checkbox_empty:1500939839313281234>";
 }
 
-export function boolArrayToBase64(bits: boolean[]): string {
-  const bitLength = bits.length;
+export function boolArrayToBase64(bits: boolean[]): string {// CHAT-GPT WROTE THIS IDK WHAT ID DOSE
+  const fixed = new Array(16).fill(false);
 
-  // 4-byte (32-bit) header
-  const header = new Uint8Array(4);
-  const view = new DataView(header.buffer);
-  view.setUint32(0, bitLength, false); // big-endian
+  for (let i = 0; i < Math.min(bits.length, 16); i++) {
+    fixed[i] = bits[i];
+  }
 
-  const byteLength = Math.ceil(bitLength / 8);
-  const data = new Uint8Array(byteLength);
+  const bytes = new Uint8Array(2); // 16 bits = 2 bytes
 
-  for (let i = 0; i < bitLength; i++) {
-    if (bits[i]) {
-      data[i >> 3] |= 1 << (7 - (i % 8));
+  for (let i = 0; i < 16; i++) {
+    if (fixed[i]) {
+      bytes[i >> 3] |= 1 << (7 - (i % 8));
     }
   }
 
-  const combined = new Uint8Array(4 + byteLength);
-  combined.set(header, 0);
-  combined.set(data, 4);
-
-  return Buffer.from(combined).toString("base64");
+  return Buffer.from(bytes).toString("base64");
 }
 
 export function base64ToBoolArray(base64: string): boolean[] {// CHAT-GPT WROTE THIS IDK WHAT ID DOSE
-  const bytes = Buffer.from(base64, "base64");
+  const bytes = new Uint8Array(Buffer.from(base64, "base64"));
 
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  const bitLength = view.getUint32(0, false); // big-endian
+  const bits: boolean[] = new Array(16).fill(false);
 
-  const bits: boolean[] = [];
-
-  for (let i = 0; i < bitLength; i++) {
-    const byte = bytes[4 + (i >> 3)];
-    const bit = (byte & (1 << (7 - (i % 8)))) !== 0;
-    bits.push(bit);
+  for (let i = 0; i < 16; i++) {
+    const byte = bytes[i >> 3];
+    bits[i] = (byte & (1 << (7 - (i % 8)))) !== 0;
   }
 
   return bits;

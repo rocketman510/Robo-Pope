@@ -5,11 +5,14 @@ import { base64ToBoolArray, boolArrayToBase64, render_share } from "../functions
 export default {
     data: "rp",
     async execute(interaction: ButtonInteraction) {
-      const match = interaction.customId.match(/^\w.(?:-+)([\w]*)(?:-+)([\w]*)(?:-+)?([\w]*)?/)
+      const match = interaction.customId.match(/^\w.(?:-+)([\w]*)(?:-+)([\w]*)(?:-+)?([A-Za-z0-9+/=]*)?/)
 
       if (!match || !match[1] || !match[2]) return;
 
       const settings = base64ToBoolArray(match[3] ?? boolArrayToBase64([false]));
+
+      console.log(match, settings);
+      
 
       const container = await render_share(match[1], match[2], 3000, interaction.client.db.collection("book_primitives"), settings)
 
