@@ -8,7 +8,7 @@ export async function render_page(book_id: string, start_id: string, max_caharac
   const error = new ContainerBuilder().setAccentColor(0x242429).addTextDisplayComponents(t => t.setContent("Error Could not find that part of the book"));
   let entry = await primitives.findOne({_id: start_id, book_id: book_id });
 
-  let components_accumulator = 2 + 2 + 1
+  let components_accumulator = 2 + 3 + 1
 
   if (entry === null) return [error];
 
@@ -208,7 +208,7 @@ export async function render_share(book_id: string, start_id: string, max_cahara
   const error = new ContainerBuilder().setAccentColor(0x242429).addTextDisplayComponents(t => t.setContent("Error Could not find that part of the book"));
   let entry = await primitives.findOne({_id: start_id, book_id: book_id });
 
-  let components_accumulator = 2 + 2 + 1
+  let components_accumulator = 2 + 4 + 1
 
   if (entry === null) return [error];
 
@@ -216,7 +216,7 @@ export async function render_share(book_id: string, start_id: string, max_cahara
 
   while (true) {
     components_accumulator += entry.type == "title" ? 1 : 3;
-    if (components_accumulator > 40) break;
+    if (components_accumulator >= 40) break;
 
     let buffer = entry.type == "title" ? "### " : ""
     buffer += entry.reference_number != 0 ? to_superscript(entry.reference_number) : "";
@@ -273,7 +273,10 @@ export async function render_share(book_id: string, start_id: string, max_cahara
     index++;
   }
 
-  container.addActionRowComponents(ar => ar.addComponents(new ButtonBuilder().setCustomId("todo2+/").setStyle(ButtonStyle.Success).setLabel("Share").setEmoji("<:share_to_channel_white:1500941470696472836>")))
+  container.addActionRowComponents(ar => ar.addComponents(
+    new ButtonBuilder().setCustomId("todo1").setStyle(ButtonStyle.Success).setLabel("Share").setEmoji("<:share_to_channel_white:1500941470696472836>"),
+    new ButtonBuilder().setCustomId("todo2").setStyle(ButtonStyle.Danger).setLabel("Cancel")
+  ))
 
   return [container]
 }
