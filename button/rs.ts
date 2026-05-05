@@ -17,6 +17,7 @@ export default {
     const document = await interaction.client.db.collection<Book>("books").findOne({_id: match[1]});
     const book = match[2].slice(0,3).toUpperCase();
     const chapter = Number(match[2].slice(3,6));
+    const decoded = decode(match[3]!).sort((a, b) => Number(a) - Number(b));
 
     if (!match[3]) {
       const section = new SectionBuilder()
@@ -26,8 +27,15 @@ export default {
       await interaction.update({components: await render_page(match[1], match[2] + "001", 3000, book_primitives, books)})
       await interaction.channel.send({components: [section], flags: MessageFlags.IsComponentsV2})
     } else {
+      let buffer: number[] = [];
+      for (const item of decoded) {
+        const primitive = await book_primitives.findOne({_id: match[2] + item, book_id: match[1]})
+        if (!primitive) return;
+        buffer.push(Number(primitive.reference_number));
+      }
+
       const section = new SectionBuilder()
-        .addTextDisplayComponents(t => t.setContent(`<@${interaction.user.id}> shared a part of ${document?.title} - ${book} ${chapter}:${format_list(decode(match[3]!))}`))
+        .addTextDisplayComponents(t => t.setContent(`<@${interaction.user.id}> shared a part of ${document?.title} - ${book} ${chapter}:${format_list(buffer)}`))
         .setButtonAccessory(new ButtonBuilder().setCustomId("rv-" + match[1] + "-" + match[2] + "-" + match[3]).setStyle(ButtonStyle.Primary).setLabel("Read"));
 
       await interaction.update({components: await render_page(match[1], match[2] + "001", 3000, book_primitives, books)})
@@ -193,7 +201,7 @@ export function decode(str: string): string[] {
   return result;
 }
 
-export function format_list(input: string[]): string {
+export function format_list(input: number[]): string {
   if (input.length === 0) return "";
 
   const nums = input
