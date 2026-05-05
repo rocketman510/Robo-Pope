@@ -194,11 +194,10 @@ export function to_superscript(input: string | number): string {
 export async function render_primitives(primitives: BookPrimitive[]): Promise<ContainerBuilder[]> {
   let text = "# " + primitives[0]?.reference.book + " " + primitives[0]?.reference.chapter;
   for (const primitive of primitives) {
-    text += "\n > "
+    text += "\n\n"
     text += primitive.reference_number == 0 ? "" : to_superscript(primitive.reference_number)
     text += primitive.content
-    text += "\n"
-    text += primitive.foot_note.length > 0 ? "-# " + primitive.foot_note.join(", ") : ""
+    text += primitive.foot_note.length > 0 ? "\n-# " + primitive.foot_note.join(", ") : ""
   }
 
   const container = new ContainerBuilder()

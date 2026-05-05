@@ -31,64 +31,75 @@ export default {
         .setButtonAccessory(new ButtonBuilder().setCustomId("rv-" + match[1] + "-" + match[2] + "-" + match[3]).setStyle(ButtonStyle.Primary).setLabel("Read"));
 
       await interaction.update({components: await render_page(match[1], match[2] + "001", 3000, book_primitives, books)})
-      console.log(match[1], match[2] + "001");
-      
       await interaction.channel.send({components: [section], flags: MessageFlags.IsComponentsV2})
     }
   },
 } as Button;
 
-export function encode(input: number[]): string {//CHAT-GPT
-  if (input.length === 0) return "";
 
-  // 1. Sort ascending
-  const arr = [...input].sort((a, b) => a - b);
+/*
+ * CHAT GPT KEEK AWAY
+ * */
 
-  const bits: number[] = [];
+const MAX_VALUE = 999;
+const VALUE_BITS = 10;   // 0..1023, enough for 000..999
+const COUNT_BITS = 16;   // up to 65535 items
+const DELTA_BITS = 4;    // 0..15
+const DELTA_MAX = 15;
+const ESCAPE_FLAG = 1;
+const DIRECT_FLAG = 0;
 
-  // helper: push bits into stream
-  function push(value: number, bitCount: number) {
+class BitWriter {
+  private bits: number[] = [];
+
+  write(value: number, bitCount: number) {
+    if (bitCount <= 0) return;
+    if (!Number.isInteger(value) || value < 0) {
+      throw new Error(`Invalid bit value: ${value}`);
+    }
+
     for (let i = bitCount - 1; i >= 0; i--) {
-      bits.push((value >> i) & 1);
+      this.bits.push((value >> i) & 1);
     }
   }
 
-  // 2. Encode first value as 10-bit base
-  const base = arr[0];
-  if (base < 0 || base > 1023) {
-    throw new Error("Base value out of 10-bit range");
-  }
-  push(base, 10);
+  toBase64(): string {
+    const byteLength = Math.ceil(this.bits.length / 8);
+    const bytes = new Uint8Array(byteLength);
 
-  // 3. Encode deltas (4-bit each)
-  for (let i = 1; i < arr.length; i++) {
-    const delta = arr[i] - arr[i - 1];
-
-    if (delta < 0) {
-      throw new Error("Array must be sorted ascending");
-    }
-    if (delta > 15) {
-      throw new Error(`Delta too large for 4 bits: ${delta}`);
+    for (let i = 0; i < this.bits.length; i++) {
+      const byteIndex = Math.floor(i / 8);
+      const bitIndex = 7 - (i % 8);
+      bytes[byteIndex] |= this.bits[i] << bitIndex;
     }
 
-    push(delta, 4);
+    return Buffer.from(bytes).toString("base64");
   }
-
-  // 4. Pack bits into bytes
-  const byteLength = Math.ceil(bits.length / 8);
-  const bytes = new Uint8Array(byteLength);
-
-  for (let i = 0; i < bits.length; i++) {
-    const byteIndex = Math.floor(i / 8);
-    const bitIndex = 7 - (i % 8);
-    bytes[byteIndex] |= bits[i] << bitIndex;
-  }
-
-  // 5. Convert to Base64
-  return Buffer.from(bytes).toString("base64");
 }
 
-export function decode(str: string): string[] {//CHAT-GPT
+class BitReader {
+  private idx = 0;
+
+  constructor(private readonly bits: number[]) {}
+
+  read(bitCount: number): number {
+    if (this.idx + bitCount > this.bits.length) {
+      throw new Error("Unexpected end of data while decoding");
+    }
+
+    let value = 0;
+    for (let i = 0; i < bitCount; i++) {
+      value = (value << 1) | this.bits[this.idx++];
+    }
+    return value;
+  }
+
+  remaining(): number {
+    return this.bits.length - this.idx;
+  }
+}
+
+function base64ToBits(str: string): number[] {
   const bytes = Buffer.from(str, "base64");
   const bits: number[] = [];
 
@@ -98,35 +109,102 @@ export function decode(str: string): string[] {//CHAT-GPT
     }
   }
 
-  let idx = 0;
+  return bits;
+}
 
-  function read(n: number): number {
-    let val = 0;
-    for (let i = 0; i < n; i++) {
-      val = (val << 1) | bits[idx++];
-    }
-    return val;
+function validateValue(n: number) {
+  if (!Number.isInteger(n)) {
+    throw new Error(`All values must be integers, got: ${n}`);
   }
+  if (n < 0 || n > MAX_VALUE) {
+    throw new Error(`Value out of range 0..${MAX_VALUE}: ${n}`);
+  }
+}
+
+export function encode(input: number[]): string {
+  if (input.length === 0) return "";
+
+  const arr = [...input].sort((a, b) => a - b);
+  arr.forEach(validateValue);
+
+  const writer = new BitWriter();
+
+  // Store item count so decode knows exactly when to stop.
+  if (arr.length > 0xFFFF) {
+    throw new Error("Too many items to encode");
+  }
+  writer.write(arr.length, COUNT_BITS);
+
+  // First value as absolute 10-bit base.
+  writer.write(arr[0], VALUE_BITS);
+
+  // Subsequent values: either small delta or escape to absolute value.
+  for (let i = 1; i < arr.length; i++) {
+    const current = arr[i];
+    const prev = arr[i - 1];
+
+    if (current < prev) {
+      throw new Error("Array must be sorted ascending");
+    }
+
+    const delta = current - prev;
+
+    if (delta <= DELTA_MAX) {
+      // Direct delta: 0..15
+      writer.write(DIRECT_FLAG, 1);
+      writer.write(delta, DELTA_BITS);
+    } else {
+      // Escape: write absolute value instead of delta.
+      writer.write(ESCAPE_FLAG, 1);
+      writer.write(current, VALUE_BITS);
+    }
+  }
+
+  return writer.toBase64();
+}
+
+export function decode(str: string): string[] {
+  if (str === "") return "";
+
+  const bits = base64ToBits(str);
+  const reader = new BitReader(bits);
+
+  const count = reader.read(COUNT_BITS);
+  if (count === 0) return [];
 
   const result: string[] = [];
 
-  let current = read(10);
+  let current = reader.read(VALUE_BITS);
   result.push(current.toString().padStart(3, "0"));
 
-  while (idx + 4 <= bits.length) {
-    const delta = read(4);
-    current += delta;
+  for (let i = 1; i < count; i++) {
+    const flag = reader.read(1);
+
+    if (flag === DIRECT_FLAG) {
+      const delta = reader.read(DELTA_BITS);
+      current += delta;
+    } else {
+      current = reader.read(VALUE_BITS);
+    }
+
     result.push(current.toString().padStart(3, "0"));
   }
 
   return result;
 }
 
-export function format_list(input: string[]) {//CHAT-GPT
+export function format_list(input: string[]): string {
   if (input.length === 0) return "";
 
-  // Convert to numbers and sort
-  const nums = input.map(n => parseInt(n, 10)).sort((a, b) => a - b);
+  const nums = input
+    .map((s) => {
+      const n = Number(s);
+      if (!Number.isInteger(n)) {
+        throw new Error(`Invalid number string: ${s}`);
+      }
+      return n;
+    })
+    .sort((a, b) => a - b);
 
   const result: string[] = [];
 
@@ -137,27 +215,15 @@ export function format_list(input: string[]) {//CHAT-GPT
     const curr = nums[i];
 
     if (curr === prev + 1) {
-      // շարունակation of range
       prev = curr;
     } else {
-      // end of range
-      if (start === prev) {
-        result.push(`${start}`);
-      } else {
-        result.push(`${start}-${prev}`);
-      }
-
+      result.push(start === prev ? `${start}` : `${start}-${prev}`);
       start = curr;
       prev = curr;
     }
   }
 
-  // handle last range
-  if (start === prev) {
-    result.push(`${start}`);
-  } else {
-    result.push(`${start}-${prev}`);
-  }
+  result.push(start === prev ? `${start}` : `${start}-${prev}`);
 
   return result.join(", ");
 }
