@@ -2,6 +2,7 @@ import { ButtonBuilder, ButtonStyle, ContainerBuilder, flatten } from "discord.j
 import type { Collection } from "mongodb";
 import type { BookPrimitive, Book } from "../commands/read";
 import { get_chapter_screen_id } from "./chapter_picker";
+import { encode } from "../button/rs";
 
 
 export async function render_page(book_id: string, start_id: string, max_caharacters: number, primitives: Collection<BookPrimitive>, documents: Collection<Book>): Promise<ContainerBuilder[]> {
@@ -190,13 +191,15 @@ export function to_superscript(input: string | number): string {
     .join("");
 }
 
-export async function render_primitive(primitive: BookPrimitive): Promise<ContainerBuilder[]> {
-  let text = "# " + primitive.reference.book + " " + primitive.reference.chapter
-  text += "\n > "
-  text += primitive.reference_number == 0 ? "" : to_superscript(primitive.reference_number)
-  text += primitive.content
-  text += "\n"
-  text += primitive.foot_note.length > 0 ? "-# " + primitive.foot_note.join(", ") : ""
+export async function render_primitives(primitives: BookPrimitive[]): Promise<ContainerBuilder[]> {
+  let text = "# " + primitives[0]?.reference.book + " " + primitives[0]?.reference.chapter;
+  for (const primitive of primitives) {
+    text += "\n > "
+    text += primitive.reference_number == 0 ? "" : to_superscript(primitive.reference_number)
+    text += primitive.content
+    text += "\n"
+    text += primitive.foot_note.length > 0 ? "-# " + primitive.foot_note.join(", ") : ""
+  }
 
   const container = new ContainerBuilder()
     .addTextDisplayComponents(t => t.setContent(text))
@@ -256,6 +259,7 @@ export async function render_share(book_id: string, start_id: string, max_cahara
       .setButtonAccessory(new ButtonBuilder().setEmoji(get_selection_box(chapter_is_selected)).setLabel("Chapter").setCustomId("rp-" + book_id + "-" + start_id + "-" + boolArrayToBase64(chapter_settings)).setStyle(ButtonStyle.Secondary))
     )
 
+  let share_accumulator: number[] = []
   index = 0
   for (const { value, id } of text_buffer) {
     if (value.startsWith("#")) {
@@ -270,11 +274,22 @@ export async function render_share(book_id: string, start_id: string, max_cahara
       .addTextDisplayComponents(t => t.setContent(value))
       .setButtonAccessory(new ButtonBuilder().setEmoji(get_selection_box(settings[index] ?? false)).setCustomId("rp-" + book_id + "-" + start_id + "-" + boolArrayToBase64(next_settings)).setStyle(ButtonStyle.Secondary).setDisabled(chapter_is_selected))
     )
+
+    if (settings[index]) {
+      share_accumulator.push(Number(id.slice(6,9)))
+    }
     index++;
   }
 
+  let share_custionId;
+  if (chapter_is_selected) {
+    share_custionId = "rs-" + book_id + "-" + start_id.slice(0,6);
+  } else {
+    share_custionId = "rs-" + book_id + "-" + start_id.slice(0,6) + "-" + encode(share_accumulator);
+  }
+
   container.addActionRowComponents(ar => ar.addComponents(
-    new ButtonBuilder().setCustomId("todo1").setStyle(ButtonStyle.Success).setLabel("Share").setEmoji("<:share_to_channel_white:1500941470696472836>"),
+    new ButtonBuilder().setCustomId(share_custionId).setStyle(ButtonStyle.Success).setLabel("Share").setEmoji("<:share_to_channel_white:1500941470696472836>"),
     new ButtonBuilder().setCustomId("rn-" + book_id + "-" + start_id).setStyle(ButtonStyle.Danger).setLabel("Cancel")
   ))
 

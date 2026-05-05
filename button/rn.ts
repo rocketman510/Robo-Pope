@@ -11,6 +11,10 @@ export default {
 
       const container = await render_page(match[1], match[2], 3000, interaction.client.db.collection("book_primitives"), interaction.client.db.collection("books"));
 
-      await interaction.update({ components: container, flags: MessageFlags.IsComponentsV2 })
+      if (interaction.ephemeral) {
+        await interaction.update({ components: container, flags: MessageFlags.IsComponentsV2 })
+      } else {
+        await interaction.reply({ components: container, flags: [ MessageFlags.IsComponentsV2, MessageFlags.Ephemeral ] })
+      }
     },
 } as Button;

@@ -11,7 +11,6 @@ export default {
 
       const settings = base64ToBoolArray(match[3] ?? boolArrayToBase64([false]));
 
-
       const container = await render_share(match[1], match[2], 3000, interaction.client.db.collection("book_primitives"), settings)
 
       await interaction.update({ components: container, flags: MessageFlags.IsComponentsV2 })
