@@ -42,6 +42,7 @@ export default async function(client: Client) {
   client.ows_last_bot_message = new Collection<string, string>();
   client.dyn_vc = new Collection<string, string[]>();
   client.interaction_queue = new Collection<string, number>();
+  client.highlight_color = new Collection<string, number>();
 
   client.shouldStopSpam = false;
   client.is_counting_messages = true;

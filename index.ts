@@ -24,6 +24,7 @@ declare module "discord.js" {
         ows_sentence_history: Collection<string, string[]>;
         dyn_vc: Collection<string, string[]>;
         interaction_queue: Collection<string, number>;
+        highlight_color: Collection<string, number>;
     }
 }
 

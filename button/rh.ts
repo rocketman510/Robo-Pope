@@ -10,7 +10,7 @@ export default {
       if (!match || !match[1] || !match[2]) return;
 
 
-      const container = await render_highlighting(match[1], match[2], interaction.client.db.collection("book_primitives"), decode3BitPacked(match[3] ?? ""))
+      const container = await render_highlighting(match[1], match[2], interaction.client.db.collection("book_primitives"), decode3BitPacked(match[3] ?? ""), interaction)
 
       await interaction.update({ components: container, flags: MessageFlags.IsComponentsV2 })
     },

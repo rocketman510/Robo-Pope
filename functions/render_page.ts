@@ -1,9 +1,9 @@
-import { ButtonBuilder, ButtonStyle, ContainerBuilder, flatten, StringSelectMenuBuilder, StringSelectMenuOptionBuilder } from "discord.js";
+import { ButtonBuilder, ButtonStyle, ContainerBuilder, flatten, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, type Interaction } from "discord.js";
 import type { Collection } from "mongodb";
 import type { BookPrimitive, Book } from "../commands/read";
 import { get_chapter_screen_id } from "./chapter_picker";
 import { encode } from "../button/rs";
-
+import { Collection as DiscordCollection } from "discord.js";
 
 export async function render_page(book_id: string, start_id: string, max_caharacters: number, primitives: Collection<BookPrimitive>, documents: Collection<Book>): Promise<ContainerBuilder[]> {
   const error = new ContainerBuilder().setAccentColor(0x242429).addTextDisplayComponents(t => t.setContent("Error Could not find that part of the book"));
@@ -330,7 +330,7 @@ export function base64ToBoolArray(base64: string): boolean[] {// CHAT-GPT WROTE 
   return bits;
 }
 
-export async function render_highlighting(book_id: string, start_id: string, primitives: Collection<BookPrimitive>, settings: number[]) {
+export async function render_highlighting(book_id: string, start_id: string, primitives: Collection<BookPrimitive>, settings: number[], interaction: Interaction) {
   const error = new ContainerBuilder().setAccentColor(0x242429).addTextDisplayComponents(t => t.setContent("Error Could not find that part of the book"));
 
   let entry: BookPrimitive | null = await primitives.findOne({_id: start_id, book_id});
@@ -362,6 +362,8 @@ export async function render_highlighting(book_id: string, start_id: string, pri
     index++;
   }
 
+  const highlighter_color = interaction.client.highlight_color.ensure(interaction.user.id, () => 1)
+
   const drop_down = new StringSelectMenuBuilder()
     .setCustomId('colorpicker')
     .addOptions(
@@ -369,23 +371,27 @@ export async function render_highlighting(book_id: string, start_id: string, pri
         .setLabel('Yellow')
         .setEmoji('<:colorpicker_yellow:1502124141380108330>')
         .setValue('yellow')
-        .setDefault(true),//TODO
+        .setDefault(highlighter_color == 1),
       new StringSelectMenuOptionBuilder()
         .setLabel('Red')
         .setEmoji('<:colorpicker_red:1502124118948970608>')
-        .setValue('red'),
+        .setValue('red')
+        .setDefault(highlighter_color == 2),
       new StringSelectMenuOptionBuilder()
         .setLabel('Purple')
         .setEmoji('<:colorpicker_purple:1502124109461454858>')
-        .setValue('purple'),
+        .setValue('purple')
+        .setDefault(highlighter_color == 3),
       new StringSelectMenuOptionBuilder()
         .setLabel('Green')
         .setEmoji('<:colorpicker_green:1502124134472089710>')
-        .setValue('green'),
+        .setValue('green')
+        .setDefault(highlighter_color == 4),
       new StringSelectMenuOptionBuilder()
         .setLabel('blue')
         .setEmoji('<:colorpicker_blue:1502124127325130862>')
         .setValue('blue')
+        .setDefault(highlighter_color == 5),
     )
 
   container.addActionRowComponents(ar => ar.addComponents(drop_down))
