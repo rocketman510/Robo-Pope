@@ -1,4 +1,4 @@
-import { ButtonBuilder, ButtonStyle, ContainerBuilder, flatten } from "discord.js";
+import { ButtonBuilder, ButtonStyle, ContainerBuilder, flatten, StringSelectMenuBuilder, StringSelectMenuOptionBuilder } from "discord.js";
 import type { Collection } from "mongodb";
 import type { BookPrimitive, Book } from "../commands/read";
 import { get_chapter_screen_id } from "./chapter_picker";
@@ -9,7 +9,7 @@ export async function render_page(book_id: string, start_id: string, max_caharac
   const error = new ContainerBuilder().setAccentColor(0x242429).addTextDisplayComponents(t => t.setContent("Error Could not find that part of the book"));
   let entry = await primitives.findOne({_id: start_id, book_id: book_id });
 
-  let components_accumulator = 2 + 3 + 1
+  let components_accumulator = 2 + 4 + 1
 
   if (entry === null) return [error];
 
@@ -57,7 +57,7 @@ export async function render_page(book_id: string, start_id: string, max_caharac
     )
     .addActionRowComponents(ar => ar
       .addComponents(new ButtonBuilder().setEmoji("<:previous_button_stop:1499162066236211350>").setStyle(ButtonStyle.Secondary).setCustomId("rn--" + entry.book_id + "-" + this_book_start).setDisabled(previous_id == ""))
-      .addComponents(new ButtonBuilder().setEmoji("<:highlighter:1499170569818734642>").setStyle(ButtonStyle.Secondary).setCustomId("2").setDisabled(start_id == ""))
+      .addComponents(new ButtonBuilder().setEmoji("<:highlighter:1499170569818734642>").setStyle(ButtonStyle.Secondary).setCustomId("rh-" + entry.book_id + "-" + start_id).setDisabled(start_id == ""))
       .addComponents(new ButtonBuilder().setEmoji("<:next_button_stop:1499162049375240262>").setStyle(ButtonStyle.Secondary).setCustomId("rn--" + entry.book_id + "-" + next_chapter).setDisabled(entry.next == ""))
     )
 
@@ -328,4 +328,131 @@ export function base64ToBoolArray(base64: string): boolean[] {// CHAT-GPT WROTE 
   }
 
   return bits;
+}
+
+export async function render_highlighting(book_id: string, start_id: string, primitives: Collection<BookPrimitive>, settings: number[]) {
+  const error = new ContainerBuilder().setAccentColor(0x242429).addTextDisplayComponents(t => t.setContent("Error Could not find that part of the book"));
+
+  let entry: BookPrimitive | null = await primitives.findOne({_id: start_id, book_id});
+  if (!entry) return [error];
+
+  let components_accumulator = 3 + 1 + 2 // Title, Container, Drop Down
+  const container = new ContainerBuilder()
+    .addSectionComponents(s => s
+      .addTextDisplayComponents(t => t.setContent("# " + entry!.reference.book + " " + entry!.reference.chapter))
+      .setButtonAccessory(new ButtonBuilder().setCustomId("todo1").setLabel("Back").setStyle(ButtonStyle.Secondary))
+    )
+
+  settings = Array.from({ length: Math.ceil((40 - components_accumulator) / 3) }, (_, i) => settings[i] ?? 0);
+
+  let index = 0
+  while (components_accumulator < 37) {
+    let temp_settings = [...settings];
+    temp_settings[index] = temp_settings[index] != 0 ? 0:1;
+
+    container.addSectionComponents(s => s
+      .addTextDisplayComponents(t => t.setContent(entry!.content))
+      .setButtonAccessory(new ButtonBuilder().setCustomId("rh-" + entry!.book_id + "-" + start_id + "-" + encode3BitPacked(temp_settings)).setEmoji(settings[index] != 0 ? "<:colorpicker_yellow:1502124141380108330>" : "<:colorpicker_empty:1502124148913344593>").setStyle(ButtonStyle.Secondary))
+    )
+
+    const pre_entry: BookPrimitive | null = await primitives.findOne({_id: entry.next, book_id});
+    if (pre_entry === null) break;
+    entry = pre_entry;
+    components_accumulator += 3;
+    index++;
+  }
+
+  const drop_down = new StringSelectMenuBuilder()
+    .setCustomId('colorpicker')
+    .addOptions(
+      new StringSelectMenuOptionBuilder()
+        .setLabel('Yellow')
+        .setEmoji('<:colorpicker_yellow:1502124141380108330>')
+        .setValue('yellow')
+        .setDefault(true),//TODO
+      new StringSelectMenuOptionBuilder()
+        .setLabel('Red')
+        .setEmoji('<:colorpicker_red:1502124118948970608>')
+        .setValue('red'),
+      new StringSelectMenuOptionBuilder()
+        .setLabel('Purple')
+        .setEmoji('<:colorpicker_purple:1502124109461454858>')
+        .setValue('purple'),
+      new StringSelectMenuOptionBuilder()
+        .setLabel('Green')
+        .setEmoji('<:colorpicker_green:1502124134472089710>')
+        .setValue('green'),
+      new StringSelectMenuOptionBuilder()
+        .setLabel('blue')
+        .setEmoji('<:colorpicker_blue:1502124127325130862>')
+        .setValue('blue')
+    )
+
+  container.addActionRowComponents(ar => ar.addComponents(drop_down))
+
+  return [container]
+}
+
+export function encode3BitPacked(values: number[]): string {//Gemini
+  const totalBits = values.length * 3;
+  const byteLength = Math.ceil(totalBits / 8);
+  const bytes = new Uint8Array(byteLength);
+
+  let bitCursor = 0;
+
+  for (const val of values) {
+    if (val < 0 || val > 7) throw new Error("Value out of 3-bit range (0-7)");
+
+    let bitsToWrite = 3;
+    while (bitsToWrite > 0) {
+      const byteIdx = Math.floor(bitCursor / 8);
+      const bitOffset = bitCursor % 8;
+      const spaceInByte = 8 - bitOffset;
+
+      // Determine how many bits of the current value fit into the current byte
+      const chunkCount = Math.min(bitsToWrite, spaceInByte);
+      const chunk = (val >> (bitsToWrite - chunkCount)) & ((1 << chunkCount) - 1);
+
+      // Shift chunk to the correct position and OR it into the byte
+      bytes[byteIdx] |= (chunk << (spaceInByte - chunkCount));
+
+      bitCursor += chunkCount;
+      bitsToWrite -= chunkCount;
+    }
+  }
+
+  return Buffer.from(bytes).toString('base64');
+}
+
+export function decode3BitPacked(base64: string): number[] {//Gemini
+  const bytes = Buffer.from(base64, 'base64');
+  const totalBits = bytes.length * 8;
+  const result: number[] = [];
+  
+  let bitCursor = 0;
+
+  // Continue as long as there is a full 3-bit chunk available
+  while (bitCursor + 3 <= totalBits) {
+    let value = 0;
+    let bitsToRead = 3;
+
+    while (bitsToRead > 0) {
+      const byteIdx = Math.floor(bitCursor / 8);
+      const bitOffset = bitCursor % 8;
+      const spaceInByte = 8 - bitOffset;
+
+      const chunkCount = Math.min(bitsToRead, spaceInByte);
+      // Extract bits from the current byte
+      const chunk = (bytes[byteIdx] >> (spaceInByte - chunkCount)) & ((1 << chunkCount) - 1);
+
+      // Shift the value to make room and add the chunk
+      value = (value << chunkCount) | chunk;
+
+      bitCursor += chunkCount;
+      bitsToRead -= chunkCount;
+    }
+    result.push(value);
+  }
+
+  return result;
 }
