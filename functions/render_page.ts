@@ -337,22 +337,38 @@ export async function render_highlighting(book_id: string, start_id: string, pri
   if (!entry) return [error];
 
   let components_accumulator = 3 + 1 + 2 // Title, Container, Drop Down
+
+  settings = Array.from({ length: Math.ceil((40 - components_accumulator) / 3) }, (_, i) => settings[i] ?? 0);
+  const highlighter_color = interaction.client.highlight_color.ensure(interaction.user.id, () => 1)
+
   const container = new ContainerBuilder()
     .addSectionComponents(s => s
       .addTextDisplayComponents(t => t.setContent("# " + entry!.reference.book + " " + entry!.reference.chapter))
       .setButtonAccessory(new ButtonBuilder().setCustomId("todo1").setLabel("Back").setStyle(ButtonStyle.Secondary))
     )
 
-  settings = Array.from({ length: Math.ceil((40 - components_accumulator) / 3) }, (_, i) => settings[i] ?? 0);
+  settings = settings.map((v) => v == 7 ? highlighter_color:v)
+
 
   let index = 0
   while (components_accumulator < 37) {
     let temp_settings = [...settings];
-    temp_settings[index] = temp_settings[index] != 0 ? 0:1;
+    temp_settings[index] = temp_settings[index] != 0 ? 0:7;
+
+    const emojis = [
+      "<:colorpicker_empty:1502124148913344593>",
+      "<:colorpicker_yellow:1502124141380108330>",
+      "<:colorpicker_red:1502124118948970608>",
+      "<:colorpicker_purple:1502124109461454858>",
+      "<:colorpicker_green:1502124134472089710>",
+      "<:colorpicker_blue:1502124127325130862>",
+      "",
+    ]
+    emojis[7] = emojis[highlighter_color] ?? ""
 
     container.addSectionComponents(s => s
       .addTextDisplayComponents(t => t.setContent(entry!.content))
-      .setButtonAccessory(new ButtonBuilder().setCustomId("rh-" + entry!.book_id + "-" + start_id + "-" + encode3BitPacked(temp_settings)).setEmoji(settings[index] != 0 ? "<:colorpicker_yellow:1502124141380108330>" : "<:colorpicker_empty:1502124148913344593>").setStyle(ButtonStyle.Secondary))
+      .setButtonAccessory(new ButtonBuilder().setCustomId("rh-" + entry!.book_id + "-" + start_id + "-" + encode3BitPacked(temp_settings)).setEmoji(emojis[settings[index] ?? 0] ?? "<:colorpicker_empty:1502124148913344593>").setStyle(ButtonStyle.Secondary))
     )
 
     const pre_entry: BookPrimitive | null = await primitives.findOne({_id: entry.next, book_id});
@@ -362,7 +378,6 @@ export async function render_highlighting(book_id: string, start_id: string, pri
     index++;
   }
 
-  const highlighter_color = interaction.client.highlight_color.ensure(interaction.user.id, () => 1)
 
   const drop_down = new StringSelectMenuBuilder()
     .setCustomId('colorpicker')

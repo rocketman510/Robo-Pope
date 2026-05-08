@@ -31,7 +31,7 @@ export default {
       "blue": 5
     }
 
-    interaction.client.highlight_color.ensure(interaction.user.id, () => values[selected]!)
+    interaction.client.highlight_color.set(interaction.user.id, values[selected] ?? 1)
 
     await interaction.update({components: interaction.message.components, flags: MessageFlags.IsComponentsV2})
   },
