@@ -4,6 +4,7 @@ import type { BookPrimitive, Book } from "../commands/read";
 import { get_chapter_screen_id } from "./chapter_picker";
 import { encode } from "../button/rs";
 import { Collection as DiscordCollection } from "discord.js";
+import type { HighlighterSetting } from "../button/rh";
 
 export async function render_page(book_id: string, start_id: string, max_caharacters: number, primitives: Collection<BookPrimitive>, documents: Collection<Book>): Promise<ContainerBuilder[]> {
   const error = new ContainerBuilder().setAccentColor(0x242429).addTextDisplayComponents(t => t.setContent("Error Could not find that part of the book"));
@@ -330,7 +331,7 @@ export function base64ToBoolArray(base64: string): boolean[] {// CHAT-GPT WROTE 
   return bits;
 }
 
-export async function render_highlighting(book_id: string, start_id: string, primitives: Collection<BookPrimitive>, settings: number[], interaction: Interaction) {
+export async function render_highlighting(book_id: string, start_id: string, primitives: Collection<BookPrimitive>, interaction: Interaction, highlighter_settings: Collection<HighlighterSetting>) {
   const error = new ContainerBuilder().setAccentColor(0x242429).addTextDisplayComponents(t => t.setContent("Error Could not find that part of the book"));
 
   let entry: BookPrimitive | null = await primitives.findOne({_id: start_id, book_id});
@@ -338,7 +339,7 @@ export async function render_highlighting(book_id: string, start_id: string, pri
 
   let components_accumulator = 3 + 1 + 2 // Title, Container, Drop Down
 
-  settings = Array.from({ length: Math.ceil((40 - components_accumulator) / 3) }, (_, i) => settings[i] ?? 0);
+  // settings = Array.from({ length: Math.ceil((40 - components_accumulator) / 3) }, (_, i) => settings[i] ?? 0);
   const highlighter_color = interaction.client.highlight_color.ensure(interaction.user.id, () => 1)
 
   const container = new ContainerBuilder()
@@ -347,13 +348,8 @@ export async function render_highlighting(book_id: string, start_id: string, pri
       .setButtonAccessory(new ButtonBuilder().setCustomId("todo1").setLabel("Back").setStyle(ButtonStyle.Secondary))
     )
 
-  settings = settings.map((v) => v == 7 ? highlighter_color:v)
-
-
   let index = 0
   while (components_accumulator < 37) {
-    let temp_settings = [...settings];
-    temp_settings[index] = temp_settings[index] != 0 ? 0:7;
 
     const emojis = [
       "<:colorpicker_empty:1502124148913344593>",
@@ -366,9 +362,13 @@ export async function render_highlighting(book_id: string, start_id: string, pri
     ]
     emojis[7] = emojis[highlighter_color] ?? ""
 
+    const emoji = (await highlighter_settings.findOne({ _id: entry._id, book_id: entry.book_id, user_id: interaction.user.id }))?.color ?? 0;
+
+    console.log(await highlighter_settings.findOne({ _id: entry._id, book_id: entry.book_id, user_id: interaction.user.id }));
+
     container.addSectionComponents(s => s
       .addTextDisplayComponents(t => t.setContent(entry!.content))
-      .setButtonAccessory(new ButtonBuilder().setCustomId("rh-" + entry!.book_id + "-" + start_id + "-" + encode3BitPacked(temp_settings)).setEmoji(emojis[settings[index] ?? 0] ?? "<:colorpicker_empty:1502124148913344593>").setStyle(ButtonStyle.Secondary))
+      .setButtonAccessory(new ButtonBuilder().setCustomId("rh-" + entry!.book_id + "-" + start_id + "-" + entry!._id.slice(6,9)).setEmoji(emojis[emoji] ?? "<:colorpicker_empty:1502124148913344593>").setStyle(ButtonStyle.Secondary))
     )
 
     const pre_entry: BookPrimitive | null = await primitives.findOne({_id: entry.next, book_id});
@@ -403,7 +403,7 @@ export async function render_highlighting(book_id: string, start_id: string, pri
         .setValue('green')
         .setDefault(highlighter_color == 4),
       new StringSelectMenuOptionBuilder()
-        .setLabel('blue')
+        .setLabel('Blue')
         .setEmoji('<:colorpicker_blue:1502124127325130862>')
         .setValue('blue')
         .setDefault(highlighter_color == 5),
