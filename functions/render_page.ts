@@ -345,7 +345,7 @@ export async function render_highlighting(book_id: string, start_id: string, pri
   const container = new ContainerBuilder()
     .addSectionComponents(s => s
       .addTextDisplayComponents(t => t.setContent("# " + entry!.reference.book + " " + entry!.reference.chapter))
-      .setButtonAccessory(new ButtonBuilder().setCustomId("todo1").setLabel("Back").setStyle(ButtonStyle.Secondary))
+      .setButtonAccessory(new ButtonBuilder().setCustomId("rn-" + book_id + "-" + start_id).setLabel("Back").setStyle(ButtonStyle.Secondary))
     )
 
   let index = 0
@@ -412,68 +412,4 @@ export async function render_highlighting(book_id: string, start_id: string, pri
   container.addActionRowComponents(ar => ar.addComponents(drop_down))
 
   return [container]
-}
-
-export function encode3BitPacked(values: number[]): string {//Gemini
-  const totalBits = values.length * 3;
-  const byteLength = Math.ceil(totalBits / 8);
-  const bytes = new Uint8Array(byteLength);
-
-  let bitCursor = 0;
-
-  for (const val of values) {
-    if (val < 0 || val > 7) throw new Error("Value out of 3-bit range (0-7)");
-
-    let bitsToWrite = 3;
-    while (bitsToWrite > 0) {
-      const byteIdx = Math.floor(bitCursor / 8);
-      const bitOffset = bitCursor % 8;
-      const spaceInByte = 8 - bitOffset;
-
-      // Determine how many bits of the current value fit into the current byte
-      const chunkCount = Math.min(bitsToWrite, spaceInByte);
-      const chunk = (val >> (bitsToWrite - chunkCount)) & ((1 << chunkCount) - 1);
-
-      // Shift chunk to the correct position and OR it into the byte
-      bytes[byteIdx] |= (chunk << (spaceInByte - chunkCount));
-
-      bitCursor += chunkCount;
-      bitsToWrite -= chunkCount;
-    }
-  }
-
-  return Buffer.from(bytes).toString('base64');
-}
-
-export function decode3BitPacked(base64: string): number[] {//Gemini
-  const bytes = Buffer.from(base64, 'base64');
-  const totalBits = bytes.length * 8;
-  const result: number[] = [];
-  
-  let bitCursor = 0;
-
-  // Continue as long as there is a full 3-bit chunk available
-  while (bitCursor + 3 <= totalBits) {
-    let value = 0;
-    let bitsToRead = 3;
-
-    while (bitsToRead > 0) {
-      const byteIdx = Math.floor(bitCursor / 8);
-      const bitOffset = bitCursor % 8;
-      const spaceInByte = 8 - bitOffset;
-
-      const chunkCount = Math.min(bitsToRead, spaceInByte);
-      // Extract bits from the current byte
-      const chunk = (bytes[byteIdx] >> (spaceInByte - chunkCount)) & ((1 << chunkCount) - 1);
-
-      // Shift the value to make room and add the chunk
-      value = (value << chunkCount) | chunk;
-
-      bitCursor += chunkCount;
-      bitsToRead -= chunkCount;
-    }
-    result.push(value);
-  }
-
-  return result;
 }

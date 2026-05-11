@@ -1,6 +1,6 @@
 import { ButtonInteraction, MessageFlags } from "discord.js";
 import type { Button } from "../deploy";
-import { decode3BitPacked, render_highlighting } from "../functions/render_page";
+import { render_highlighting } from "../functions/render_page";
 
 export type HighlighterSetting = {
   _id: string,
@@ -12,7 +12,6 @@ export type HighlighterSetting = {
 export default {
   data: "rh",
   async execute(interaction: ButtonInteraction) {
-    // const match = interaction.customId.match(/^\w.(?:-+)([\w]*)(?:-+)([\w]*)(?:-+)?([A-Za-z0-9+/=]*)?/)
     const match = interaction.customId.match(/^\w.(?:-+)([\w]*)(?:-+)([\w]*)(?:-+)?([\w]*)?/)
 
     if (!match || !match[1] || !match[2]) return;

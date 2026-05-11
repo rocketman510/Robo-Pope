@@ -17,7 +17,6 @@ export default {
     const document = await interaction.client.db.collection<Book>("books").findOne({_id: match[1]});
     const book = match[2].slice(0,3).toUpperCase();
     const chapter = Number(match[2].slice(3,6));
-    const decoded = decode(match[3]!).sort((a, b) => Number(a) - Number(b));
 
     if (!match[3]) {
       const section = new SectionBuilder()
@@ -27,6 +26,7 @@ export default {
       await interaction.update({components: await render_page(match[1], match[2] + "001", 3000, book_primitives, books)})
       await interaction.channel.send({components: [section], flags: MessageFlags.IsComponentsV2})
     } else {
+      const decoded = decode(match[3]!).sort((a, b) => Number(a) - Number(b));
       let buffer: number[] = [];
       for (const item of decoded) {
         const primitive = await book_primitives.findOne({_id: match[2] + item, book_id: match[1]})
