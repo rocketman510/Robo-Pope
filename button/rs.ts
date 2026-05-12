@@ -2,6 +2,7 @@ import { ButtonBuilder, ButtonInteraction, ButtonStyle, MessageFlags, SectionBui
 import type { Button } from "../deploy";
 import type { Book, BookPrimitive } from "../commands/read";
 import { render_page } from "../functions/render_page";
+import type { HighlighterSetting } from "./rh";
 
 export default {
   data: "rs",
@@ -13,7 +14,8 @@ export default {
 
     const books = interaction.client.db.collection<Book>("books");
     const book_primitives = interaction.client.db.collection<BookPrimitive>("book_primitives");
-    
+    const highlighter = interaction.client.db.collection<HighlighterSetting>("highlighter_settings");
+
     const document = await interaction.client.db.collection<Book>("books").findOne({_id: match[1]});
     const book = match[2].slice(0,3).toUpperCase();
     const chapter = Number(match[2].slice(3,6));
@@ -23,7 +25,7 @@ export default {
         .addTextDisplayComponents(t => t.setContent(`<@${interaction.user.id}> shared a chapter of ${document?.title} - ${book} ${chapter}`))
         .setButtonAccessory(new ButtonBuilder().setCustomId("rn-" + match[1] + "-" + match[2] + "001").setStyle(ButtonStyle.Primary).setLabel("Read"));
 
-      await interaction.update({components: await render_page(match[1], match[2] + "001", 3000, book_primitives, books)})
+      await interaction.update({components: await render_page(match[1], match[2] + "001", 3000, book_primitives, books, highlighter)})
       await interaction.channel.send({components: [section], flags: MessageFlags.IsComponentsV2})
     } else {
       const decoded = decode(match[3]!).sort((a, b) => Number(a) - Number(b));
@@ -38,7 +40,7 @@ export default {
         .addTextDisplayComponents(t => t.setContent(`<@${interaction.user.id}> shared a part of ${document?.title} - ${book} ${chapter}:${format_list(buffer)}`))
         .setButtonAccessory(new ButtonBuilder().setCustomId("rv-" + match[1] + "-" + match[2] + "-" + match[3]).setStyle(ButtonStyle.Primary).setLabel("Read"));
 
-      await interaction.update({components: await render_page(match[1], match[2] + "001", 3000, book_primitives, books)})
+      await interaction.update({components: await render_page(match[1], match[2] + "001", 3000, book_primitives, books, highlighter)})
       await interaction.channel.send({components: [section], flags: MessageFlags.IsComponentsV2})
     }
   },

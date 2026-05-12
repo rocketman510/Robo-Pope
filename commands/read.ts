@@ -5,6 +5,7 @@ import path from "path";
 import { render_page } from "../functions/render_page";
 import { render } from "../functions/chapter_picker";
 import { parse } from "../functions/read_string_parsing";
+import type { HighlighterSetting } from "../button/rh";
 
 export type BookPrimitive = {
   _id: string;
@@ -60,6 +61,7 @@ export default {
 
     const books = db.collection<Book>('books');
     const primitives = db.collection<BookPrimitive>('book_primitives');
+    const highlighter = db.collection<HighlighterSetting>('highlighter_settings');
 
     const document_id = interaction.options.getString("document")
     if (!document_id) return;
@@ -73,7 +75,7 @@ export default {
     if (book_id.length <= 3) {
       container = render(this_book, book_id, 1);
     } else {
-      container = await render_page(document_id, book_id + "001", 1500, primitives, books);
+      container = await render_page(document_id, book_id + "001", 1500, primitives, books, highlighter);
     }
 
     interaction.reply({components: container, flags: [MessageFlags.Ephemeral, MessageFlags.IsComponentsV2]})
