@@ -41,11 +41,12 @@ export async function render_page(book_id: string, start_id: string, max_caharac
   ]
 
   let last_color = 0
+  let highlight;
 
   while (components_accumulator < 37) {
     components_accumulator += entry.type == "title" ? 1 : 3;
 
-    const highlight = await highlighter_settings.findOne({ _id: entry._id, book_id: entry.book_id, user_id: interaction.user.id }) ?? { color: 0 }
+    highlight = await highlighter_settings.findOne({ _id: entry._id, book_id: entry.book_id, user_id: interaction.user.id }) ?? { color: 0 }
     const content = (entry.type == "title" ? "### ":"") + (entry.reference_number == 0 ? "":to_superscript(entry.reference_number)) + entry.content;
 
     if (highlight.color != last_color) {
@@ -66,8 +67,10 @@ export async function render_page(book_id: string, start_id: string, max_caharac
     last_color = highlight.color
   }
 
-  container_buffer.push(container)
-  container = new ContainerBuilder()
+  if (last_color != 0) {
+    container_buffer.push(container);
+    container = new ContainerBuilder();
+  }
 
   container.addActionRowComponents(ar => ar
       .addComponents(new ButtonBuilder().setEmoji("<:previous_button:1499160154828963940>").setStyle(ButtonStyle.Secondary).setCustomId("rn-" + entry.book_id + "-" + previous_id).setDisabled(previous_id == ""))
