@@ -75,7 +75,7 @@ export default {
     if (book_id.length <= 3) {
       container = render(this_book, book_id, 1);
     } else {
-      container = await render_page(document_id, book_id + "001", 1500, primitives, books, highlighter);
+      container = await render_page(document_id, book_id + "001", 1500, interaction, primitives, books, highlighter);
     }
 
     interaction.reply({components: container, flags: [MessageFlags.Ephemeral, MessageFlags.IsComponentsV2]})
