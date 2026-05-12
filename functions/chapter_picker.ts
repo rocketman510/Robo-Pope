@@ -5,6 +5,8 @@ export function render(book: Book, chapter: string, starting_chapter: number) {
   if (!book.books[chapter] || !book.chapters[chapter]) return;
 
   const books = Object.entries(book.books);
+  const current_book_index = books.findIndex(([key]) => key === chapter);
+  const next_book: string | undefined = books[current_book_index + 1]?.[0];
 
   const container = new ContainerBuilder()
     .addTextDisplayComponents(t => t.setContent("# " + book.books[chapter]))
@@ -19,7 +21,7 @@ export function render(book: Book, chapter: string, starting_chapter: number) {
     buffer.push(new ButtonBuilder().setCustomId("rn-" + book._id + "-" + chapter + format(i) + "001").setLabel(i.toString()).setStyle(ButtonStyle.Secondary));
 
     if (i >= book.chapters[chapter]) {
-      next_button_id = books[books.findIndex(([key]) => key === chapter) + 1]?.[0] + "001";
+      next_button_id = next_book?.concat("001") ?? null;
     } else {
       next_button_id = chapter + format(i+1);
     }
@@ -29,12 +31,10 @@ export function render(book: Book, chapter: string, starting_chapter: number) {
     const previous_book = books[books.findIndex(([key]) => key === chapter) - 1]?.[0];
     if (previous_book !== undefined) {
       const previous_chapters = book.chapters[previous_book]!;
-      const whole_pgs = Math.floor(previous_chapters/25);
-      if ((previous_chapters - 1) % 25 == 0) {
-        previous_button_id = previous_book + format((whole_pgs - 1) * 25);
-      } else {
-        previous_button_id = previous_book + format(previous_chapters - (previous_chapters - 1) % 25);
-      }
+
+      const previous_page_start = Math.floor((previous_chapters - 1) / 25) * 25 + 1;
+
+      previous_button_id = previous_book + format(previous_page_start);
     } else {
       previous_button_id = null
     }

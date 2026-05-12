@@ -7,6 +7,9 @@ export default {
     data: "cp",
     async execute(interaction: ButtonInteraction) {
       const match = interaction.customId.match(/^\w.(?:-+)([\w]*)(?:-+)([\w]*)$/)
+
+      console.log(interaction, interaction.customId);
+      
       
       if (!match || !match[1] || !match[2]) return;
 
