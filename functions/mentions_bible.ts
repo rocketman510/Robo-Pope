@@ -1,5 +1,4 @@
 import { MessageFlags, type Message, type MessageReaction, type User } from "discord.js";
-import { interpolators } from "sharp";
 import type { BookPrimitive } from "../commands/read";
 import { render_primitives } from "./render_page";
 
@@ -122,8 +121,6 @@ export async function handel_bible_mention(message: Message) {
         const num = Number(part);
         return Number.isNaN(num) ? [] : [String(num)];
       });
-
-    console.log(matchs, verses);
 
     for (const verse of verses) {
       const primitive = await message.client.db.collection<BookPrimitive>("book_primitives").findOne({book_id: "nrsv_ci", _id: key + match[2]!.padStart(3, "0") + verse.padStart(3, "0")});
