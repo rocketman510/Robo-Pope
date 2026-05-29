@@ -1,0 +1,37 @@
+{
+  "metadata": {
+    "_id": "example",
+    "title": "Example",
+    "translation": "",
+    "language": "English",
+    "thumbnail": "",
+    "author": "John Doe",
+    "books": {
+      "exp": "Example"
+    },
+    "chapters": {
+      "exp": 1
+    }
+  },
+  "primitives": [
+    {
+      "_id": "exp001001",
+      "book_id": "example",
+      "absolute_index": 1001001,
+      "content": "The quick brown fox jumped over the lazy dog",
+      "type": "sentence",
+      "reference_number": 0,
+      "is_image": false,
+      "image_path": "",
+      "foot_note": [],
+      "next": "exp001002",
+      "previous": "",
+      "reference": {
+        "book": "Example",
+        "chapter": "Chapter 1",
+        "primitive": "001",
+        "section": ""
+      }
+    }
+  ]
+}

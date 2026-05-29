@@ -9,6 +9,7 @@ import fs from "fs";
 import path from "node:path";
 import { ensure } from ".";
 import { update_leaderboard } from "./functions/level_leaderboard";
+import { readdirSync, readFileSync } from "node:fs";
 
 export interface Command {
     data: SlashCommandBuilder;
@@ -40,6 +41,8 @@ export default async function(client: Client) {
   client.ows_sentence_history = new Collection<string, string[]>();
   client.ows_last_bot_message = new Collection<string, string>();
   client.dyn_vc = new Collection<string, string[]>();
+  client.interaction_queue = new Collection<string, number>();
+  client.highlight_color = new Collection<string, number>();
 
   client.shouldStopSpam = false;
   client.is_counting_messages = true;
@@ -68,6 +71,8 @@ export default async function(client: Client) {
   deploy_xp(client);
   console.log("Connecting to DB");
   client.db = await deploy_db();
+  console.log("Deploy Books");
+  await deploy_books(client);
 }
 
 async function deploy_commands(client_commands: Collection<string,Command>) {
@@ -242,8 +247,9 @@ async function get_ows_history(client: Client) {
     let first_punctuation = false
 
     while (!first_punctuation) {// This looks for the first punctuation.
-      const [result, content]= test_for_first_punctuation(message_buffer);
+      const [result, content] = test_for_first_punctuation(message_buffer);
       if (!result) {
+        if (message_buffer.last() == undefined) break;
         before_message = message_buffer.last()!.id;
         message_buffer = await channel.messages.fetch({limit: 100, before: before_message})
       } else {
@@ -255,6 +261,7 @@ async function get_ows_history(client: Client) {
     }
 
     while (message_buffer.size == 100) {// This handle the chunks of 100 messages.
+      if (message_buffer.last() == undefined) break;
       before_message = message_buffer.last()!.id;
       const next_chunk = await channel.messages.fetch({limit: 100, before: before_message});
       const is_last_chunck = next_chunk.size == 0;
@@ -305,4 +312,24 @@ function test_for_first_punctuation(message_buffer: Collection<string, Message>)
     }
   }
   return [null, null]
+}
+
+async function deploy_books(client: Client) {
+  const dir = readdirSync("./books/");
+  
+  for (const file of dir) {
+    const file_name = path.parse(file).name;
+    const file_ext = path.parse(file).ext;
+
+    if (file_name.startsWith('.')) continue;
+    if (file_ext != ".json") continue;
+
+    const file_data = readFileSync("./books/" + file, "utf-8");
+    const file_json = JSON.parse(file_data);
+
+    await client.db.collection("books").drop()
+    await client.db.collection("books").insertOne(file_json.metadata);
+    await client.db.collection("book_primitives").drop()
+    await client.db.collection("book_primitives").insertMany(file_json.primitives);
+  }
 }
