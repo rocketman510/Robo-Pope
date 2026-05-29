@@ -41,30 +41,36 @@ export async function render_page(book_id: string, start_id: string, max_caharac
   ]
 
   let last_color = 0
-  let highlight;
+
+  const user_highlights = await highlighter_settings.find({ 
+    book_id: book_id, 
+    user_id: interaction.user.id 
+  }).toArray();
+
+  const highlight_map = new Map(user_highlights.map(h => [h._id, h.color]));
 
   while (components_accumulator < 37) {
     components_accumulator += entry.type == "title" ? 1 : 3;
 
-    highlight = await highlighter_settings.findOne({ _id: entry._id, book_id: entry.book_id, user_id: interaction.user.id }) ?? { color: 0 }
+    const highlight_color = highlight_map.get(entry._id) ?? 0;
     const content = (entry.type == "title" ? "### ":"") + (entry.reference_number == 0 ? "":to_superscript(entry.reference_number)) + entry.content;
 
-    if (highlight.color != last_color) {
-      container_buffer.push(container)
-      container = new ContainerBuilder()
-        .addTextDisplayComponents(t => t.setContent(content))
+    if (highlight_color != last_color) {
+      container_buffer.push(container);
+      container = new ContainerBuilder().addTextDisplayComponents(t => t.setContent(content));
 
-      if (highlight.color != 0) {
-        container.setAccentColor(colors[highlight.color])
+      if (highlight_color != 0) {
+        container.setAccentColor(colors[highlight_color]);
       }
     } else {
-      container.addTextDisplayComponents(t => t.setContent(content))
+      container.addTextDisplayComponents(t => t.setContent(content));
     }
 
+    // Follow the pointer to the next primitive
     const pre_entry: BookPrimitive | null = await primitives.findOne({_id: entry.next, book_id: book_id});
     if (pre_entry === null) break;
     entry = pre_entry;
-    last_color = highlight.color
+    last_color = highlight_color;
   }
 
   if (last_color != 0) {
