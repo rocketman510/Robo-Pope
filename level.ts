@@ -53,7 +53,7 @@ export async function getMessageHistory(client: Client, channel: Channel, guild_
       addUserMessage(client, value);
       console.log('addUserMessage:');
 
-      console.log(value.author.displayName + " with " + value.content);
+    console.log(value.author.displayName + " with " + value.content);
     }
 
     if (messages.size < 100) {

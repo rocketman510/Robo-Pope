@@ -7,6 +7,7 @@ import { handleLevel, handleReaction } from "./level";
 import type { Db } from "mongodb"
 import { handleOwsMessage } from "./functions/one_word_story";
 import { handle_join } from "./functions/dyn_voice_channel";
+import { handel_bible_mention, handel_reaction_bible } from "./functions/mentions_bible";
 
 declare module "discord.js" {
     export interface Client {
@@ -24,6 +25,7 @@ declare module "discord.js" {
         ows_sentence_history: Collection<string, string[]>;
         dyn_vc: Collection<string, string[]>;
         interaction_queue: Collection<string, number>;
+        highlight_color: Collection<string, number>;
     }
 }
 
@@ -51,6 +53,7 @@ client.once(Events.ClientReady, async readyClient => {
     client.on(Events.MessageCreate, async (message) => {
       await handleOwsMessage(message);
       await handleLevel(client, message);
+      handel_bible_mention(message);
       if (message.content == '?test') {
         for (let i = 0; i < 50; i++) {
           await message.channel.send(i.toString())
@@ -60,6 +63,7 @@ client.once(Events.ClientReady, async readyClient => {
 
     client.on(Events.MessageReactionAdd, async (reaction, user) => {
       await handleReaction(reaction, user);
+      await handel_reaction_bible(reaction, user)
     });
 
     client.on(Events.GuildMemberAdd, async () => {
@@ -83,7 +87,12 @@ client.once(Events.ClientReady, async readyClient => {
           script(interaction);
         } catch (err) {error(err)};
       } else if (interaction.isButton()) {
-        const button = client.buttons.get(interaction.customId)
+        let button: any = {};
+        if (/^\w.-+[\w-+/=]*$/.test(interaction.customId)) {
+          button = client.buttons.get(interaction.customId.slice(0,2))
+        } else {
+          button = client.buttons.get(interaction.customId)
+        }
         if (!button) return;
         try {
           button.execute(interaction)
