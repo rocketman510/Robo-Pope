@@ -1,4 +1,4 @@
-import { ButtonBuilder, ButtonStyle, ContainerBuilder, flatten, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, type Interaction } from "discord.js";
+import { ButtonBuilder, ButtonStyle, ContainerBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, type Interaction } from "discord.js";
 import type { Collection } from "mongodb";
 import type { BookPrimitive, Book } from "../commands/read";
 import { get_chapter_screen_id } from "./chapter_picker";
@@ -80,7 +80,7 @@ export async function render_page(book_id: string, start_id: string, max_caharac
     .addActionRowComponents(ar => ar
       .addComponents(new ButtonBuilder().setEmoji("<:previous_button_stop:1499162066236211350>").setStyle(ButtonStyle.Secondary).setCustomId("rn--" + entry.book_id + "-" + this_book_start).setDisabled(previous_id == ""))
       .addComponents(new ButtonBuilder().setEmoji("<:highlighter:1499170569818734642>").setStyle(ButtonStyle.Secondary).setCustomId("rh-" + entry.book_id + "-" + start_id).setDisabled(start_id == ""))
-      .addComponents(new ButtonBuilder().setEmoji("<:next_button_stop:1499162049375240262>").setStyle(ButtonStyle.Secondary).setCustomId("rn--" + entry.book_id + "-" + next_chapter).setDisabled(entry.next == ""))
+      .addComponents(new ButtonBuilder().setEmoji("<:next_button_stop:1499162049375240262>").setStyle(ButtonStyle.Secondary).setCustomId("rn--" + entry.book_id + "-" + next_chapter).setDisabled(next_chapter == ""))
     )
 
   container_buffer.push(container)
@@ -156,7 +156,9 @@ async function get_next_chapter(start_id: string, book_id: string, book_db: Coll
   
   const next = this_book_index !== -1 ? entries[this_book_index + 1] : undefined;
 
-  return next?.[0]! + "001001";
+  if (next === undefined) return "";
+
+  return next[0] + "001001";
 }
 
 function get_previous_chapter(primitive: BookPrimitive) {
