@@ -88,7 +88,7 @@ export async function render_page(book_id: string, start_id: string, max_caharac
   return container_buffer
 }
 
-export async function find_previous_page_start(book_id: string, start_id: string, max_characters: number, primitives: Collection<BookPrimitive>): Promise<string> {// AI WROTE THIS IDK WHAT IT DOSE
+export async function find_previous_page_start(book_id: string, start_id: string, max_caharacters: number, primitives: Collection<BookPrimitive>): Promise<string> {// AI WROTE THIS IDK WHAT IT DOSE
   let entry = await primitives.findOne({_id: start_id, book_id: book_id});
   if (entry === null) return "";
 
@@ -112,7 +112,7 @@ export async function find_previous_page_start(book_id: string, start_id: string
 
     total += entrySize;
 
-    if (total > max_characters) {
+    if (total > max_caharacters) {
       const nextEntry = await primitives.findOne({_id: chapterEntry.next, book_id: book_id});
       if (nextEntry === null || nextEntry._id.slice(0, 6) !== chapter_prefix) {
         break;
@@ -226,7 +226,7 @@ export async function render_primitives(primitives: BookPrimitive[]): Promise<Co
     let pre_text = "";
 
     if (this_chapter != last_chapter) {
-      last_chapter == this_chapter
+      last_chapter = this_chapter
       pre_text += "\n" + this_chapter
     }
 
