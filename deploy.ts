@@ -10,6 +10,7 @@ import path from "node:path";
 import { ensure } from ".";
 import { update_leaderboard } from "./functions/level_leaderboard";
 import { readdirSync, readFileSync } from "node:fs";
+import type { ChatLogEntry } from "./functions/ai";
 
 export interface Command {
     data: SlashCommandBuilder;
@@ -43,6 +44,7 @@ export default async function(client: Client) {
   client.dyn_vc = new Collection<string, string[]>();
   client.interaction_queue = new Collection<string, number>();
   client.highlight_color = new Collection<string, number>();
+  client.ai_message_buffer = new Collection<string, ChatLogEntry[]>()
 
   client.shouldStopSpam = false;
   client.is_counting_messages = true;
