@@ -1,12 +1,12 @@
-import { resolve } from 'path';
+import path from 'path';
 import type { User } from "discord.js";
 import fs from 'fs';
 import { ensure } from '..';
 
-export async function get_welcome_banner(user: User): Promise<string> {
-  const htmlPath = resolve('./assets/welcome.html');
-  const cssPath = resolve('./assets/welcome.css');
-  const imagePath = resolve('./cache/welcome.png')
+export async function get_welcome_banner(user: User, server_name: string): Promise<string> {
+  const htmlPath = path.resolve('./assets/welcome.html');
+  const cssPath = path.resolve('./assets/welcome.css');
+  const imagePath = path.resolve('./cache/welcome.png')
 
   let html = fs.readFileSync(htmlPath, 'utf-8');
   let css = fs.readFileSync(cssPath, 'utf-8');
@@ -14,17 +14,55 @@ export async function get_welcome_banner(user: User): Promise<string> {
   const replaceCSS = {
   }
 
-  css = css.replace(/\$\{(.*?)\}/g, (_, repName) => {
-    const value = replaceCSS[repName as keyof typeof replaceCSS];
-    return value?.toString() ?? '';
+  css = css.replace(/\$\{(.*?)\}/g, (_, rep_name: string) => {
+    if (rep_name.startsWith('RANDOM<') && rep_name.endsWith('>')) {
+      const r_match = rep_name.match(/RANDOM<(-?\d+),(-?\d+)>/);
+      
+      if (r_match) {
+        const num_1 = parseInt(r_match[1]!, 10);
+        const num_2 = parseInt(r_match[2]!, 10);
+        
+        const min_val = Math.min(num_1, num_2);
+        const max_val = Math.max(num_1, num_2);
+        
+        const random_value = Math.floor(Math.random() * (max_val - min_val + 1)) + min_val;
+        return random_value.toString();
+      }
+    }
+
+    const lookup_value = replaceCSS[rep_name as keyof typeof replaceCSS];
+    return lookup_value?.toString() ?? '';
   });
 
+  const star_abs = path.join(__dirname, '..', 'assets', 'star.svg');
+  const star_path = `file://${star_abs}`;
+
   const replaceHTML = {
+    "CSS": css,
+    "STARPATH": star_path,
+    "SERVERNAME": server_name.toUpperCase(),
+    "AVATAR": user.displayAvatarURL(),
+    "USERNAME": user.displayName,
   }
 
-  html = html.replace(/\$\{(.*?)\}/g, (_, repName) => {
-    const value = replaceHTML[repName as keyof typeof replaceHTML];
-    return value?.toString() ?? '';
+  html = html.replace(/\$\{(.*?)\}/g, (_, rep_name: string) => {
+    if (rep_name.startsWith('RANDOM<') && rep_name.endsWith('>')) {
+      const r_match = rep_name.match(/RANDOM<(-?\d+),(-?\d+)>/);
+      
+      if (r_match) {
+        const num_1 = parseInt(r_match[1]!, 10);
+        const num_2 = parseInt(r_match[2]!, 10);
+        
+        const min_val = Math.min(num_1, num_2);
+        const max_val = Math.max(num_1, num_2);
+        
+        const random_value = Math.floor(Math.random() * (max_val - min_val + 1)) + min_val;
+        return random_value.toString();
+      }
+    }
+
+    const lookup_value = replaceHTML[rep_name as keyof typeof replaceHTML];
+    return lookup_value?.toString() ?? '';
   });
 
   fs.writeFileSync(process.env.CACHE_PATH! + 'welcome.html', html);
@@ -46,7 +84,7 @@ export async function get_welcome_banner(user: User): Promise<string> {
   await page.screenshot({
     path: imagePath,
     omitBackground: true,
-    fullPage: true,
+    fullPage: false,
   });
 
   if (ensure(process.env.DEV_MODE, 'No DEV_MODE ENV') == 'false') {

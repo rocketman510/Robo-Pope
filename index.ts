@@ -58,7 +58,12 @@ client.once(Events.ClientReady, async readyClient => {
     client.on(Events.MessageCreate, async (message) => {
       //TODO: Remove
       if (message.content == '!test') {
-        await get_welcome_banner(message.author);
+        const welcome_banner = await get_welcome_banner(message.author, message.guild?.name!);
+        const channel = await client.channels.fetch(ensure(process.env.WELCOME_CHANNEL));
+        if (!channel) return;
+        if (!channel.isSendable()) return;
+
+        await channel.send({files: [welcome_banner]});
       }
       await handleOwsMessage(message);
       await handleLevel(client, message);
@@ -72,10 +77,16 @@ client.once(Events.ClientReady, async readyClient => {
 
     client.on(Events.MessageReactionAdd, async (reaction, user) => {
       await handleReaction(reaction, user);
-      await handel_reaction_bible(reaction, user)
+      await handel_reaction_bible(reaction, user);
     });
 
-    client.on(Events.GuildMemberAdd, async () => {
+    client.on(Events.GuildMemberAdd, async (member) => {
+      const welcome_banner = await get_welcome_banner(member.user);
+      const channel = await client.channels.fetch(ensure(process.env.WELCOME_CHANNEL));
+      if (!channel) return;
+      if (!channel.isSendable()) return;
+
+      await channel.send({files: [welcome_banner]});
       await deply_member_count(client);
     });
 
