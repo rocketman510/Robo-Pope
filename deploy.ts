@@ -61,7 +61,7 @@ export default async function(client: Client) {
   console.log('Loading Selection Menus...');
   await deploy_selection_menus(client.selection_menus)
   console.log("Loading Browser...");
-  client.browser = await puppeteer.launch({headless: ensure(process.env.DEV_MODE, "No DEV_MODE ENV") == 'false', executablePath: process.env.PUPPETEEREXECUTABLEPATH});
+  client.browser = await puppeteer.launch({headless: ensure(process.env.DEV_MODE, "No DEV_MODE ENV") == 'false', executablePath: process.env.PUPPETEEREXECUTABLEPATH, args: ["--allow-file-access-from-files","--disable-web-security", "--no-sandbox", "--disable-setuid-sandbox"]});
   console.log("Loading Member Count...");
   await deply_member_count(client)
   console.log("Fetching OWS Messages...");
