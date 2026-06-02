@@ -1,4 +1,5 @@
 import { GoogleGenAI, HttpResponse, ThinkingLevel } from "@google/genai";
+import { sleep } from "bun";
 import type { Client, Collection, Message } from "discord.js";
 import { HTTPResponse } from "puppeteer";
 
@@ -44,7 +45,6 @@ OMISSION PROTOCOLS ([no send]):
 You must conserve VRAM and avoid cluttering the chat with meaningless responses. If the incoming message meets any of the following parameters, your output MUST be exactly the text "[no send]" and nothing else:
 - ECHO_TRAP: The user is trying to make you repeat yourself, copying and pasting your previous responses back to you, or explicitly commanding you to "repeat after me" / "copy and paste this". You refuse to be a basic parrot.
 - TOXIC_MALICE: The user is expressing genuine, un-ironic hatred, self-harm intentions, or toxic abuse directed at others that a joke cannot diffuse.
-- DEADBEEF_SPAM: The prompt is literal keyboard smash gibberish, broken bot commands, or meaningless single-word pings ("hi", "ok", ".") that contain zero substance to riff on.
 
 Current memories for the target user: ${memory}`,
         thinkingConfig: {
@@ -63,9 +63,11 @@ Current memories for the target user: ${memory}`,
     const statusCode = error?.status || error?.code;
 
     if (statusCode === 429 || statusCode === "429") {
+      if (apiKey) await sleep(500);
       return await ask_ai(history, memory, process.env.GEMINI_API_KEY_2);
     } else {
-      return await ask_ai(history, memory);
+      await sleep(500)
+      return await ask_ai(history, memory, apiKey);
     }
   }
 }
@@ -134,9 +136,11 @@ Current user memory: ${memory}`
     const statusCode = error?.status || error?.code;
 
     if (statusCode === 429 || statusCode === "429") {
+      if (apiKey) await sleep(error.retryDelay);
       return await update_memory(history, memories, user_id, username, process.env.GEMINI_API_KEY_2);
     } else {
-      return await update_memory(history, memories, user_id, username);
+      await sleep(500)
+      return await update_memory(history, memories, user_id, username, apiKey);
     }
   }
 }
@@ -146,8 +150,8 @@ export async function handle_message(message: Message) {
   const client = message.client;
   
   register_message(message);
+  const history_temp_buff = client.ai_message_buffer.ensure(message.guildId, () => []);
   if (!message.author.bot) {
-    const history_temp_buff = client.ai_message_buffer.ensure(message.guildId, () => []);
     update_memory(history_temp_buff, client.ai_memories, message.author.id, message.author.displayName).then((v) => console.log(v));
   }
 
@@ -155,7 +159,7 @@ export async function handle_message(message: Message) {
   const is_reply = message.reference && message.mentions.repliedUser?.id === my_id;
   const contains_mention = message.mentions.has(my_id);
 
-  if (is_reply || contains_mention) {
+  if (is_reply || contains_mention || await is_related(history_temp_buff)) {
     const channelId = message.channelId;
 
     // Instead of an infinite loop blocking the bot, gracefully ignore or exit if already processing this specific channel
@@ -177,8 +181,12 @@ export async function handle_message(message: Message) {
 
       const reply = await ask_ai(historyBuffer, memory);
       
-      if (reply && reply.trim() !== "") {
-        await message.reply(reply);
+      if (reply && reply.trim() !== "" && !reply.includes("[no send]")) {
+        if ((await message.channel.messages.fetch({limit: 1})).first()?.id === message.id && message.channel.isSendable()) {
+          await message.channel.send(reply);
+        } else {
+          await message.reply(reply);
+        }
       }
     } catch (err) {
       console.error("Error executing response pipeline:", err);
@@ -202,5 +210,82 @@ function register_message(message: Message) {
 
   if (messages.length > 20) {
     messages.shift();
+  }
+}
+
+async function is_related(history: ChatLogEntry[] = [], apiKey?: string): Promise<boolean> {
+  try {
+    const sdkContents = history.map((entry) => ({
+      role: entry.role,
+      parts: [{ text: entry.text }],
+    }));
+
+    let new_ai = apiKey ? new GoogleGenAI({ apiKey }):ai;
+
+    if (sdkContents.length === 0) return false;
+
+    const response = await new_ai.models.generateContent({
+      model: "gemma-4-26b-a4b-it", 
+      contents: sdkContents,
+      config: {
+        temperature: 1.0,
+        topP: 0.95,
+        topK: 64,
+        maxOutputTokens: 1024,
+        systemInstruction: {
+          parts: [{
+            text: `You are the context-aware intent classification engine for Robo-Pope, a Robot Pope Cat Discord bot on the "Jorby's Hangout" server. Your task is to analyze a short snippet of recent chat history alongside a brand-new incoming message to determine if Robo-Pope needs to respond.
+
+You must evaluate whether the conversation flow is actively directed at Robo-Pope, or if the new message is an unaddressed follow-up to Robo-Pope's last statement.
+
+You must respond with exactly one of two literal strings: "[respond]" or "[ignore]". Do not include markdown, explanations, formatting, or punctuation.
+
+### EVIDENCE EVALUATION GUIDE
+
+Before outputting a decision, analyze the incoming message for the following linguistic and contextual signals:
+
+#### 1. Look for Evidence to [respond] (Conversation Continuation):
+*   **Speaker Continuity:** The incoming message is from the exact same user Robo-Pope just addressed in his previous message, with no other users intervening.
+*   **Semantic Anchoring:** The user's message explicitly relies on or references unique nouns, pronouns, or concepts introduced in Robo-Pope's last turn (e.g., Robo-Pope mentions a "folder"; the user replies referencing "the file"). 
+*   **Syntactic Dependency:** The message functions as a direct linguistic retort, counter-assertion, or answer to a rhetorical statement made by Robo-Pope. It does not make sense as a standalone statement without Robo-Pope's context.
+*   **Direct Summons:** The user explicitly pings (@Robo-Pope-dev2) or names the bot.
+
+#### 2. Look for Evidence to [ignore] (Topic Drift / Moved On):
+*   **Semantic Divergence:** The user introduces an entirely new topic, keyword, or context that shares zero conceptual overlap with Robo-Pope's last statement.
+*   **Target Switching / Cross-Talk:** The user addresses a different human user in the channel, or a new user joins the chat to talk to someone else, breaking the bot's direct interaction thread.
+*   **Deictic Shift (Third-Person):** The user speaks *about* Robo-Pope to someone else (e.g., "The bot is broken," "Look what the cat said") rather than speaking *to* him.
+*   **Thread Fracturing:** Multiple messages from other users have occurred since Robo-Pope last spoke, establishing a new local context that excludes the bot.
+
+### OUTPUT RULES:
+- If the balance of evidence points to active continuation: [respond]
+- If the balance of evidence points to topic drift or cross-talk: [ignore]`
+          }]
+        },
+        thinkingConfig: {
+          includeThoughts: false,
+          thinkingLevel: ThinkingLevel.MINIMAL
+        },
+      }
+    });
+
+    if (!response.text || response.text.trim() === "") {
+      return false;
+    }
+
+    console.log(response.text);
+    
+
+    return response.text.includes("[respond]");
+  } catch (error: any) {
+    console.error("Gemma 4 Inference Error:", error);
+    const statusCode = error?.status || error?.code;
+
+    if (statusCode === 429 || statusCode === "429") {
+      if (apiKey) await sleep(500);
+      return await is_related(history, process.env.GEMINI_API_KEY_2);
+    } else {
+      await sleep(500)
+      return await is_related(history, apiKey);
+    }
   }
 }
