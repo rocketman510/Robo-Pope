@@ -57,26 +57,9 @@ client.once(Events.ClientReady, async readyClient => {
     console.log(`Ready! Logged in as ${readyClient.user.tag}`);
 
     client.on(Events.MessageCreate, async (message) => {
-      //TODO: Remove
-      if (message.content == '!test') {
-        const welcome_banner = await get_welcome_banner(message.author, message.guild?.name!);
-        const channel = await client.channels.fetch(ensure(process.env.WELCOME_CHANNEL));
-        console.log("test");
-        
-        if (!channel) return;
-        if (!channel.isSendable()) return;
-
-        await channel.send({files: [welcome_banner]});
-        fs.unlinkSync(welcome_banner);
-      }
       await handleOwsMessage(message);
       await handleLevel(client, message);
       handel_bible_mention(message);
-      if (message.content == '?test') {
-        for (let i = 0; i < 50; i++) {
-          await message.channel.send(i.toString())
-        }
-      }
     });
 
     client.on(Events.MessageReactionAdd, async (reaction, user) => {
@@ -90,8 +73,9 @@ client.once(Events.ClientReady, async readyClient => {
       if (!channel) return;
       if (!channel.isSendable()) return;
 
-      await channel.send({files: [welcome_banner]});
+      await channel.send({content: `<@${member.id}>`, files: [welcome_banner]});
       await deply_member_count(client);
+      fs.unlinkSync(welcome_banner);
     });
 
     client.on(Events.GuildMemberRemove, async () => {
