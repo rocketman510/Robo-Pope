@@ -8,6 +8,7 @@ import type { Db } from "mongodb"
 import { handleOwsMessage } from "./functions/one_word_story";
 import { handle_join } from "./functions/dyn_voice_channel";
 import { handel_bible_mention, handel_reaction_bible } from "./functions/mentions_bible";
+import fs from "fs";
 
 
 //TODO: Remove
@@ -60,10 +61,13 @@ client.once(Events.ClientReady, async readyClient => {
       if (message.content == '!test') {
         const welcome_banner = await get_welcome_banner(message.author, message.guild?.name!);
         const channel = await client.channels.fetch(ensure(process.env.WELCOME_CHANNEL));
+        console.log("test");
+        
         if (!channel) return;
         if (!channel.isSendable()) return;
 
         await channel.send({files: [welcome_banner]});
+        fs.unlinkSync(welcome_banner);
       }
       await handleOwsMessage(message);
       await handleLevel(client, message);
