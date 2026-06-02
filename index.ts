@@ -10,7 +10,7 @@ import { handle_join } from "./functions/dyn_voice_channel";
 import { handel_bible_mention, handel_reaction_bible } from "./functions/mentions_bible";
 import fs from "fs";
 import { get_welcome_banner } from "./functions/welcome_banner";
-
+import { handle_message, type ChatLogEntry } from "./functions/ai";
 
 declare module "discord.js" {
     export interface Client {
@@ -29,6 +29,9 @@ declare module "discord.js" {
         dyn_vc: Collection<string, string[]>;
         interaction_queue: Collection<string, number>;
         highlight_color: Collection<string, number>;
+        ai_message_buffer: Collection<string, ChatLogEntry[]>;
+        ai_is_thinking: boolean;
+        ai_memories: Collection<string, string>;
     }
 }
 
@@ -56,7 +59,15 @@ client.once(Events.ClientReady, async readyClient => {
     client.on(Events.MessageCreate, async (message) => {
       await handleOwsMessage(message);
       await handleLevel(client, message);
-      handel_bible_mention(message);
+      await handel_bible_mention(message);
+
+      await handle_message(message);
+
+      if (message.content == '?test') {
+        for (let i = 0; i < 50; i++) {
+          await message.channel.send(i.toString())
+        }
+      }
     });
 
     client.on(Events.MessageReactionAdd, async (reaction, user) => {
