@@ -29,6 +29,7 @@ declare module "discord.js" {
         highlight_color: Collection<string, number>;
         ai_message_buffer: Collection<string, ChatLogEntry[]>;
         ai_is_thinking: boolean;
+        ai_memories: Collection<string, string>;
     }
 }
 

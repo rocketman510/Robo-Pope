@@ -44,7 +44,8 @@ export default async function(client: Client) {
   client.dyn_vc = new Collection<string, string[]>();
   client.interaction_queue = new Collection<string, number>();
   client.highlight_color = new Collection<string, number>();
-  client.ai_message_buffer = new Collection<string, ChatLogEntry[]>()
+  client.ai_message_buffer = new Collection<string, ChatLogEntry[]>();
+  client.ai_memories = new Collection<string, string>();
 
   client.shouldStopSpam = false;
   client.is_counting_messages = true;
