@@ -34,15 +34,16 @@ export async function get_welcome_banner(user: User, server_name: string): Promi
     return lookup_value?.toString() ?? '';
   });
 
-  const star_abs = path.join(__dirname, '..', 'assets', 'star.svg');
-  const star_path = `file://${star_abs}`;
+  const left_flourish = "file://" + path.join(__dirname, '..', 'assets', 'left_flourish.svg');
+  const right_flourish = "file://" + path.join(__dirname, '..', 'assets', 'right_flourish.svg');
 
   const replaceHTML = {
     "CSS": css,
-    "STARPATH": star_path,
     "SERVERNAME": server_name.toUpperCase(),
     "AVATAR": user.displayAvatarURL(),
     "USERNAME": user.displayName,
+    "LEFT_FLOURISH": left_flourish,
+    "RIGHT_FLOURISH": right_flourish,
   }
 
   html = html.replace(/\$\{(.*?)\}/g, (_, rep_name: string) => {

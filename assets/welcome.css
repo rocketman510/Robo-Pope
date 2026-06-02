@@ -1,36 +1,68 @@
 * {
   margin: 0px;
-  font-family: 'ABC Ginto Nord Condensed Unlicensed Trial', sans-serif;
+  font-family: "Cormorant Garamond", serif;
+  font-variant-numeric: "lining-nums";
 }
 
 body {
   height: 128px;
   width: 512px;
-  background: radial-gradient(ellipse at center bottom, #19175C 0%, #000000 100%);
+  background: #fff;
   overflow: hidden;
 }
 
 img {
-  filter: drop-shadow(0px 0px 10px rgb(0 0 25 / 1)) drop-shadow(0px 0px 10px rgb(0 0 25 / 1));
+  height: 35px;
+  width: 60px;
+}
+
+.avatar {
+  border-radius: 100%;
+  width: 35px;
+  height: 35px;
+  filter: sepia(1) saturate(1.6) contrast(1.1) brightness(0.9);
 }
 
 h1 {
   text-align: center;
-  height: 32vh;
-  color: #fff;
-  text-shadow: 0px 0px 5px rgb(0 0 25 / 1);
+  height: 43vh;
+  color: #e9d086;
+  /* text-shadow: 0px 0px 5px rgb(0 0 25 / 1); */
   white-space: nowrap;
   top: 0px;
-  font-size: 18cqw;
-  line-height: 67vh;
+  font-size: 15cqw;
+  line-height: 37vh;
 }
 
 h2 {
   text-align: center;
-  color: #fff;
-  text-shadow: 0px 0px 10px rgb(0 0 25 / 1), 0px 0px 10px rgb(0 0 25 / 1), 0px 0px 10px rgb(0 0 25 / 1);
+  color: #e9d086;
+  /* text-shadow: 0px 0px 10px rgb(0 0 25 / 1), 0px 0px 10px rgb(0 0 25 / 1), 0px 0px 10px rgb(0 0 25 / 1); */
   white-space: nowrap;
   font-size: 7cqw;
+}
+
+hr {
+  width: 80vw;
+  border-block-color: #e9d086;
+  border-width: 1px;
+  border: none; 
+  border-top: 3px double #e9d086;
+  color: #e9d086;
+  overflow: visible;
+  text-align: center
+}
+
+hr::before {
+  content: "";
+  position: absolute;
+  height: 11px;
+  width: 15px;
+  background-color: #fff;
+  transform: translateY(-7px) translateX(-7px);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-image: url("file:///home/rocketman510/Programs/Robo-Pope/assets/cross.png");
 }
 
 .wrapper {
@@ -43,7 +75,7 @@ h2 {
   container-type: inline-size;
   flex-direction: column;
   justify-content: center;
-  gap: 10px;
+  gap: 5px;
 }
 
 .user_wrapper {
