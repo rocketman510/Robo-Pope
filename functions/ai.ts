@@ -2,12 +2,19 @@ import { GoogleGenAI, HttpResponse, ThinkingLevel } from "@google/genai";
 import { sleep } from "bun";
 import type { Client, Collection, Message } from "discord.js";
 import { HTTPResponse } from "puppeteer";
+import type { ensure } from "..";
 
 const ai = new GoogleGenAI({});
+
+export interface DiscordAttachment {
+  base64Data: string;
+  mimeType: string;
+}
 
 export interface ChatLogEntry {
   role: "user" | "model";
   text: string;
+  attachment?: DiscordAttachment;
 }
 
 // Track active inference tasks per channel ID to avoid global lock collision
@@ -15,10 +22,23 @@ const activeInferenceChannels = new Set<string>();
 
 async function ask_ai(history: ChatLogEntry[] = [], memory: string, apiKey?: string): Promise<string | null> {
   try {
-    const sdkContents = history.map((entry) => ({
-      role: entry.role,
-      parts: [{ text: entry.text }],
-    }));
+    const sdkContents = history.map((entry) => {
+      const parts: any[] = [{ text: entry.text }];
+
+      if (entry.attachment) {
+        parts.push({
+          inlineData: {
+            mimeType: entry.attachment.mimeType,
+            data: entry.attachment.base64Data,
+          },
+        });
+      }
+
+      return {
+        role: entry.role,
+        parts: parts,
+      };
+    });
 
     let new_ai = apiKey ? new GoogleGenAI({ apiKey }):ai;
 
@@ -149,7 +169,7 @@ export async function handle_message(message: Message) {
   if (!message.guildId) return;
   const client = message.client;
   
-  register_message(message);
+  await register_message(message);
   const history_temp_buff = client.ai_message_buffer.ensure(message.guildId, () => []);
   if (!message.author.bot) {
     update_memory(history_temp_buff, client.ai_memories, message.author.id, message.author.displayName).then((v) => console.log(v));
@@ -162,7 +182,6 @@ export async function handle_message(message: Message) {
   if (is_reply || contains_mention || await is_related(history_temp_buff)) {
     const channelId = message.channelId;
 
-    // Instead of an infinite loop blocking the bot, gracefully ignore or exit if already processing this specific channel
     if (activeInferenceChannels.has(channelId)) {
       await message.reply("Hold on, I'm already formulating a response to a previous message here!");
       return;
@@ -171,10 +190,8 @@ export async function handle_message(message: Message) {
     const historyBuffer = client.ai_message_buffer.ensure(message.guildId, () => []);
     
     try {
-      // Lock execution ONLY for this specific channel
       activeInferenceChannels.add(channelId);
       
-      // Trigger native Discord typing indicator while awaiting API response
       await message.channel.sendTyping();
 
       const memory = client.ai_memories.get(message.author.id) ?? "No current memor";
@@ -191,20 +208,51 @@ export async function handle_message(message: Message) {
     } catch (err) {
       console.error("Error executing response pipeline:", err);
     } finally {
-      // CRITICAL: Always release the lock inside a finally block so it never freezes up permanently on API failure
       activeInferenceChannels.delete(channelId);
     }
   }
 }
 
-function register_message(message: Message) {
+async function downloadAttachmentToBase64(url: string): Promise<string> {//AI
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Failed to fetch attachment: ${response.statusText}`);
+  
+  const arrayBuffer = await response.arrayBuffer();
+  return Buffer.from(arrayBuffer).toString('base64');
+}
+
+async function register_message(message: Message) {
   if (!message.guildId) return;
   const messages = message.client.ai_message_buffer.ensure(message.guildId, () => []);
 
+  const isBot = message.author.id === message.client.user.id;
+
   const log_entry: ChatLogEntry = {
-    role: message.author.id === message.client.user.id ? "model" as const : "user" as const, 
-    text: message.author.id === message.client.user.id ? `${message.content}`:`@${message.author.displayName}: ${message.content}`
+    role: isBot ? "model" : "user", 
+    text: isBot ? `${message.content}` : `@${message.author.displayName}: ${message.content}`
   };
+
+  const attachment = message.attachments.first();
+  if (attachment && !isBot) {
+    const mimeType = attachment.contentType;
+
+    if (mimeType?.startsWith('image/') || mimeType?.startsWith('video/')) {
+      try {
+        const base64Data = await downloadAttachmentToBase64(attachment.url);
+        
+        log_entry.attachment = {
+          base64Data,
+          mimeType
+        };
+
+        if (!log_entry.text || log_entry.text.trim() === `@${message.author.displayName}:`) {
+          log_entry.text = `@${message.author.displayName}: [Shared a media file]`;
+        }
+      } catch (error) {
+        console.error("Error processing message attachment:", error);
+      }
+    }
+  }
 
   messages.push(log_entry);
 
