@@ -42,8 +42,8 @@ export async function get_welcome_banner(user: User, server_name: string): Promi
     "SERVERNAME": server_name.toUpperCase(),
     "AVATAR": user.displayAvatarURL(),
     "USERNAME": user.displayName,
-    "LEFT_FLOURISH": left_flourish,
-    "RIGHT_FLOURISH": right_flourish,
+    // "LEFT_FLOURISH": left_flourish,
+    // "RIGHT_FLOURISH": right_flourish,
   }
 
   html = html.replace(/\$\{(.*?)\}/g, (_, rep_name: string) => {
