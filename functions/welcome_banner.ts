@@ -39,7 +39,7 @@ export async function get_welcome_banner(user: User, server_name: string): Promi
 
   const replaceHTML = {
     "CSS": css,
-    "SERVERNAME": server_name.toUpperCase(),
+    // "SERVERNAME": server_name.toUpperCase(),
     "AVATAR": user.displayAvatarURL(),
     "USERNAME": user.displayName,
     // "LEFT_FLOURISH": left_flourish,
