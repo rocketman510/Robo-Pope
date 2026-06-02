@@ -3,7 +3,7 @@ import type { User } from "discord.js";
 import fs from 'fs';
 import { ensure } from '..';
 
-export async function get_welcome_banner(user: User, server_name: string): Promise<string> {
+export async function get_welcome_banner(user: User): Promise<string> {
   const htmlPath = path.resolve('./assets/welcome.html');
   const cssPath = path.resolve('./assets/welcome.css');
   const imagePath = path.resolve('./cache/welcome.png')

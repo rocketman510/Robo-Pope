@@ -9,9 +9,6 @@ import { handleOwsMessage } from "./functions/one_word_story";
 import { handle_join } from "./functions/dyn_voice_channel";
 import { handel_bible_mention, handel_reaction_bible } from "./functions/mentions_bible";
 import fs from "fs";
-
-
-//TODO: Remove
 import { get_welcome_banner } from "./functions/welcome_banner";
 
 
@@ -73,7 +70,7 @@ client.once(Events.ClientReady, async readyClient => {
       if (!channel) return;
       if (!channel.isSendable()) return;
 
-      await channel.send({content: `<@${member.id}>`, files: [welcome_banner]});
+      await channel.send({files: [welcome_banner]});
       await deply_member_count(client);
       fs.unlinkSync(welcome_banner);
     });
