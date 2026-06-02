@@ -12,16 +12,18 @@ export interface ChatLogEntry {
 // Track active inference tasks per channel ID to avoid global lock collision
 const activeInferenceChannels = new Set<string>();
 
-async function ask_ai(history: ChatLogEntry[] = [], memory: string): Promise<string | null> {
+async function ask_ai(history: ChatLogEntry[] = [], memory: string, apiKey?: string): Promise<string | null> {
   try {
     const sdkContents = history.map((entry) => ({
       role: entry.role,
       parts: [{ text: entry.text }],
     }));
 
+    let new_ai = apiKey ? new GoogleGenAI({ apiKey }):ai;
+
     if (sdkContents.length === 0) return "No context provided to the model.";
 
-    const response = await ai.models.generateContent({
+    const response = await new_ai.models.generateContent({
       model: "gemma-4-31b-it", 
       contents: sdkContents,
       config: {
@@ -56,13 +58,19 @@ Current memories for the target user: ${memory}`,
     }
 
     return response.text;
-  } catch (error) {
+  } catch (error: any) {
     console.error("Gemma 4 Inference Error:", error);
-    return await ask_ai(history, memory);
+    const statusCode = error?.status || error?.code;
+
+    if (statusCode === 429 || statusCode === "429") {
+      return await ask_ai(history, memory, process.env.GEMINI_API_KEY_2);
+    } else {
+      return await ask_ai(history, memory);
+    }
   }
 }
 
-async function update_memory(history: ChatLogEntry[] = [], memories: Collection<string, string>, user_id: string, username: string) {
+async function update_memory(history: ChatLogEntry[] = [], memories: Collection<string, string>, user_id: string, username: string, apiKey?: string) {
   try {
     const sdkContents = history.map((entry) => ({
       role: entry.role,
@@ -73,7 +81,9 @@ async function update_memory(history: ChatLogEntry[] = [], memories: Collection<
 
     if (sdkContents.length === 0) return "No context provided to the model.";
 
-    const response = await ai.models.generateContent({
+    let new_ai = apiKey ? new GoogleGenAI({ apiKey }):ai;
+
+    const response = await new_ai.models.generateContent({
       model: "gemma-4-26b-a4b-it", 
       contents: sdkContents,
       config: {
@@ -119,9 +129,15 @@ Current user memory: ${memory}`
 
     memories.set(user_id, response.text);
     return response.text;
-  } catch (error) {
+  } catch (error: any) {
     console.error("Gemma 4 Inference Error:", error);
-    return await update_memory(history, memories, user_id, username);
+    const statusCode = error?.status || error?.code;
+
+    if (statusCode === 429 || statusCode === "429") {
+      return await update_memory(history, memories, user_id, username, process.env.GEMINI_API_KEY_2);
+    } else {
+      return await update_memory(history, memories, user_id, username);
+    }
   }
 }
 
