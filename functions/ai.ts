@@ -48,7 +48,7 @@ async function ask_ai(history: ChatLogEntry[] = [], memory: string, apiKey?: str
       model: "gemma-4-31b-it", 
       contents: sdkContents,
       config: {
-        temperature: 0.5,
+        temperature: 1.0,
         topP: 0.95,
         topK: 64,
         maxOutputTokens: 1024,
@@ -109,7 +109,7 @@ async function update_memory(history: ChatLogEntry[] = [], memories: Collection<
       model: "gemma-4-26b-a4b-it", 
       contents: sdkContents,
       config: {
-        temperature: 1.0,
+        temperature: 0.3,
         topP: 0.95,
         topK: 64,
         maxOutputTokens: 1024,
@@ -178,14 +178,12 @@ export async function handle_message(message: Message) {
   const my_id = client.user.id;
   const is_reply = message.reference && message.mentions.repliedUser?.id === my_id;
   const contains_mention = message.mentions.has(my_id);
+  const is_self = message.author.id === my_id;
 
-  if (is_reply || contains_mention || await is_related(history_temp_buff)) {
+  if (is_reply || contains_mention || !is_self || await is_related(history_temp_buff)) {
     const channelId = message.channelId;
 
-    if (activeInferenceChannels.has(channelId)) {
-      await message.reply("Hold on, I'm already formulating a response to a previous message here!");
-      return;
-    }
+    if (activeInferenceChannels.has(channelId)) {await sleep(100)}
 
     const historyBuffer = client.ai_message_buffer.ensure(message.guildId, () => []);
     
@@ -276,7 +274,7 @@ async function is_related(history: ChatLogEntry[] = [], apiKey?: string): Promis
       model: "gemma-4-26b-a4b-it", 
       contents: sdkContents,
       config: {
-        temperature: 1.0,
+        temperature: 0.0,
         topP: 0.95,
         topK: 64,
         maxOutputTokens: 1024,
