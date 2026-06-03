@@ -1,7 +1,7 @@
-import { Client, Events, GatewayIntentBits, Collection, MessageFlags, ContainerBuilder} from "discord.js";
+import { Client, Events, GatewayIntentBits, Collection, MessageFlags, ContainerBuilder, flatten, TextDisplayBuilder} from "discord.js";
 import type { Command, Button, Modal, SelectionMenu } from "./deploy";
 import deploy, { deply_member_count } from "./deploy";
-import { error, log } from "node:console";
+import { error } from "node:console";
 import { Browser } from 'puppeteer';
 import { handleLevel, handleReaction } from "./level";
 import type { Db } from "mongodb"
@@ -11,6 +11,7 @@ import { handel_bible_mention, handel_reaction_bible } from "./functions/mention
 import fs from "fs";
 import { get_welcome_banner } from "./functions/welcome_banner";
 import { handle_message, type ChatLogEntry } from "./functions/ai";
+import { Page, TextDisplay } from "./functions/ui_framework/ui.ts"
 
 declare module "discord.js" {
     export interface Client {
@@ -64,9 +65,10 @@ client.once(Events.ClientReady, async readyClient => {
       await handle_message(message);
 
       if (message.content == '?test') {
-        for (let i = 0; i < 50; i++) {
-          await message.channel.send(i.toString())
-        }
+        const test = new Page("test")
+          .addStaticElements(new TextDisplay("test"))
+          .render();
+        message.reply(test)
       }
     });
 
