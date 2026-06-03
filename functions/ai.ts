@@ -1,8 +1,6 @@
-import { GoogleGenAI, HttpResponse, ThinkingLevel } from "@google/genai";
+import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 import { sleep } from "bun";
-import type { Client, Collection, Message } from "discord.js";
-import { HTTPResponse } from "puppeteer";
-import type { ensure } from "..";
+import type { Collection, Message } from "discord.js";
 
 const ai = new GoogleGenAI({});
 
@@ -180,7 +178,9 @@ export async function handle_message(message: Message) {
   const contains_mention = message.mentions.has(my_id);
   const is_self = message.author.id === my_id;
 
-  if (is_reply || contains_mention || !is_self || await is_related(history_temp_buff)) {
+  if (is_self) return;
+
+  if ((is_reply || contains_mention || await is_related(history_temp_buff))) {
     const channelId = message.channelId;
 
     if (activeInferenceChannels.has(channelId)) {await sleep(100)}
