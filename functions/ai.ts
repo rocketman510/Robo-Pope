@@ -227,7 +227,7 @@ async function register_message(message: Message) {
 
   const log_entry: ChatLogEntry = {
     role: isBot ? "model" : "user", 
-    text: isBot ? `${message.content.slice(0,77)}` : `@${message.author.displayName}: ${message.content}`
+    text: isBot ? `${message.content.slice(76)}` : `@${message.author.displayName}: ${message.content}`
   };
 
   const attachment = message.attachments.first();
