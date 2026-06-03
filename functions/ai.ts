@@ -194,7 +194,7 @@ export async function handle_message(message: Message) {
 
       const memory = client.ai_memories.get(message.author.id) ?? "No current memor";
 
-      const reply = await ask_ai(historyBuffer, memory);
+      const reply = "-# AI response  <:beta_l:1511524707432927373><:beta_r:1511524720397258944>\n" + await ask_ai(historyBuffer, memory);
       
       if (reply && reply.trim() !== "" && !reply.includes("[no send]")) {
         if ((await message.channel.messages.fetch({limit: 1})).first()?.id === message.id && message.channel.isSendable()) {
@@ -227,7 +227,7 @@ async function register_message(message: Message) {
 
   const log_entry: ChatLogEntry = {
     role: isBot ? "model" : "user", 
-    text: isBot ? `${message.content}` : `@${message.author.displayName}: ${message.content}`
+    text: isBot ? `${message.content.slice(0,77)}` : `@${message.author.displayName}: ${message.content}`
   };
 
   const attachment = message.attachments.first();
