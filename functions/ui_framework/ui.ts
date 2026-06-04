@@ -1,5 +1,5 @@
 import { ContainerBuilder, MessageFlags, TextDisplayBuilder, SectionBuilder } from "discord.js";
-import type { ButtonBuilder, Interaction, MessageReplyOptions } from "discord.js";
+import type { ButtonBuilder, Interaction, MessageReplyOptions, ThumbnailBuilder } from "discord.js";
 
 type Element = TextDisplay | Section
 
@@ -62,6 +62,15 @@ export class Button {
   constructor(execution: ButtonExecution, builder: ButtonBuilder) {
     this.builder = builder;
     this.execution = execution;
+  }
+}
+
+export class Thumbnail {
+  public builder: ThumbnailBuilder;
+  public page!: Page;
+
+  constructor(builder: ThumbnailBuilder) {
+    this.builder = builder;
   }
 }
 
