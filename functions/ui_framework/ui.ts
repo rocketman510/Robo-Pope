@@ -1,7 +1,7 @@
-import { ContainerBuilder, MessageFlags, TextDisplayBuilder } from "discord.js";
+import { ContainerBuilder, MessageFlags, TextDisplayBuilder, SectionBuilder } from "discord.js";
 import type { ButtonBuilder, Interaction, MessageReplyOptions } from "discord.js";
 
-type Element = TextDisplay
+type Element = TextDisplay | Section
 
 export class Page {
   public customID: string;
@@ -25,7 +25,7 @@ export class Page {
     }
   }
 
-  public addStaticElements(element: Element): Page {
+  public addStaticElement(element: Element): Page {
     element.page = this;
     this.staticElements.push(element);
     return this;
@@ -79,5 +79,24 @@ export class TextDisplay {
 
   public apply(container: ContainerBuilder) {
     container.addTextDisplayComponents(this.builder);
+  }
+}
+
+export class Section {
+  public builder: SectionBuilder;
+  public page!: Page;
+
+  constructor(builder: SectionBuilder | { text: string, accessory: Button }) {
+    if (builder instanceof SectionBuilder) {
+      this.builder = builder;
+    } else {
+      this.builder = new SectionBuilder()
+        .addTextDisplayComponents((t) => t.setContent(builder.text))
+        .setButtonAccessory(builder.accessory.builder);
+    }
+  }
+
+  public apply(container: ContainerBuilder) {
+    container.addSectionComponents(this.builder);
   }
 }
