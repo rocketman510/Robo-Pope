@@ -1,7 +1,8 @@
-import { ContainerBuilder, MessageFlags, TextDisplayBuilder, SectionBuilder } from "discord.js";
-import type { ButtonBuilder, Interaction, MessageReplyOptions, ThumbnailBuilder } from "discord.js";
+import { ContainerBuilder, MessageFlags, TextDisplayBuilder, SectionBuilder, type MessageActionRowComponentBuilder } from "discord.js";
+import { ActionRowBuilder, type ButtonBuilder, type Interaction, type MessageReplyOptions, type ThumbnailBuilder } from "discord.js";
+import excommunicate from "../../commands/excommunicate";
 
-type Element = TextDisplay | Section
+type Element = TextDisplay | Section | ActionRow
 
 export class Page {
   public customID: string;
@@ -92,20 +93,44 @@ export class TextDisplay {
 }
 
 export class Section {
-  public builder: SectionBuilder;
+  public builder!: SectionBuilder;
   public page!: Page;
 
-  constructor(builder: SectionBuilder | { text: string, accessory: Button }) {
+  constructor(builder: SectionBuilder | { text: string, accessory: Button | Thumbnail }) {
     if (builder instanceof SectionBuilder) {
       this.builder = builder;
     } else {
-      this.builder = new SectionBuilder()
-        .addTextDisplayComponents((t) => t.setContent(builder.text))
-        .setButtonAccessory(builder.accessory.builder);
+      if (builder.accessory instanceof Button) {
+        this.builder = new SectionBuilder()
+          .addTextDisplayComponents((t) => t.setContent(builder.text))
+          .setButtonAccessory(builder.accessory.builder);
+      } else if (builder.accessory instanceof Thumbnail) {
+        this.builder = new SectionBuilder()
+          .addTextDisplayComponents((t) => t.setContent(builder.text))
+          .setThumbnailAccessory(builder.accessory.builder);
+      }
     }
   }
 
   public apply(container: ContainerBuilder) {
     container.addSectionComponents(this.builder);
+  }
+}
+
+export class ActionRow {
+  public builder: ActionRowBuilder<MessageActionRowComponentBuilder>;
+  public page!: Page;
+
+  constructor(builder: ActionRowBuilder<MessageActionRowComponentBuilder> | { accessorys: Button[] }) {
+    if (builder instanceof ActionRowBuilder) {
+      this.builder = builder;
+    } else {
+      this.builder = new ActionRowBuilder<MessageActionRowComponentBuilder>()
+        .setComponents(builder.accessorys.map((v) => v.builder))
+    }
+  }
+
+  public apply(container: ContainerBuilder) {
+    container.addActionRowComponents([this.builder])
   }
 }

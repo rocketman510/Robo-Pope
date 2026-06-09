@@ -1,4 +1,4 @@
-import { Client, Events, GatewayIntentBits, Collection, MessageFlags, ContainerBuilder, flatten, TextDisplayBuilder, ButtonBuilder, ButtonStyle} from "discord.js";
+import { Client, Events, GatewayIntentBits, Collection, MessageFlags, ContainerBuilder, flatten, TextDisplayBuilder, ButtonBuilder, ButtonStyle, ThumbnailBuilder } from "discord.js";
 import type { Command, Button, Modal, SelectionMenu } from "./deploy";
 import deploy, { deply_member_count } from "./deploy";
 import { error } from "node:console";
@@ -11,7 +11,7 @@ import { handel_bible_mention, handel_reaction_bible } from "./functions/mention
 import fs from "fs";
 import { get_welcome_banner } from "./functions/welcome_banner";
 import { handle_message, type ChatLogEntry } from "./functions/ai";
-import { Button as UiButton, Page, Section, TextDisplay } from "./functions/ui_framework/ui.ts"
+import { Button as UiButton, Thumbnail, Page, Section, TextDisplay, ActionRow  } from "./functions/ui_framework/ui.ts"
 
 declare module "discord.js" {
     export interface Client {
@@ -66,8 +66,10 @@ client.once(Events.ClientReady, async readyClient => {
 
       if (message.content == '?test') {
         const test = new Page("test", true)
-          .addStaticElement(new Section({ text: "Test", accessory: new UiButton(() => {}, new ButtonBuilder().setLabel("test").setCustomId("test").setStyle(ButtonStyle.Secondary))}))
+          .addStaticElement(new Section({ text: "Test", accessory: new UiButton(() => {console.log("test")}, new ButtonBuilder().setLabel("test").setCustomId("test").setStyle(ButtonStyle.Secondary))}))
+          .addStaticElement(new Section({ text: "Test", accessory: new Thumbnail(new ThumbnailBuilder().setDescription("test").setURL("https://cdn.discordapp.com/attachments/1491947021244825680/1514015586001358849/Screenshot_20260607_184455_Instagram.jpg?ex=6a29d464&is=6a2882e4&hm=41c2b1601d01939cfb3dc85caf8b146a71e3b99d49ea8399d26c60b0fb5fe0e3&animated=true")) }))
           .addStaticElement(new TextDisplay("test"))
+          .addStaticElement(new ActionRow({ accessorys: [new UiButton(() => {}, new ButtonBuilder().setCustomId("test2").setLabel("test").setStyle(ButtonStyle.Success))] }))
           .render();
         message.reply(test)
       }
