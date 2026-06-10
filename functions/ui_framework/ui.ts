@@ -1,15 +1,18 @@
-import { ContainerBuilder, MessageFlags, TextDisplayBuilder, SectionBuilder, type MessageActionRowComponentBuilder } from "discord.js";
-import { ActionRowBuilder, type ButtonBuilder, type Interaction, type MessageReplyOptions, type ThumbnailBuilder } from "discord.js";
-import excommunicate from "../../commands/excommunicate";
+import { ContainerBuilder, MessageFlags, TextDisplayBuilder, SectionBuilder, type MessageActionRowComponentBuilder, ButtonStyle } from "discord.js";
+import { ActionRowBuilder, ButtonBuilder, type Interaction, type MessageReplyOptions, type ThumbnailBuilder } from "discord.js";
+import { createHash } from 'crypto';
 
-type Element = TextDisplay | Section | ActionRow
+
+type Element = Section | ActionRow | TextDisplay
+type ButtonExecution = (interaction: Interaction, data: any) => void;
+type Execution = ButtonExecution
 
 export class Page {
   public customID: string;
   public isContainer: boolean;
   readonly staticElements: Element[];
   readonly dynamicElements: Element[];
-  readonly cache = new Map<string, Element>;
+  readonly cache = new Map<string, Execution>;
   readonly data = new Map<string, any>;
 
   constructor(custom_id: string, is_container?: boolean, static_elements?: Element[], dynamic_elements?: Element[]) {
@@ -19,15 +22,15 @@ export class Page {
     this.dynamicElements = dynamic_elements ?? [];
 
     for (const element of this.staticElements) {
-      element.page = this;
+      element.bind(this);
     }
     for (const element of this.dynamicElements) {
-      element.page = this;
+      element.bind(this);
     }
   }
 
   public addStaticElement(element: Element): Page {
-    element.page = this;
+    element.bind(this);
     this.staticElements.push(element);
     return this;
   }
@@ -53,16 +56,43 @@ export class Page {
   }
 }
 
-type ButtonExecution = (interaction: Interaction) => void;
-
+/*
+ *
+ * ACCESSORIES:
+ *
+ */
 export class Button {
   public builder: ButtonBuilder;
   public execution: ButtonExecution;
   public page!: Page;
+  public data: any;
 
-  constructor(execution: ButtonExecution, builder: ButtonBuilder) {
-    this.builder = builder;
+  constructor(execution: ButtonExecution, builder: ButtonBuilder | { style: ButtonStyle, label: string, emoji?: string } | { style: ButtonStyle, label?: string, emoji: string }, data: any) {
     this.execution = execution;
+    this.data = data;
+
+    if (builder instanceof ButtonBuilder) {
+      this.builder = builder;
+    } else {
+      this.builder = new ButtonBuilder()
+        .setLabel(builder.label ?? "")
+        .setEmoji(builder.emoji ?? "")
+        .setStyle(builder.style);
+    }
+  }
+
+  public bind(page: Page): Button {
+    this.page = page;
+    const hash = this.cache(this.data);
+    this.builder.setCustomId("ui-" + this.page.customID + "-" + hash);
+    return this;
+  }
+
+  public cache(data: any): string {
+    const hash = createHash("sha256").update(JSON.stringify(data) + JSON.stringify(this.execution)).digest('base64url');
+    this.page.cache.set(hash, this.execution)
+    this.page.data.set(hash, data)
+    return hash;
   }
 }
 
@@ -70,11 +100,20 @@ export class Thumbnail {
   public builder: ThumbnailBuilder;
   public page!: Page;
 
+  public bind(page: Page) {
+    this.page = page;
+  }
+
   constructor(builder: ThumbnailBuilder) {
     this.builder = builder;
   }
 }
 
+/*
+ *
+ * ELEMENTS:
+ *
+ */
 export class TextDisplay {
   public builder: TextDisplayBuilder;
   public page!: Page;
@@ -87,6 +126,10 @@ export class TextDisplay {
     } 
   }
 
+  public bind(page: Page) {
+    this.page = page
+  }
+
   public apply(container: ContainerBuilder) {
     container.addTextDisplayComponents(this.builder);
   }
@@ -95,20 +138,21 @@ export class TextDisplay {
 export class Section {
   public builder!: SectionBuilder;
   public page!: Page;
+  public accessory: Button | Thumbnail;
 
-  constructor(builder: SectionBuilder | { text: string, accessory: Button | Thumbnail }) {
-    if (builder instanceof SectionBuilder) {
-      this.builder = builder;
-    } else {
-      if (builder.accessory instanceof Button) {
-        this.builder = new SectionBuilder()
-          .addTextDisplayComponents((t) => t.setContent(builder.text))
-          .setButtonAccessory(builder.accessory.builder);
-      } else if (builder.accessory instanceof Thumbnail) {
-        this.builder = new SectionBuilder()
-          .addTextDisplayComponents((t) => t.setContent(builder.text))
-          .setThumbnailAccessory(builder.accessory.builder);
-      }
+  constructor(builder: { text: string, accessory: Button | Thumbnail }) {
+    this.builder = new SectionBuilder().addTextDisplayComponents((t) => t.setContent(builder.text))
+    this.accessory = builder.accessory;
+  }
+
+  public bind(page: Page) {
+    this.page = page;
+    this.accessory.bind(page);
+
+    if (this.accessory instanceof Button) {
+      this.builder.setButtonAccessory(this.accessory.builder)
+    } else if (this.accessory instanceof Thumbnail) {
+      this.builder.setThumbnailAccessory(this.accessory.builder)
     }
   }
 
@@ -120,14 +164,20 @@ export class Section {
 export class ActionRow {
   public builder: ActionRowBuilder<MessageActionRowComponentBuilder>;
   public page!: Page;
+  public accessorys: Button[];
 
-  constructor(builder: ActionRowBuilder<MessageActionRowComponentBuilder> | { accessorys: Button[] }) {
-    if (builder instanceof ActionRowBuilder) {
-      this.builder = builder;
-    } else {
-      this.builder = new ActionRowBuilder<MessageActionRowComponentBuilder>()
-        .setComponents(builder.accessorys.map((v) => v.builder))
+  constructor(builder: { accessorys: Button[] }) {
+    this.builder = new ActionRowBuilder<MessageActionRowComponentBuilder>()
+    this.accessorys = builder.accessorys;
+  }
+
+  public bind(page: Page) {
+    this.page = page;
+    for (const accessory of this.accessorys) {
+      accessory.bind(page);
     }
+
+    this.builder.setComponents(this.accessorys.map((v) => v.builder));
   }
 
   public apply(container: ContainerBuilder) {

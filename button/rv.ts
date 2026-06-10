@@ -24,5 +24,3 @@ export default {
     interaction.reply({components: container, flags: [MessageFlags.IsComponentsV2, MessageFlags.Ephemeral]})
   },
 } as Button;
-
-
