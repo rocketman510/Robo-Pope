@@ -1,25 +1,30 @@
-import { ContainerBuilder, MessageFlags, TextDisplayBuilder, SectionBuilder, type MessageActionRowComponentBuilder, ButtonStyle } from "discord.js";
+import { ContainerBuilder, MessageFlags, TextDisplayBuilder, SectionBuilder, type MessageActionRowComponentBuilder, ButtonStyle, Client } from "discord.js";
 import { ActionRowBuilder, ButtonBuilder, type Interaction, type MessageReplyOptions, type ThumbnailBuilder } from "discord.js";
 import { createHash } from 'crypto';
 
 
-type Element = Section | ActionRow | TextDisplay
-type ButtonExecution = (interaction: Interaction, data: any) => void;
+type Element = Section | ActionRow | TextDisplay | Window
+type ButtonExecution = (interaction: Interaction, data: any) => Promise<void>;
 type Execution = ButtonExecution
 
 export class Page {
   public customID: string;
   public isContainer: boolean;
+  public dynamicStartIndex: number;
+  public dynamicStartMax: number;
   readonly staticElements: Element[];
   readonly dynamicElements: Element[];
   readonly cache = new Map<string, Execution>;
   readonly data = new Map<string, any>;
 
-  constructor(custom_id: string, is_container?: boolean, static_elements?: Element[], dynamic_elements?: Element[]) {
+  constructor(custom_id: string, client: Client, is_container?: boolean, static_elements?: Element[], dynamic_elements?: Element[], dynami_start_index?: number, dynami_start_max?: number) {
+    client.pages.set(custom_id, this)
     this.customID = custom_id;
     this.isContainer = is_container ?? false;
     this.staticElements = static_elements ?? [];
     this.dynamicElements = dynamic_elements ?? [];
+    this.dynamicStartIndex = dynami_start_index ?? 0;
+    this.dynamicStartMax = dynami_start_max ?? 5;
 
     for (const element of this.staticElements) {
       element.bind(this);
@@ -32,6 +37,12 @@ export class Page {
   public addStaticElement(element: Element): Page {
     element.bind(this);
     this.staticElements.push(element);
+    return this;
+  }
+
+  public addDynamicElement(element: Element): Page {
+    element.bind(this);
+    this.dynamicElements.push(element);
     return this;
   }
 
@@ -48,7 +59,13 @@ export class Page {
       let components = [];
 
       for (const element of this.staticElements) {
-        components.push(element.builder);
+        if (element instanceof Window) {
+          for (const subelement of element.builder) {
+            components.push(subelement.builder);
+          }
+        } else {
+          components.push(element.builder);
+        }
       }
 
       return { components, flags: MessageFlags.IsComponentsV2 }
@@ -182,5 +199,21 @@ export class ActionRow {
 
   public apply(container: ContainerBuilder) {
     container.addActionRowComponents([this.builder])
+  }
+}
+
+export class Window {
+  public builder!: Element[];
+  public page!: Page;
+
+  public bind(page: Page) {
+    this.page = page;
+  }
+
+  public apply(container: ContainerBuilder) {
+    this.builder = this.page.dynamicElements.slice(this.page.dynamicStartIndex, this.page.dynamicStartIndex + this.page.dynamicStartMax)
+    for (const element of this.builder) {
+      element.apply(container)
+    }
   }
 }
