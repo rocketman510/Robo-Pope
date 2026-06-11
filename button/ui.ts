@@ -5,7 +5,7 @@ export default {
   data: "ui",
   async execute(interaction: ButtonInteraction) {
     const client = interaction.client;
-    const match = interaction.customId.match(/^ui-(.+)-([A-Za-z0-9_-]+)$/);
+    const match = interaction.customId.match(/^ui-(.+?)-([A-Za-z0-9_-]+)$/);
     
     if (!match) return;
     const custom_id = match[1];

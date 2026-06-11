@@ -66,11 +66,10 @@ client.once(Events.ClientReady, async readyClient => {
       // await handle_message(message);
 
       if (message.content == '?test') {
-        const test = new Page("test", client, true)
+        let test = new Page("test", client, true)
           .addStaticElement(new Section({ text: "Test", accessory: new UiButton(async () => {console.log("test")}, new ButtonBuilder().setLabel("test").setCustomId("test").setStyle(ButtonStyle.Secondary), 1)}))
           .addStaticElement(new Section({ text: "Test", accessory: new Thumbnail(new ThumbnailBuilder().setDescription("test").setURL("https://static.wixstatic.com/media/16a265_38600247e9554deabc93de93300c667c~mv2.jpg/v1/fill/w_560,h_459,al_c,lg_1,q_80/16a265_38600247e9554deabc93de93300c667c~mv2.jpg"))}))
           .addStaticElement(new Window())
-          .addStaticElement(new ActionRow({ accessorys: [new UiButton(async (i) => {i.reply("Dynamic code execution is operational.")}, new ButtonBuilder().setLabel("test").setStyle(ButtonStyle.Success), null)] }))
           .addDynamicElement(new TextDisplay("Test1"))
           .addDynamicElement(new TextDisplay("Test2"))
           .addDynamicElement(new TextDisplay("Test3"))
@@ -87,8 +86,25 @@ client.once(Events.ClientReady, async readyClient => {
           .addDynamicElement(new TextDisplay("Test14"))
           .addDynamicElement(new TextDisplay("Test15"))
           .addDynamicElement(new TextDisplay("Test16"))
-          .render();
-        message.reply(test)
+
+        const next_button = new UiButton(
+          async (i, d: Page) => {
+            await d.next(i)
+          },
+          {style: ButtonStyle.Secondary, label: "next"},
+          test
+        )
+        const previous_button = new UiButton(
+          async (i, d: Page) => {
+            await d.previous(i)
+          },
+          {style: ButtonStyle.Secondary, label: "previous"},
+          test
+        )
+
+        test.addStaticElement(new ActionRow({accessorys: [previous_button, next_button]}))
+
+        message.reply(test.render())
       }
     });
 

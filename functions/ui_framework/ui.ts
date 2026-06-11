@@ -1,4 +1,4 @@
-import { ContainerBuilder, MessageFlags, TextDisplayBuilder, SectionBuilder, type MessageActionRowComponentBuilder, ButtonStyle, Client } from "discord.js";
+import { ContainerBuilder, MessageFlags, TextDisplayBuilder, SectionBuilder, type MessageActionRowComponentBuilder, ButtonStyle, Client, MessagePayload } from "discord.js";
 import { ActionRowBuilder, ButtonBuilder, type Interaction, type MessageReplyOptions, type ThumbnailBuilder } from "discord.js";
 import { createHash } from 'crypto';
 
@@ -46,7 +46,30 @@ export class Page {
     return this;
   }
 
-  public render(): MessageReplyOptions {
+  public async next(interaction?: Interaction): Promise<Page> {
+    if (this.dynamicStartIndex + this.dynamicStartMax < this.dynamicElements.length) {
+      this.dynamicStartIndex += this.dynamicStartMax
+    }
+    if (!!interaction && interaction.isButton()) {
+      await interaction.update(this.render())
+    }
+    return this;
+  }
+
+  public async previous(interaction?: Interaction): Promise<Page> {
+    console.log(this.dynamicStartIndex - this.dynamicStartMax >= 0, this.dynamicStartIndex, this.dynamicStartMax);
+    
+    if (this.dynamicStartIndex - this.dynamicStartMax >= 0) {
+      this.dynamicStartIndex -= this.dynamicStartMax
+    }
+    if (!!interaction && interaction.isButton()) {
+      await interaction.update(this.render())
+    }
+    return this;
+  }
+
+  public render(dyn_index?: number): MessageReplyOptions {
+    this.dynamicStartIndex = dyn_index ?? this.dynamicStartIndex ?? 0;
     if (this.isContainer) {
       const container = new ContainerBuilder()
 
@@ -55,21 +78,21 @@ export class Page {
       }
 
       return { components: [container], flags: MessageFlags.IsComponentsV2 }
-    } else {
-      let components = [];
-
-      for (const element of this.staticElements) {
-        if (element instanceof Window) {
-          for (const subelement of element.builder) {
-            components.push(subelement.builder);
-          }
-        } else {
-          components.push(element.builder);
-        }
-      }
-
-      return { components, flags: MessageFlags.IsComponentsV2 }
-    }
+    }// else {
+    //   let components = [];
+    //
+    //   for (const element of this.staticElements) {
+    //     if (element instanceof Window) {
+    //       for (const subelement of element.builder) {
+    //         components.push(subelement.builder);
+    //       }
+    //     } else {
+    //       components.push(element.builder);
+    //     }
+    //   }
+    //
+    //   return { components, flags: MessageFlags.IsComponentsV2 }
+    // }
   }
 }
 
@@ -92,9 +115,14 @@ export class Button {
       this.builder = builder;
     } else {
       this.builder = new ButtonBuilder()
-        .setLabel(builder.label ?? "")
-        .setEmoji(builder.emoji ?? "")
         .setStyle(builder.style);
+
+      if (!!builder.label) {
+        this.builder.setLabel(builder.label)
+      }
+      if (!!builder.emoji) {
+        this.builder.setEmoji(builder.emoji)
+      }
     }
   }
 
@@ -106,7 +134,16 @@ export class Button {
   }
 
   public cache(data: any): string {
-    const hash = createHash("sha256").update(JSON.stringify(data) + JSON.stringify(this.execution)).digest('base64url');
+    let dataIdentifier: string;
+
+    if (data && typeof data === 'object' && 'customID' in data) {
+      dataIdentifier = data.customID;
+    } else if (typeof data === 'object' && data !== null) {
+      dataIdentifier = JSON.stringify(data);
+    } else {
+      dataIdentifier = String(data);
+    }
+    const hash = createHash("sha256").update(dataIdentifier + this.execution.toString()).digest('base64url');
     this.page.cache.set(hash, this.execution)
     this.page.data.set(hash, data)
     return hash;
