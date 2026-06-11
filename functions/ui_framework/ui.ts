@@ -4,7 +4,17 @@ import { createHash } from 'crypto';
 
 type Element = Section | ActionRow | TextDisplay | Window
 type ButtonExecution = (interaction: Interaction, data: any) => Promise<void>;
-type Execution = ButtonExecution
+type DynamicProp<T> = T | ((interaction: Interaction) => Promise<T>);
+type DynamicAttributes = {
+  style: DynamicProp<ButtonStyle>,
+  label?: DynamicProp<string>,
+  emoji?: DynamicProp<string>,
+  disabled?: DynamicProp<boolean>
+};
+
+async function resolve_prop<T>(prop: DynamicProp<T>, interaction?: Interaction): Promise<T> {
+  return typeof prop === 'function' ? await (prop as Function)(interaction) : (prop as T);
+}
 
 export class Page {
   public customID: string;
@@ -13,101 +23,63 @@ export class Page {
   public dynamicStartMax: number;
   readonly staticElements: Element[];
   readonly dynamicElements: Element[];
-  readonly cache = new Map<string, Execution>;
+  readonly cache = new Map<string, ButtonExecution>;
   readonly data = new Map<string, any>;
 
   constructor(custom_id: string, client: Client, is_container?: boolean, static_elements?: Element[], dynamic_elements?: Element[], dynamic_start_index?: number, dynamic_start_max?: number) {
-    client.pages.set(custom_id, this)
+    client.pages.set(custom_id, this);
     this.customID = custom_id;
     this.isContainer = is_container ?? false;
     this.staticElements = static_elements ?? [];
     this.dynamicElements = dynamic_elements ?? [];
     this.dynamicStartIndex = dynamic_start_index ?? 0;
     this.dynamicStartMax = dynamic_start_max ?? 5;
-
-    for (const element of this.staticElements) {
-      element.bind(this);
-    }
-    for (const element of this.dynamicElements) {
-      element.bind(this);
-    }
+    for (const element of this.staticElements) element.bind(this);
+    for (const element of this.dynamicElements) element.bind(this);
   }
 
-  public addStaticElement(element: Element): Page {
-    element.bind(this);
-    this.staticElements.push(element);
-    return this;
-  }
-
-  public addDynamicElement(element: Element): Page {
-    element.bind(this);
-    this.dynamicElements.push(element);
-    return this;
-  }
+  public addStaticElement(element: Element): Page { element.bind(this); this.staticElements.push(element); return this; }
+  public addDynamicElement(element: Element): Page { element.bind(this); this.dynamicElements.push(element); return this; }
 
   public async next(interaction?: Interaction): Promise<Page> {
-    if (this.dynamicStartIndex + this.dynamicStartMax < this.dynamicElements.length) {
-      this.dynamicStartIndex += this.dynamicStartMax
-    }
-    if (!!interaction && interaction.isButton()) {
-      await interaction.update(this.render() as InteractionUpdateOptions)
-    }
+    if (this.dynamicStartIndex + this.dynamicStartMax < this.dynamicElements.length) this.dynamicStartIndex += this.dynamicStartMax;
+    if (interaction?.isButton()) await interaction.update(await this.render(undefined, interaction));
     return this;
   }
 
   public async previous(interaction?: Interaction): Promise<Page> {
-    if (this.dynamicStartIndex - this.dynamicStartMax >= 0) {
-      this.dynamicStartIndex -= this.dynamicStartMax
-    }
-    if (!!interaction && interaction.isButton()) {
-      await interaction.update(this.render() as InteractionUpdateOptions)
-    }
+    if (this.dynamicStartIndex - this.dynamicStartMax >= 0) this.dynamicStartIndex -= this.dynamicStartMax;
+    if (interaction?.isButton()) await interaction.update(await this.render(undefined, interaction));
     return this;
   }
 
-  public render(dyn_index?: number): MessageReplyOptions {
+  public async render(dyn_index?: number, interaction?: Interaction): Promise<MessageReplyOptions> {
     this.dynamicStartIndex = dyn_index ?? this.dynamicStartIndex ?? 0;
-      const container = new ContainerBuilder()
-
-      for (const element of this.staticElements) {
-        element.apply(container);
-      }
-
-    if (this.isContainer) {
-      return { components: [container], flags: MessageFlags.IsComponentsV2 }
-    } else {
-      return { components: container.components, flags: MessageFlags.IsComponentsV2 }//Seems to work?
-    }
+    const container = new ContainerBuilder();
+    for (const element of this.staticElements) await element.apply(container, interaction);
+    return { 
+        components: this.isContainer ? [container] : container.components, 
+        flags: MessageFlags.IsComponentsV2 
+    };
   }
 }
 
-/*
- *
- * ACCESSORIES:
- *
- * */
 export class Button {
   public builder: ButtonBuilder;
   public execution: ButtonExecution;
   public page!: Page;
   public data: any;
+  public dynAttributes: DynamicAttributes | null;
 
-  constructor(execution: ButtonExecution, builder: ButtonBuilder | { style: ButtonStyle, label: string, emoji?: string } | { style: ButtonStyle, label?: string, emoji: string }, data: any) {
+  constructor(execution: ButtonExecution, builder: ButtonBuilder | DynamicAttributes, data: any) {
     this.execution = execution;
     this.data = data;
-
     if (builder instanceof ButtonBuilder) {
       this.builder = builder;
+      this.dynAttributes = null;
     } else {
-      this.builder = new ButtonBuilder()
-        .setStyle(builder.style);
-
-      if (!!builder.label) {
-        this.builder.setLabel(builder.label)
-      }
-      if (!!builder.emoji) {
-        this.builder.setEmoji(builder.emoji)
-      }
+      this.builder = new ButtonBuilder();
+      this.dynAttributes = builder;
     }
   }
 
@@ -118,19 +90,25 @@ export class Button {
     return this;
   }
 
-  public cache(data: any): string {
-    let dataIdentifier: string;
-
-    if (data && typeof data === 'object' && 'customID' in data) {
-      dataIdentifier = data.customID;
-    } else if (typeof data === 'object' && data !== null) {
-      dataIdentifier = JSON.stringify(data);
-    } else {
-      dataIdentifier = String(data);
+  public async compute(interaction?: Interaction): Promise<ButtonBuilder> {
+    if (this.dynAttributes) {
+      const builder = new ButtonBuilder();
+      if (this.builder.data.custom_id) builder.setCustomId(this.builder.data.custom_id);
+      const attrs = this.dynAttributes;
+      if (attrs.emoji) builder.setEmoji(await resolve_prop(attrs.emoji, interaction));
+      if (attrs.label) builder.setLabel(await resolve_prop(attrs.label, interaction));
+      if (attrs.disabled !== undefined) builder.setDisabled(await resolve_prop(attrs.disabled, interaction));
+      builder.setStyle(await resolve_prop(attrs.style, interaction));
+      return builder;
     }
+    return this.builder;
+  }
+
+  public cache(data: any): string {
+    const dataIdentifier = (data && typeof data === 'object' && 'customID' in data) ? data.customID : JSON.stringify(data);
     const hash = createHash("sha256").update(dataIdentifier + this.execution.toString()).digest('base64url');
-    this.page.cache.set(hash, this.execution)
-    this.page.data.set(hash, data)
+    this.page.cache.set(hash, this.execution);
+    this.page.data.set(hash, data);
     return hash;
   }
 }
@@ -138,104 +116,47 @@ export class Button {
 export class Thumbnail {
   public builder: ThumbnailBuilder;
   public page!: Page;
-
-  public bind(page: Page) {
-    this.page = page;
-  }
-
-  constructor(builder: ThumbnailBuilder) {
-    this.builder = builder;
-  }
+  public bind(page: Page) { this.page = page; }
+  constructor(builder: ThumbnailBuilder) { this.builder = builder; }
+  public async apply(container: ContainerBuilder) { container.setThumbnailAccessory(this.builder); }
 }
 
-/*
- *
- * ELEMENTS:
- *
- * */
 export class TextDisplay {
   public builder: TextDisplayBuilder;
   public page!: Page;
-
-  constructor(builder: TextDisplayBuilder | string) {
-    if (typeof builder === "string") {
-      this.builder = new TextDisplayBuilder().setContent(builder);
-    } else {
-      this.builder = builder;
-    } 
-  }
-
-  public bind(page: Page) {
-    this.page = page
-  }
-
-  public apply(container: ContainerBuilder) {
-    container.addTextDisplayComponents(this.builder);
-  }
+  constructor(builder: TextDisplayBuilder | string) { this.builder = typeof builder === "string" ? new TextDisplayBuilder().setContent(builder) : builder; }
+  public bind(page: Page) { this.page = page; }
+  public async apply(container: ContainerBuilder) { container.addTextDisplayComponents(this.builder); }
 }
 
 export class Section {
-  public builder!: SectionBuilder;
+  public builder: SectionBuilder = new SectionBuilder();
   public page!: Page;
-  public accessory: Button | Thumbnail;
-
-  constructor(builder: { text: string, accessory: Button | Thumbnail }) {
-    this.builder = new SectionBuilder().addTextDisplayComponents((t) => t.setContent(builder.text))
-    this.accessory = builder.accessory;
-  }
-
-  public bind(page: Page) {
-    this.page = page;
-    this.accessory.bind(page);
-
-    if (this.accessory instanceof Button) {
-      this.builder.setButtonAccessory(this.accessory.builder)
-    } else if (this.accessory instanceof Thumbnail) {
-      this.builder.setThumbnailAccessory(this.accessory.builder)
-    }
-  }
-
-  public apply(container: ContainerBuilder) {
+  constructor(public text: string, public accessory: Button | Thumbnail) { this.builder.addTextDisplayComponents(t => t.setContent(text)); }
+  public bind(page: Page) { this.page = page; this.accessory.bind(page); }
+  public async apply(container: ContainerBuilder, interaction?: Interaction) {
+    if (this.accessory instanceof Button) this.builder.setButtonAccessory(await this.accessory.compute(interaction));
+    else this.builder.setThumbnailAccessory(this.accessory.builder);
     container.addSectionComponents(this.builder);
   }
 }
 
 export class ActionRow {
-  public builder: ActionRowBuilder<MessageActionRowComponentBuilder>;
+  public builder: ActionRowBuilder<MessageActionRowComponentBuilder> = new ActionRowBuilder();
   public page!: Page;
-  public accessorys: Button[];
-
-  constructor(builder: { accessorys: Button[] }) {
-    this.builder = new ActionRowBuilder<MessageActionRowComponentBuilder>()
-    this.accessorys = builder.accessorys;
-  }
-
-  public bind(page: Page) {
-    this.page = page;
-    for (const accessory of this.accessorys) {
-      accessory.bind(page);
-    }
-
-    this.builder.setComponents(this.accessorys.map((v) => v.builder));
-  }
-
-  public apply(container: ContainerBuilder) {
-    container.addActionRowComponents([this.builder])
+  constructor(public accessorys: Button[]) {}
+  public bind(page: Page) { this.page = page; for (const a of this.accessorys) a.bind(page); }
+  public async apply(container: ContainerBuilder, interaction?: Interaction) {
+    this.builder.setComponents(await Promise.all(this.accessorys.map(a => a.compute(interaction))));
+    container.addActionRowComponents([this.builder]);
   }
 }
 
 export class Window {
-  public builder!: Element[];
   public page!: Page;
-
-  public bind(page: Page) {
-    this.page = page;
-  }
-
-  public apply(container: ContainerBuilder) {
-    this.builder = this.page.dynamicElements.slice(this.page.dynamicStartIndex, this.page.dynamicStartIndex + this.page.dynamicStartMax)
-    for (const element of this.builder) {
-      element.apply(container)
-    }
+  public bind(page: Page) { this.page = page; }
+  public async apply(container: ContainerBuilder, interaction?: Interaction) {
+    const elements = this.page.dynamicElements.slice(this.page.dynamicStartIndex, this.page.dynamicStartIndex + this.page.dynamicStartMax);
+    for (const e of elements) await e.apply(container, interaction);
   }
 }
