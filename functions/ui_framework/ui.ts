@@ -1,7 +1,6 @@
-import { ContainerBuilder, MessageFlags, TextDisplayBuilder, SectionBuilder, type MessageActionRowComponentBuilder, ButtonStyle, Client, MessagePayload } from "discord.js";
-import { ActionRowBuilder, ButtonBuilder, type Interaction, type MessageReplyOptions, type ThumbnailBuilder } from "discord.js";
+import { ContainerBuilder, MessageFlags, TextDisplayBuilder, SectionBuilder, type MessageActionRowComponentBuilder, ButtonStyle, Client } from "discord.js";
+import { ActionRowBuilder, ButtonBuilder, type Interaction, type MessageReplyOptions, type InteractionUpdateOptions, type ThumbnailBuilder } from "discord.js";
 import { createHash } from 'crypto';
-
 
 type Element = Section | ActionRow | TextDisplay | Window
 type ButtonExecution = (interaction: Interaction, data: any) => Promise<void>;
@@ -17,14 +16,14 @@ export class Page {
   readonly cache = new Map<string, Execution>;
   readonly data = new Map<string, any>;
 
-  constructor(custom_id: string, client: Client, is_container?: boolean, static_elements?: Element[], dynamic_elements?: Element[], dynami_start_index?: number, dynami_start_max?: number) {
+  constructor(custom_id: string, client: Client, is_container?: boolean, static_elements?: Element[], dynamic_elements?: Element[], dynamic_start_index?: number, dynamic_start_max?: number) {
     client.pages.set(custom_id, this)
     this.customID = custom_id;
     this.isContainer = is_container ?? false;
     this.staticElements = static_elements ?? [];
     this.dynamicElements = dynamic_elements ?? [];
-    this.dynamicStartIndex = dynami_start_index ?? 0;
-    this.dynamicStartMax = dynami_start_max ?? 5;
+    this.dynamicStartIndex = dynamic_start_index ?? 0;
+    this.dynamicStartMax = dynamic_start_max ?? 5;
 
     for (const element of this.staticElements) {
       element.bind(this);
@@ -51,48 +50,34 @@ export class Page {
       this.dynamicStartIndex += this.dynamicStartMax
     }
     if (!!interaction && interaction.isButton()) {
-      await interaction.update(this.render())
+      await interaction.update(this.render() as InteractionUpdateOptions)
     }
     return this;
   }
 
   public async previous(interaction?: Interaction): Promise<Page> {
-    console.log(this.dynamicStartIndex - this.dynamicStartMax >= 0, this.dynamicStartIndex, this.dynamicStartMax);
-    
     if (this.dynamicStartIndex - this.dynamicStartMax >= 0) {
       this.dynamicStartIndex -= this.dynamicStartMax
     }
     if (!!interaction && interaction.isButton()) {
-      await interaction.update(this.render())
+      await interaction.update(this.render() as InteractionUpdateOptions)
     }
     return this;
   }
 
   public render(dyn_index?: number): MessageReplyOptions {
     this.dynamicStartIndex = dyn_index ?? this.dynamicStartIndex ?? 0;
-    if (this.isContainer) {
       const container = new ContainerBuilder()
 
       for (const element of this.staticElements) {
         element.apply(container);
       }
 
+    if (this.isContainer) {
       return { components: [container], flags: MessageFlags.IsComponentsV2 }
-    }// else {
-    //   let components = [];
-    //
-    //   for (const element of this.staticElements) {
-    //     if (element instanceof Window) {
-    //       for (const subelement of element.builder) {
-    //         components.push(subelement.builder);
-    //       }
-    //     } else {
-    //       components.push(element.builder);
-    //     }
-    //   }
-    //
-    //   return { components, flags: MessageFlags.IsComponentsV2 }
-    // }
+    } else {
+      return { components: container.components, flags: MessageFlags.IsComponentsV2 }//Seems to work?
+    }
   }
 }
 
@@ -100,7 +85,7 @@ export class Page {
  *
  * ACCESSORIES:
  *
- */
+ * */
 export class Button {
   public builder: ButtonBuilder;
   public execution: ButtonExecution;
@@ -167,7 +152,7 @@ export class Thumbnail {
  *
  * ELEMENTS:
  *
- */
+ * */
 export class TextDisplay {
   public builder: TextDisplayBuilder;
   public page!: Page;

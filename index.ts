@@ -66,7 +66,7 @@ client.once(Events.ClientReady, async readyClient => {
       // await handle_message(message);
 
       if (message.content == '?test') {
-        let test = new Page("test", client, true)
+        let test = new Page("test", client, false)
           .addStaticElement(new Section({ text: "Test", accessory: new UiButton(async () => {console.log("test")}, new ButtonBuilder().setLabel("test").setCustomId("test").setStyle(ButtonStyle.Secondary), 1)}))
           .addStaticElement(new Section({ text: "Test", accessory: new Thumbnail(new ThumbnailBuilder().setDescription("test").setURL("https://static.wixstatic.com/media/16a265_38600247e9554deabc93de93300c667c~mv2.jpg/v1/fill/w_560,h_459,al_c,lg_1,q_80/16a265_38600247e9554deabc93de93300c667c~mv2.jpg"))}))
           .addStaticElement(new Window())
