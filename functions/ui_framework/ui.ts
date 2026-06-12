@@ -1,18 +1,21 @@
 import { ContainerBuilder, MessageFlags, TextDisplayBuilder, SectionBuilder, type MessageActionRowComponentBuilder, ButtonStyle, Client } from "discord.js";
-import { ActionRowBuilder, ButtonBuilder, type Interaction, type MessageReplyOptions, type InteractionUpdateOptions, type ThumbnailBuilder } from "discord.js";
+import { ActionRowBuilder, ButtonBuilder, ThumbnailBuilder, type Interaction, type MessageReplyOptions, type InteractionUpdateOptions } from "discord.js";
 import { createHash } from 'crypto';
 
 type Element = Section | ActionRow | TextDisplay | Window
 type ButtonExecution = (interaction: Interaction, data: any) => Promise<void>;
 type DynamicProp<T> = T | ((interaction: Interaction) => Promise<T>);
-type DynamicAttributes = {
+type DynamicButtonAttributes = {
   style: DynamicProp<ButtonStyle>,
   label?: DynamicProp<string>,
   emoji?: DynamicProp<string>,
   disabled?: DynamicProp<boolean>
 };
+type DynamicThumbnailAttributes = {
+  url: DynamicProp<string>,
+}
 
-async function resolve_prop<T>(prop: DynamicProp<T>, interaction?: Interaction): Promise<T> {
+async function resolve_prop<T>(prop: DynamicProp<T>, interaction: Interaction): Promise<T> {
   return typeof prop === 'function' ? await (prop as Function)(interaction) : (prop as T);
 }
 
@@ -69,9 +72,9 @@ export class Button {
   public execution: ButtonExecution;
   public page!: Page;
   public data: any;
-  public dynAttributes: DynamicAttributes | null;
+  public dynAttributes: DynamicButtonAttributes | null;
 
-  constructor(execution: ButtonExecution, builder: ButtonBuilder | DynamicAttributes, data: any) {
+  constructor(execution: ButtonExecution, builder: ButtonBuilder | DynamicButtonAttributes, data: any) {
     this.execution = execution;
     this.data = data;
     if (builder instanceof ButtonBuilder) {
@@ -90,7 +93,7 @@ export class Button {
     return this;
   }
 
-  public async compute(interaction?: Interaction): Promise<ButtonBuilder> {
+  public async compute(interaction: Interaction): Promise<ButtonBuilder> {
     if (this.dynAttributes) {
       const builder = new ButtonBuilder();
       if (this.builder.data.custom_id) builder.setCustomId(this.builder.data.custom_id);
@@ -102,6 +105,10 @@ export class Button {
       return builder;
     }
     return this.builder;
+  }
+
+  public async apply(container: SectionBuilder, interaction: Interaction) {
+    container.setButtonAccessory(await this.compute(interaction));
   }
 
   public cache(data: any): string {
@@ -116,9 +123,16 @@ export class Button {
 export class Thumbnail {
   public builder: ThumbnailBuilder;
   public page!: Page;
+  public dynAttributes: DynamicThumbnailAttributes | null;
+  constructor(builder: ThumbnailBuilder | DynamicThumbnailAttributes ) {
+    this.builder = builder instanceof ThumbnailBuilder ? builder : new ThumbnailBuilder();
+    this.dynAttributes = builder instanceof ThumbnailBuilder ? null : builder;
+  }
   public bind(page: Page) { this.page = page; }
-  constructor(builder: ThumbnailBuilder) { this.builder = builder; }
-  public async apply(container: ContainerBuilder) { container.setThumbnailAccessory(this.builder); }
+  public async apply(container: SectionBuilder, interaction: Interaction) {
+    this.dynAttributes ? this.builder.setURL(await resolve_prop(this.dynAttributes.url, interaction)) : null;
+    container.setThumbnailAccessory(this.builder);
+  }
 }
 
 export class TextDisplay {
@@ -126,17 +140,16 @@ export class TextDisplay {
   public page!: Page;
   constructor(builder: TextDisplayBuilder | string) { this.builder = typeof builder === "string" ? new TextDisplayBuilder().setContent(builder) : builder; }
   public bind(page: Page) { this.page = page; }
-  public async apply(container: ContainerBuilder) { container.addTextDisplayComponents(this.builder); }
+  public async apply(container: ContainerBuilder | SectionBuilder) { container.addTextDisplayComponents(this.builder); }
 }
 
 export class Section {
   public builder: SectionBuilder = new SectionBuilder();
   public page!: Page;
-  constructor(public text: string, public accessory: Button | Thumbnail) { this.builder.addTextDisplayComponents(t => t.setContent(text)); }
+  constructor(text: string, public accessory: Button | Thumbnail) { this.builder.addTextDisplayComponents(t => t.setContent(text)); }
   public bind(page: Page) { this.page = page; this.accessory.bind(page); }
-  public async apply(container: ContainerBuilder, interaction?: Interaction) {
-    if (this.accessory instanceof Button) this.builder.setButtonAccessory(await this.accessory.compute(interaction));
-    else this.builder.setThumbnailAccessory(this.accessory.builder);
+  public async apply(container: ContainerBuilder, interaction: Interaction) {
+    await this.accessory.apply(this.builder, interaction);
     container.addSectionComponents(this.builder);
   }
 }
@@ -146,7 +159,7 @@ export class ActionRow {
   public page!: Page;
   constructor(public accessorys: Button[]) {}
   public bind(page: Page) { this.page = page; for (const a of this.accessorys) a.bind(page); }
-  public async apply(container: ContainerBuilder, interaction?: Interaction) {
+  public async apply(container: ContainerBuilder, interaction: Interaction) {
     this.builder.setComponents(await Promise.all(this.accessorys.map(a => a.compute(interaction))));
     container.addActionRowComponents([this.builder]);
   }
@@ -155,7 +168,7 @@ export class ActionRow {
 export class Window {
   public page!: Page;
   public bind(page: Page) { this.page = page; }
-  public async apply(container: ContainerBuilder, interaction?: Interaction) {
+  public async apply(container: ContainerBuilder, interaction: Interaction) {
     const elements = this.page.dynamicElements.slice(this.page.dynamicStartIndex, this.page.dynamicStartIndex + this.page.dynamicStartMax);
     for (const e of elements) await e.apply(container, interaction);
   }

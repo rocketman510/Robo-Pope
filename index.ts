@@ -68,7 +68,7 @@ client.once(Events.ClientReady, async readyClient => {
       if (message.content == '?test') {
         let test = new Page("test", client, true)
           .addStaticElement(new Section("Test", new UiButton(async () => {}, { label: async (i) => i?.user?.username ?? "No Username", style: ButtonStyle.Secondary }, null)))
-          .addStaticElement(new Section("test", new Thumbnail(new ThumbnailBuilder().setURL("https://images-ext-1.discordapp.net/external/-0-1pGDZj_iwVP8oHfOV2bhFdSl4GdM6Xmq4KiPWbno/https/static.wixstatic.com/media/16a265_38600247e9554deabc93de93300c667c~mv2.jpg/v1/fill/w_560%2Ch_459%2Cal_c%2Clg_1%2Cq_80/16a265_38600247e9554deabc93de93300c667c~mv2.jpg?format=webp"))))
+          .addStaticElement(new Section("test", new Thumbnail({ url: async () => "https://images-ext-1.discordapp.net/external/UvhGUq0bLrS6rpDzZT6rt7GQyrBNQKjhhzUu_QNPeNs/%3Fformat%3Dwebp/https/images-ext-1.discordapp.net/external/-0-1pGDZj_iwVP8oHfOV2bhFdSl4GdM6Xmq4KiPWbno/https/static.wixstatic.com/media/16a265_38600247e9554deabc93de93300c667c~mv2.jpg/v1/fill/w_560%252Ch_459%252Cal_c%252Clg_1%252Cq_80/16a265_38600247e9554deabc93de93300c667c~mv2.jpg?format=webp"})))
           .addStaticElement(new Window())
           .addDynamicElement(new TextDisplay("Test1"))
           .addDynamicElement(new TextDisplay("Test2"))
@@ -85,7 +85,7 @@ client.once(Events.ClientReady, async readyClient => {
           .addDynamicElement(new TextDisplay("Test13"))
           .addDynamicElement(new TextDisplay("Test14"))
           .addDynamicElement(new TextDisplay("Test15"))
-          .addDynamicElement(new TextDisplay("Test16"))
+          .addDynamicElement(new TextDisplay("Test16"));
 
         const next_button = new UiButton(
           async (i, d: Page) => {
