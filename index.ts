@@ -1,7 +1,7 @@
-import { Client, Events, GatewayIntentBits, Collection, MessageFlags, ContainerBuilder, flatten, TextDisplayBuilder, ButtonBuilder, ButtonStyle, ThumbnailBuilder } from "discord.js";
+import { Client, Events, GatewayIntentBits, Collection, MessageFlags, ContainerBuilder, flatten, TextDisplayBuilder, ButtonBuilder, ButtonStyle, ThumbnailBuilder, SeparatorSpacingSize } from "discord.js";
 import type { Command, Button, Modal, SelectionMenu } from "./deploy";
 import deploy, { deply_member_count } from "./deploy";
-import { error } from "node:console";
+import { error, trace } from "node:console";
 import { Browser } from 'puppeteer';
 import { handleLevel, handleReaction } from "./level";
 import type { Db } from "mongodb"
@@ -11,7 +11,7 @@ import { handel_bible_mention, handel_reaction_bible } from "./functions/mention
 import fs from "fs";
 import { get_welcome_banner } from "./functions/welcome_banner";
 import { handle_message, type ChatLogEntry } from "./functions/ai";
-import { Button as UiButton, Thumbnail, Page, Section, TextDisplay, ActionRow, Window  } from "./functions/ui_framework/ui.ts"
+import { Button as UiButton, Thumbnail, Page, Section, TextDisplay, ActionRow, Window, Separator  } from "./functions/ui_framework/ui.ts"
 
 declare module "discord.js" {
     export interface Client {
@@ -67,7 +67,7 @@ client.once(Events.ClientReady, async readyClient => {
 
       if (message.content == '?test') {
         let test = new Page("test", client, true)
-          .addStaticElement(new Section("Test", new UiButton(async () => {}, { label: async (i) => i?.user?.username ?? "No Username", style: ButtonStyle.Secondary }, null)))
+          .addStaticElement(new Section("Test", new UiButton(async () => {}, { label: async (p, i) => i?.user?.username ?? "No Username", style: ButtonStyle.Secondary }, null)))
           .addStaticElement(new Section("test", new Thumbnail({ url: async () => "https://images-ext-1.discordapp.net/external/UvhGUq0bLrS6rpDzZT6rt7GQyrBNQKjhhzUu_QNPeNs/%3Fformat%3Dwebp/https/images-ext-1.discordapp.net/external/-0-1pGDZj_iwVP8oHfOV2bhFdSl4GdM6Xmq4KiPWbno/https/static.wixstatic.com/media/16a265_38600247e9554deabc93de93300c667c~mv2.jpg/v1/fill/w_560%252Ch_459%252Cal_c%252Clg_1%252Cq_80/16a265_38600247e9554deabc93de93300c667c~mv2.jpg?format=webp"})))
           .addStaticElement(new Window())
           .addDynamicElement(new TextDisplay("Test1"))
@@ -78,6 +78,7 @@ client.once(Events.ClientReady, async readyClient => {
           .addDynamicElement(new TextDisplay("Test6"))
           .addDynamicElement(new TextDisplay("Test7"))
           .addDynamicElement(new TextDisplay("Test8"))
+          .addDynamicElement(new Separator(async () => true, async () => SeparatorSpacingSize.Large))
           .addDynamicElement(new TextDisplay("Test9"))
           .addDynamicElement(new TextDisplay("Test10"))
           .addDynamicElement(new TextDisplay("Test11"))
@@ -91,14 +92,14 @@ client.once(Events.ClientReady, async readyClient => {
           async (i, d: Page) => {
             await d.next(i)
           },
-          {style: ButtonStyle.Secondary, label: "next"},
+          {style: ButtonStyle.Secondary, label: "next", disabled: async (p) => p.dynamicStartIndex >= p.dynamicElements.length - p.dynamicStartMax},
           test
         )
         const previous_button = new UiButton(
           async (i, d: Page) => {
             await d.previous(i)
           },
-          {style: ButtonStyle.Secondary, label: "previous"},
+          {style: ButtonStyle.Secondary, label: "previous", disabled: async (p) => p.dynamicStartIndex == 0},
           test
         )
 
