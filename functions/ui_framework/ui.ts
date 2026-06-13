@@ -1,8 +1,8 @@
-import { ContainerBuilder, MessageFlags, TextDisplayBuilder, SectionBuilder, type MessageActionRowComponentBuilder, ButtonStyle, Client, SeparatorSpacingSize, SeparatorBuilder } from "discord.js";
+import { ContainerBuilder, MessageFlags, TextDisplayBuilder, SectionBuilder, type MessageActionRowComponentBuilder, ButtonStyle, Client, SeparatorSpacingSize, SeparatorBuilder, MediaGalleryBuilder } from "discord.js";
 import { ActionRowBuilder, ButtonBuilder, ThumbnailBuilder, type Interaction, type MessageReplyOptions } from "discord.js";
 import { createHash } from 'crypto';
 
-type Element = Section | ActionRow | TextDisplay | Window | Separator
+type Element = Section | ActionRow | TextDisplay | Window | Separator | MediaGallery
 type ButtonExecution = (interaction: Interaction, data: any) => Promise<void>;
 type DynamicProp<T> = T | ((page: Page, interaction?: Interaction) => Promise<T>);
 type DynamicButtonAttributes = {
@@ -13,6 +13,11 @@ type DynamicButtonAttributes = {
 };
 type DynamicThumbnailAttributes = {
   url: DynamicProp<string>,
+}
+type DynamicMediaGalleryAttributes = {
+  url: DynamicProp<string>,
+  description?: DynamicProp<string>,
+  spoiler?: DynamicProp<boolean>,
 }
 
 async function resolve_prop<T>(prop: DynamicProp<T>, page: Page, interaction?: Interaction): Promise<T> {
@@ -197,5 +202,24 @@ export class Separator {
   public async apply(container: ContainerBuilder, interaction?: Interaction) {
     this.builder.setDivider(await resolve_prop(this.divider, this.page, interaction)).setSpacing(await resolve_prop(this.spacing, this.page, interaction))
     container.addSeparatorComponents(this.builder)
+  }
+}
+
+export class MediaGallery {
+  public builder!: MediaGalleryBuilder;
+  public page!: Page;
+  constructor(public mediaGalleryItems: DynamicMediaGalleryAttributes[]) {}
+  public bind(page: Page) { this.page = page; }
+  public async apply(container: ContainerBuilder, interaction?: Interaction) {
+    this.builder = new MediaGalleryBuilder();
+    for (const media of this.mediaGalleryItems) {
+      const spoiler = await resolve_prop(media.spoiler, this.page, interaction);
+      const description = await resolve_prop(media.description, this.page, interaction);
+      const url = await resolve_prop(media.url, this.page, interaction);
+
+      this.builder.addItems((m) => {m.setURL(url); description ? m.setDescription(description) : null; spoiler ? m.setSpoiler(spoiler) : null; return m;})
+    }
+
+    container.addMediaGalleryComponents(this.builder)
   }
 }

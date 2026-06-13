@@ -11,7 +11,7 @@ import { handel_bible_mention, handel_reaction_bible } from "./functions/mention
 import fs from "fs";
 import { get_welcome_banner } from "./functions/welcome_banner";
 import { handle_message, type ChatLogEntry } from "./functions/ai";
-import { Button as UiButton, Thumbnail, Page, Section, TextDisplay, ActionRow, Window, Separator  } from "./functions/ui_framework/ui.ts"
+import { Button as UiButton, Thumbnail, Page, Section, TextDisplay, ActionRow, Window, Separator, MediaGallery  } from "./functions/ui_framework/ui.ts"
 
 declare module "discord.js" {
     export interface Client {
@@ -70,6 +70,7 @@ client.once(Events.ClientReady, async readyClient => {
           .addStaticElement(new Section("Test", new UiButton(async () => {}, { label: async (p, i) => i?.user?.username ?? "No Username", style: ButtonStyle.Secondary }, null)))
           .addStaticElement(new Section("test", new Thumbnail({ url: async () => "https://images-ext-1.discordapp.net/external/UvhGUq0bLrS6rpDzZT6rt7GQyrBNQKjhhzUu_QNPeNs/%3Fformat%3Dwebp/https/images-ext-1.discordapp.net/external/-0-1pGDZj_iwVP8oHfOV2bhFdSl4GdM6Xmq4KiPWbno/https/static.wixstatic.com/media/16a265_38600247e9554deabc93de93300c667c~mv2.jpg/v1/fill/w_560%252Ch_459%252Cal_c%252Clg_1%252Cq_80/16a265_38600247e9554deabc93de93300c667c~mv2.jpg?format=webp"})))
           .addStaticElement(new Window())
+          .addStaticElement(new MediaGallery([{url: "https://images-ext-1.discordapp.net/external/I0eDciGakh0_4XRqrmPsY0FsQsknas1CAz_L5kV4aTU/https/media.tenor.com/8pfnbPJLJ3gAAAPo/%25D9%2581%25D8%25B1%25D8%25A7%25D9%258A%25D8%25B2%25D9%258A-%25D9%2581%25D8%25B1%25D8%25A7%25D8%25B3.mp4"}]))
           .addDynamicElement(new TextDisplay("Test1"))
           .addDynamicElement(new TextDisplay("Test2"))
           .addDynamicElement(new TextDisplay("Test3"))
