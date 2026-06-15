@@ -1,4 +1,4 @@
-import { ContainerBuilder, MessageFlags, TextDisplayBuilder, SectionBuilder, type MessageActionRowComponentBuilder, ButtonStyle, Client, SeparatorSpacingSize, SeparatorBuilder, MediaGalleryBuilder } from "discord.js";
+import { ContainerBuilder, MessageFlags, TextDisplayBuilder, SectionBuilder, type MessageActionRowComponentBuilder, ButtonStyle, Client, SeparatorSpacingSize, SeparatorBuilder, MediaGalleryBuilder, type InteractionUpdateOptions } from "discord.js";
 import { ActionRowBuilder, ButtonBuilder, ThumbnailBuilder, type Interaction } from "discord.js";
 import { createHash } from 'crypto';
 
@@ -65,7 +65,7 @@ export class Page {
   }
 
   public async update(index: number, interaction: Interaction): Promise<Page> {
-    if (interaction?.isButton()) await interaction.update(await this.render(index, interaction));
+    if (interaction?.isButton()) await interaction.update(await this.render(index, interaction) as InteractionUpdateOptions);
     return this;
   }
 
