@@ -18,6 +18,6 @@ export default {
     if (!func) return;
     const data = page.data.get(hash);
 
-    await func(interaction, data);
+    await func(page, interaction, data);
   },
 } as Button;

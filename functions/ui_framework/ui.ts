@@ -3,8 +3,8 @@ import { ActionRowBuilder, ButtonBuilder, ThumbnailBuilder, type Interaction, ty
 import { createHash } from 'crypto';
 
 type Element = Section | ActionRow | TextDisplay | Window | Separator | MediaGallery
-type ButtonExecution = (interaction: Interaction, data: any) => Promise<void>;
-type DynamicProp<T> = T | ((page: Page, interaction?: Interaction) => Promise<T>);
+type ButtonExecution = (page: Page, interaction: Interaction, data: any) => Promise<void>;
+type DynamicProp<T> = T | ((page: Page, index: number, interaction?: Interaction) => Promise<T>);
 type DynamicButtonAttributes = {
   style: DynamicProp<ButtonStyle>,
   label?: DynamicProp<string>,
@@ -20,27 +20,34 @@ type DynamicMediaGalleryAttributes = {
   spoiler?: DynamicProp<boolean>,
 }
 
-async function resolve_prop<T>(prop: DynamicProp<T>, page: Page, interaction?: Interaction): Promise<T> {
-  return typeof prop === 'function' ? await (prop as Function)(page, interaction) : (prop as T);
+export enum ProgressBarSize {
+  Small,
+  Normal,
+  Medium,
+  Large,
+}
+
+async function resolve_prop<T>(prop: DynamicProp<T>, page: Page, index: number, interaction?: Interaction): Promise<T> {
+  return typeof prop === 'function' ? await (prop as Function)(page, index, interaction) : (prop as T);
 }
 
 export class Page {
   public customID: string;
   public isContainer: boolean;
-  public dynamicStartIndex: number;
   public dynamicStartMax: number;
+  public isEphemeral: boolean;
   readonly staticElements: Element[];
   readonly dynamicElements: Element[];
   readonly cache = new Map<string, ButtonExecution>;
   readonly data = new Map<string, any>;
 
-  constructor(custom_id: string, client: Client, is_container?: boolean, static_elements?: Element[], dynamic_elements?: Element[], dynamic_start_index?: number, dynamic_start_max?: number) {
+  constructor(custom_id: string, client: Client, is_container?: boolean, is_ephemeral?: boolean, static_elements?: Element[], dynamic_elements?: Element[], dynamic_start_max?: number) {
     client.pages.set(custom_id, this);
     this.customID = custom_id;
     this.isContainer = is_container ?? false;
+    this.isEphemeral = is_ephemeral ?? true;
     this.staticElements = static_elements ?? [];
     this.dynamicElements = dynamic_elements ?? [];
-    this.dynamicStartIndex = dynamic_start_index ?? 0;
     this.dynamicStartMax = dynamic_start_max ?? 5;
     for (const element of this.staticElements) element.bind(this);
     for (const element of this.dynamicElements) element.bind(this);
@@ -49,25 +56,29 @@ export class Page {
   public addStaticElement(element: Element): Page { element.bind(this); this.staticElements.push(element); return this; }
   public addDynamicElement(element: Element): Page { element.bind(this); this.dynamicElements.push(element); return this; }
 
-  public async next(interaction: Interaction): Promise<Page> {
-    if (this.dynamicStartIndex + this.dynamicStartMax < this.dynamicElements.length) this.dynamicStartIndex += this.dynamicStartMax;
-    if (interaction?.isButton()) await interaction.update(await this.render(undefined, interaction));
+  public async next(index: number): Promise<number> {
+    return index + this.dynamicStartMax;
+  }
+
+  public async previous(index: number): Promise<number> {
+    return index - this.dynamicStartMax
+  }
+
+  public async update(index: number, interaction: Interaction): Promise<Page> {
+    if (interaction?.isButton()) await interaction.update(await this.render(index, interaction));
     return this;
   }
 
-  public async previous(interaction: Interaction): Promise<Page> {
-    if (this.dynamicStartIndex - this.dynamicStartMax >= 0) this.dynamicStartIndex -= this.dynamicStartMax;
-    if (interaction?.isButton()) await interaction.update(await this.render(undefined, interaction));
-    return this;
-  }
-
-  public async render(dyn_index?: number, interaction?: Interaction): Promise<MessageReplyOptions> {
-    this.dynamicStartIndex = dyn_index ?? this.dynamicStartIndex ?? 0;
+  public async render(index: number, interaction?: Interaction): Promise<MessageReplyOptions> {
     const container = new ContainerBuilder();
-    for (const element of this.staticElements) await element.apply(container, interaction);
+    let flags = [];
+    flags.push(MessageFlags.IsComponentsV2);
+    if (this.isEphemeral) flags.push(MessageFlags.Ephemeral);
+
+    for (const element of this.staticElements) await element.apply(container, index, interaction);
     return { 
         components: this.isContainer ? [container] : container.components, 
-        flags: MessageFlags.IsComponentsV2 
+        flags,
     };
   }
 }
@@ -81,47 +92,41 @@ export class Page {
  *
  */
 export class Button {
-  public builder: ButtonBuilder;
   public execution: ButtonExecution;
   public page!: Page;
-  public data: any;
-  public dynAttributes: DynamicButtonAttributes | null;
+  public data: DynamicProp<any>;
+  public dynAttributes: DynamicButtonAttributes;
 
-  constructor(execution: ButtonExecution, builder: ButtonBuilder | DynamicButtonAttributes, data: any) {
+  constructor(execution: ButtonExecution, builder: DynamicButtonAttributes, data: DynamicProp<any>) {
     this.execution = execution;
     this.data = data;
-    if (builder instanceof ButtonBuilder) {
-      this.builder = builder;
-      this.dynAttributes = null;
-    } else {
-      this.builder = new ButtonBuilder();
-      this.dynAttributes = builder;
-    }
+    this.dynAttributes = builder;
   }
 
   public bind(page: Page): Button {
     this.page = page;
-    const hash = this.cache(this.data);
-    this.builder.setCustomId("ui-" + this.page.customID + "-" + hash);
     return this;
   }
 
-  public async compute(interaction?: Interaction): Promise<ButtonBuilder> {
-    if (this.dynAttributes) {
-      const builder = new ButtonBuilder();
-      if (this.builder.data.custom_id) builder.setCustomId(this.builder.data.custom_id);
-      const attrs = this.dynAttributes;
-      if (attrs.emoji) builder.setEmoji(await resolve_prop(attrs.emoji, this.page, interaction));
-      if (attrs.label) builder.setLabel(await resolve_prop(attrs.label, this.page, interaction));
-      if (attrs.disabled !== undefined) builder.setDisabled(await resolve_prop(attrs.disabled, this.page, interaction));
-      builder.setStyle(await resolve_prop(attrs.style, this.page, interaction));
-      return builder;
-    }
-    return this.builder;
+  public async compute(index: number, interaction?: Interaction): Promise<ButtonBuilder> {
+    const attributes = this.dynAttributes;
+    const builder = new ButtonBuilder();
+
+    if (!!attributes.label) builder.setLabel(await resolve_prop(attributes.label, this.page, index, interaction));
+    if (!!attributes.emoji) builder.setEmoji(await resolve_prop(attributes.emoji, this.page, index, interaction));
+    if (!!attributes.disabled) builder.setDisabled(await resolve_prop(attributes.disabled, this.page, index, interaction));
+    builder.setStyle(await resolve_prop(attributes.style, this.page, index, interaction))
+
+    const data = await resolve_prop(this.data, this.page, index, interaction);
+
+    const hash = this.cache(data)
+    builder.setCustomId("ui-" + this.page.customID + "-" + hash);
+
+    return builder;
   }
 
-  public async apply(container: SectionBuilder, interaction?: Interaction) {
-    container.setButtonAccessory(await this.compute(interaction));
+  public async apply(container: SectionBuilder, index: number, interaction?: Interaction) {
+    container.setButtonAccessory(await this.compute(index, interaction));
   }
 
   public cache(data: any): string {
@@ -142,8 +147,8 @@ export class Thumbnail {
     this.dynAttributes = builder instanceof ThumbnailBuilder ? null : builder;
   }
   public bind(page: Page) { this.page = page; }
-  public async apply(container: SectionBuilder, interaction?: Interaction) {
-    this.dynAttributes ? this.builder.setURL(await resolve_prop(this.dynAttributes.url, this.page, interaction)) : null;
+  public async apply(container: SectionBuilder, index: number, interaction?: Interaction) {
+    this.dynAttributes ? this.builder.setURL(await resolve_prop(this.dynAttributes.url, this.page, index, interaction)) : null;
     container.setThumbnailAccessory(this.builder);
   }
 }
@@ -158,18 +163,38 @@ export class Thumbnail {
 export class TextDisplay {
   public builder: TextDisplayBuilder;
   public page!: Page;
-  constructor(builder: TextDisplayBuilder | string) { this.builder = typeof builder === "string" ? new TextDisplayBuilder().setContent(builder) : builder; }
+  public dynAttributes!: { string: DynamicProp<string> };
+  constructor(builder: TextDisplayBuilder | DynamicProp<string>) {
+    if (builder instanceof TextDisplayBuilder) {
+      this.builder = builder;
+    } else {
+      this.dynAttributes = { string: builder };
+      this.builder = new TextDisplayBuilder();
+    }
+  }
   public bind(page: Page) { this.page = page; }
-  public async apply(container: ContainerBuilder | SectionBuilder, _interaction?: Interaction) { container.addTextDisplayComponents(this.builder); }
+  public async apply(container: ContainerBuilder | SectionBuilder, index: number, interaction?: Interaction) {
+    this.builder.setContent(await resolve_prop(this.dynAttributes.string, this.page, index, interaction));
+    container.addTextDisplayComponents(this.builder);
+  }
 }
 
 export class Section {
-  public builder: SectionBuilder = new SectionBuilder();
+  public builder!: SectionBuilder;
   public page!: Page;
-  constructor(text: string, public accessory: Button | Thumbnail) { this.builder.addTextDisplayComponents(t => t.setContent(text)); }
+  public dynAttributes!: { text_display: TextDisplay };
+  constructor(text: TextDisplay | DynamicProp<string>, public accessory: Button | Thumbnail) {
+    if (text instanceof TextDisplay) {
+      this.dynAttributes = { text_display: text }
+    } else {
+      this.dynAttributes = { text_display: new TextDisplay(text) }
+    }
+  }
   public bind(page: Page) { this.page = page; this.accessory.bind(page); }
-  public async apply(container: ContainerBuilder, interaction?: Interaction) {
-    await this.accessory.apply(this.builder, interaction);
+  public async apply(container: ContainerBuilder, index: number, interaction?: Interaction) {
+    this.builder = new SectionBuilder();
+    await this.dynAttributes.text_display.apply(this.builder, index, interaction);
+    await this.accessory.apply(this.builder, index, interaction);
     container.addSectionComponents(this.builder);
   }
 }
@@ -179,8 +204,8 @@ export class ActionRow {
   public page!: Page;
   constructor(public accessorys: Button[]) {}
   public bind(page: Page) { this.page = page; for (const a of this.accessorys) a.bind(page); }
-  public async apply(container: ContainerBuilder, interaction?: Interaction) {
-    this.builder.setComponents(await Promise.all(this.accessorys.map(a => a.compute(interaction))));
+  public async apply(container: ContainerBuilder, index: number, interaction?: Interaction) {
+    this.builder.setComponents(await Promise.all(this.accessorys.map(a => a.compute(index, interaction))));
     container.addActionRowComponents([this.builder]);
   }
 }
@@ -188,9 +213,9 @@ export class ActionRow {
 export class Window {
   public page!: Page;
   public bind(page: Page) { this.page = page; }
-  public async apply(container: ContainerBuilder, interaction?: Interaction) {
-    const elements = this.page.dynamicElements.slice(this.page.dynamicStartIndex, this.page.dynamicStartIndex + this.page.dynamicStartMax);
-    for (const e of elements) await e.apply(container, interaction);
+  public async apply(container: ContainerBuilder, index: number, interaction?: Interaction,) {
+    const elements = this.page.dynamicElements.slice(index, index + this.page.dynamicStartMax);
+    for (const e of elements) await e.apply(container, index, interaction);
   }
 }
 
@@ -199,8 +224,8 @@ export class Separator {
   public page!: Page;
   constructor(public divider: DynamicProp<boolean>, public spacing: DynamicProp<SeparatorSpacingSize>) {}
   public bind(page: Page) { this.page = page; }
-  public async apply(container: ContainerBuilder, interaction?: Interaction) {
-    this.builder.setDivider(await resolve_prop(this.divider, this.page, interaction)).setSpacing(await resolve_prop(this.spacing, this.page, interaction))
+  public async apply(container: ContainerBuilder, index: number, interaction?: Interaction) {
+    this.builder.setDivider(await resolve_prop(this.divider, this.page, index, interaction)).setSpacing(await resolve_prop(this.spacing, this.page, index, interaction))
     container.addSeparatorComponents(this.builder)
   }
 }
@@ -210,12 +235,12 @@ export class MediaGallery {
   public page!: Page;
   constructor(public mediaGalleryItems: DynamicMediaGalleryAttributes[]) {}
   public bind(page: Page) { this.page = page; }
-  public async apply(container: ContainerBuilder, interaction?: Interaction) {
+  public async apply(container: ContainerBuilder, index: number, interaction?: Interaction) {
     this.builder = new MediaGalleryBuilder();
     for (const media of this.mediaGalleryItems) {
-      const spoiler = await resolve_prop(media.spoiler, this.page, interaction);
-      const description = await resolve_prop(media.description, this.page, interaction);
-      const url = await resolve_prop(media.url, this.page, interaction);
+      const spoiler = await resolve_prop(media.spoiler, this.page, index, interaction);
+      const description = await resolve_prop(media.description, this.page, index, interaction);
+      const url = await resolve_prop(media.url, this.page, index, interaction);
 
       this.builder.addItems((m) => {m.setURL(url); description ? m.setDescription(description) : null; spoiler ? m.setSpoiler(spoiler) : null; return m;})
     }
@@ -223,3 +248,49 @@ export class MediaGallery {
     container.addMediaGalleryComponents(this.builder)
   }
 }
+
+export class ProgressBar {
+  public page!: Page;
+
+  constructor(public dynAttributes: { value: DynamicProp<number>, max: DynamicProp<number>, width?: DynamicProp<number>, size?: DynamicProp<ProgressBarSize> }) {}
+
+  public bind(page: Page) { this.page = page; }
+  public async apply(container: ContainerBuilder, index: number, interaction?: Interaction) {
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(await this.construct(index, interaction)));
+  }
+  public async construct(index: number, interaction?: Interaction): Promise<string> {
+    const max = await resolve_prop(this.dynAttributes.max, this.page, index, interaction);
+    const value = await resolve_prop(this.dynAttributes.value, this.page, index, interaction);
+    const width = await resolve_prop(this.dynAttributes.width ?? 15, this.page, index, interaction);
+    const size = await resolve_prop(this.dynAttributes.size ?? ProgressBarSize.Normal, this.page, index, interaction);
+    let buffer = (() => {
+      switch (size) {
+        case ProgressBarSize.Small:
+          return "-# "
+        case ProgressBarSize.Normal:
+          return ""
+        case ProgressBarSize.Medium:
+          return "## "
+        case ProgressBarSize.Large:
+          return "# "
+      }
+    })();
+
+    for (let i = 0; i < width; i++) {
+      const first = i == 0;
+      const last = i === width - 1
+
+      if (i / width >= value / max) {
+        if (first) buffer += "<:progress_bar_start_empty:1495868840339439836>";
+        else if (last) buffer += "<:progress_bar_end_empty:1495868823075688670>";
+        else buffer += "<:progress_bar_empty:1495868817648255107>";
+      } else {
+        if (first) buffer += "<:progress_bar_start_full:1495868845989040268>";
+        else if (last) buffer += "<:progress_bar_end_full:1495868834215755988>";
+        else buffer += "<:progress_bar_full:1495868805589504261>";
+      }
+    }
+
+    return buffer;
+  }
+} 
