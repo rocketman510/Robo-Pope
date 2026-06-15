@@ -62,57 +62,7 @@ client.once(Events.ClientReady, async readyClient => {
       await handleOwsMessage(message);
       await handleLevel(client, message);
       await handel_bible_mention(message);
-
-      // await handle_message(message);
-
-      if (message.content == '?test') {
-        let test = new Page("test", client, true, true)
-          .addStaticElement(new Section("Test", new UiButton(async (p,i,d) => {if (i.isRepliable()) i.reply(await p.render(0, i))}, { label: async (p, d, i) => i?.user?.username ?? "No Username", style: ButtonStyle.Secondary }, null)))
-          .addStaticElement(new Section("test", new Thumbnail({ url: async () => "https://images-ext-1.discordapp.net/external/UvhGUq0bLrS6rpDzZT6rt7GQyrBNQKjhhzUu_QNPeNs/%3Fformat%3Dwebp/https/images-ext-1.discordapp.net/external/-0-1pGDZj_iwVP8oHfOV2bhFdSl4GdM6Xmq4KiPWbno/https/static.wixstatic.com/media/16a265_38600247e9554deabc93de93300c667c~mv2.jpg/v1/fill/w_560%252Ch_459%252Cal_c%252Clg_1%252Cq_80/16a265_38600247e9554deabc93de93300c667c~mv2.jpg?format=webp"})))
-          .addStaticElement(new Window())
-          .addStaticElement(new MediaGallery([{url: "https://images-ext-1.discordapp.net/external/I0eDciGakh0_4XRqrmPsY0FsQsknas1CAz_L5kV4aTU/https/media.tenor.com/8pfnbPJLJ3gAAAPo/%25D9%2581%25D8%25B1%25D8%25A7%25D9%258A%25D8%25B2%25D9%258A-%25D9%2581%25D8%25B1%25D8%25A7%25D8%25B3.mp4"}]))
-          .addStaticElement(new ProgressBar({ value: async () => 10, max: 15, width: 11, size: ProgressBarSize.Small}))
-          .addDynamicElement(new TextDisplay("Test1"))
-          .addDynamicElement(new TextDisplay("Test2"))
-          .addDynamicElement(new TextDisplay("Test3"))
-          .addDynamicElement(new TextDisplay("Test4"))
-          .addDynamicElement(new TextDisplay("Test5"))
-          .addDynamicElement(new TextDisplay("Test6"))
-          .addDynamicElement(new TextDisplay("Test7"))
-          .addDynamicElement(new TextDisplay("Test8"))
-          .addDynamicElement(new Separator(async () => true, async () => SeparatorSpacingSize.Large))
-          .addDynamicElement(new TextDisplay("Test9"))
-          .addDynamicElement(new TextDisplay("Test10"))
-          .addDynamicElement(new TextDisplay("Test11"))
-          .addDynamicElement(new TextDisplay("Test12"))
-          .addDynamicElement(new TextDisplay("Test13"))
-          .addDynamicElement(new TextDisplay("Test14"))
-          .addDynamicElement(new TextDisplay("Test15"))
-          .addDynamicElement(new TextDisplay("Test16"))
-
-        const next_button = new UiButton(
-          async (p, i, d) => {
-            await (i as ButtonInteraction).update(await p.render(d, i));
-          },
-          {style: ButtonStyle.Secondary, label: "next", disabled: async (p, d, i) => (d ?? 0) >= p.dynamicElements.length - p.dynamicStartMax},
-          async (p, d) => {
-            return p.next(d)
-          }
-        )
-        const previous_button = new UiButton(
-          async (p, i, d) => {
-            await (i as ButtonInteraction).update(await p.render(d, i));
-          },
-          {style: ButtonStyle.Secondary, label: "previous", disabled: async (p, d, i) => d == 0},
-          async (p, d) => {
-            return p.previous(d)
-          }
-        )
-
-        test.addStaticElement(new ActionRow([previous_button, next_button]));
-
-        message.reply(await test.render(0))
-      }
+      await handle_message(message);
     });
 
     client.on(Events.MessageReactionAdd, async (reaction, user) => {
