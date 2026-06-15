@@ -139,16 +139,16 @@ export class Button {
 }
 
 export class Thumbnail {
-  public builder: ThumbnailBuilder;
+  public builder!: ThumbnailBuilder;
   public page!: Page;
-  public dynAttributes: DynamicThumbnailAttributes | null;
-  constructor(builder: ThumbnailBuilder | DynamicThumbnailAttributes ) {
-    this.builder = builder instanceof ThumbnailBuilder ? builder : new ThumbnailBuilder();
-    this.dynAttributes = builder instanceof ThumbnailBuilder ? null : builder;
+  public dynAttributes: DynamicThumbnailAttributes
+  constructor(builder: DynamicThumbnailAttributes ) {
+    this.dynAttributes = builder;
+    this.builder = new ThumbnailBuilder();
   }
   public bind(page: Page) { this.page = page; }
   public async apply(container: SectionBuilder, index: number, interaction?: Interaction) {
-    this.dynAttributes ? this.builder.setURL(await resolve_prop(this.dynAttributes.url, this.page, index, interaction)) : null;
+    this.builder.setURL(await resolve_prop(this.dynAttributes.url, this.page, index, interaction));
     container.setThumbnailAccessory(this.builder);
   }
 }
@@ -164,13 +164,9 @@ export class TextDisplay {
   public builder: TextDisplayBuilder;
   public page!: Page;
   public dynAttributes!: { string: DynamicProp<string> };
-  constructor(builder: TextDisplayBuilder | DynamicProp<string>) {
-    if (builder instanceof TextDisplayBuilder) {
-      this.builder = builder;
-    } else {
-      this.dynAttributes = { string: builder };
-      this.builder = new TextDisplayBuilder();
-    }
+  constructor(builder: DynamicProp<string>) {
+    this.dynAttributes = { string: builder };
+    this.builder = new TextDisplayBuilder();
   }
   public bind(page: Page) { this.page = page; }
   public async apply(container: ContainerBuilder | SectionBuilder, index: number, interaction?: Interaction) {
@@ -183,12 +179,8 @@ export class Section {
   public builder!: SectionBuilder;
   public page!: Page;
   public dynAttributes!: { text_display: TextDisplay };
-  constructor(text: TextDisplay | DynamicProp<string>, public accessory: Button | Thumbnail) {
-    if (text instanceof TextDisplay) {
-      this.dynAttributes = { text_display: text }
-    } else {
-      this.dynAttributes = { text_display: new TextDisplay(text) }
-    }
+  constructor(text: DynamicProp<string>, public accessory: Button | Thumbnail) {
+    this.dynAttributes = { text_display: new TextDisplay(text) }
   }
   public bind(page: Page) { this.page = page; this.accessory.bind(page); }
   public async apply(container: ContainerBuilder, index: number, interaction?: Interaction) {
