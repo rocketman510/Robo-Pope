@@ -1,5 +1,5 @@
 import { ContainerBuilder, MessageFlags, TextDisplayBuilder, SectionBuilder, type MessageActionRowComponentBuilder, ButtonStyle, Client, SeparatorSpacingSize, SeparatorBuilder, MediaGalleryBuilder } from "discord.js";
-import { ActionRowBuilder, ButtonBuilder, ThumbnailBuilder, type Interaction, type MessageReplyOptions } from "discord.js";
+import { ActionRowBuilder, ButtonBuilder, ThumbnailBuilder, type Interaction } from "discord.js";
 import { createHash } from 'crypto';
 
 type Element = Section | ActionRow | TextDisplay | Window | Separator | MediaGallery
@@ -69,7 +69,7 @@ export class Page {
     return this;
   }
 
-  public async render(index: number, interaction?: Interaction): Promise<MessageReplyOptions> {
+  public async render(index: number, interaction?: Interaction) {
     const container = new ContainerBuilder();
     let flags = [];
     flags.push(MessageFlags.IsComponentsV2);
