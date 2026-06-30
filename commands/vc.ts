@@ -45,7 +45,7 @@ export default {
     const private_button = new Button(
       async (p, i, d) => {
         const is_private = (await set_result(i, [{$set:{private:{$not:"$private"}}}]))?.private ?? false;
-        await i.update(await (is_private ? private_page:public_page).render(0, i));
+        await (is_private ? private_page:public_page).update(0, i);
       },
       { style: ButtonStyle.Secondary, disabled: false, label: async (_, __, i) => (await get_result(i!)).private ? "Private":"Public", emoji: async (_, __, i) => (await get_result(i!)).private ? "<:lock:1516602115022258186>":"<:unlock:1516602137050878094>" },
       null,
@@ -53,7 +53,7 @@ export default {
 
     const add_user = new Button(
       async (_, i) => {
-        await i.update(await vc_add_access_page.render(0, i))
+        await vc_add_access_page.update(0, i);
       },
       { style: ButtonStyle.Primary, label: "Add Access", emoji: "<:add_user:1518803305151598693>"},
       null,
@@ -63,7 +63,7 @@ export default {
       async (_, i) => {
         await set_result(i, { $addToSet: { "permitted.users_id": { $each: [...i.users.keys() ] }}})
         await set_syn_content(i, private_page);
-        await i.update(await private_page.render(0, i))
+        await private_page.update(0, i);
       },
       { type: SelectMenuType.User, min: 0, max: 25, placeholder: "Add User", options: [] },
       null
@@ -73,20 +73,20 @@ export default {
       async (_, i) => {
         await set_result(i, { $addToSet: { "permitted.roles_id": { $each: [...i.roles.keys() ] }}})
         await set_syn_content(i, private_page);
-        await i.update(await private_page.render(0, i))
+        await private_page.update(0, i);
       },
       { type: SelectMenuType.Role, min: 0, max: 25, placeholder: "Add Role", options: [] },
       null
     );
 
     const previous_button = new Button(
-      async (p, i, d) => {i.update(await p.render(d, i))},
+      async (p, i, d) => {await p.update(d, i);},
       { style: ButtonStyle.Secondary, emoji: "<:previous_button:1499160154828963940>", disabled: async (p, d, _) => (await p.previous(d)) < 0},
       async (p: Page, d: number) => p.previous(d),
     );
       
     const next_button = new Button(
-      async (p, i, d) => {i.update(await p.render(d, i))},
+      async (p, i, d) => {await p.update(d, i);},
       { style: ButtonStyle.Secondary, emoji: "<:next_button:1499159772258242600>", disabled: async (p, d, _) => (await p.next(d)) > p.dynamicElements.length},
       async (p: Page, d: number) => p.next(d),
     );
@@ -281,7 +281,7 @@ async function set_syn_content(interaction: Interaction, page: Page) {
     async (p, i, d) => {
       await set_result(i, { $pull: { "permitted.users_id": d }})
       await set_syn_content(i, p);
-      await i.update(await p.render(0, i));
+      await p.update(0, i);
     },
     { style: ButtonStyle.Danger, emoji: "<:remove_user:1518803296041566293>" },
     id
@@ -290,7 +290,7 @@ async function set_syn_content(interaction: Interaction, page: Page) {
     async (p, i, d) => {
       await set_result(i, { $pull: { "permitted.roles_id": d }})
       await set_syn_content(i, p);
-      await i.update(await p.render(0, i));
+      await p.update(0, i);
     },
     { style: ButtonStyle.Danger, emoji: "<:remove_user:1518803296041566293>" },
     id
