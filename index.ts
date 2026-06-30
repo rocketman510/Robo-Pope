@@ -115,7 +115,12 @@ client.once(Events.ClientReady, async readyClient => {
           modal.execute(interaction)
         } catch (err) {error(err)}
       } else if (interaction.isAnySelectMenu()) {
-        const selection_menu = client.selection_menus.get(interaction.customId)
+        let selection_menu: any = {};
+        if (/^\w.-+[\w-+/=]*$/.test(interaction.customId)) {
+          selection_menu = client.selection_menus.get(interaction.customId.slice(0,2))
+        } else {
+          selection_menu = client.selection_menus.get(interaction.customId)
+        }
         if (!selection_menu) return;
         try {
           selection_menu.execute(interaction)

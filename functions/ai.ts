@@ -151,7 +151,7 @@ export async function handle_message(message: Message) {
   
   register_message(message);
   const history_temp_buff = client.ai_message_buffer.ensure(message.guildId, () => []);
-  if (!message.author.bot) {
+  if (message.author.id != message.client.user.id) {
     update_memory(history_temp_buff, client.ai_memories, message.author.id, message.author.displayName).then((v) => console.log(v));
   }
 

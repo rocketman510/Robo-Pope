@@ -1,9 +1,15 @@
-import { ContainerBuilder, MessageFlags, TextDisplayBuilder, SectionBuilder, type MessageActionRowComponentBuilder, ButtonStyle, Client, SeparatorSpacingSize, SeparatorBuilder, MediaGalleryBuilder, type InteractionUpdateOptions } from "discord.js";
+import { ContainerBuilder, MessageFlags, TextDisplayBuilder, SectionBuilder, type MessageActionRowComponentBuilder, ButtonStyle, Client, SeparatorSpacingSize, SeparatorBuilder, MediaGalleryBuilder, type InteractionUpdateOptions, ButtonInteraction, StringSelectMenuBuilder, UserSelectMenuBuilder, ChannelSelectMenuBuilder, RoleSelectMenuBuilder, MentionableSelectMenuBuilder, StringSelectMenuOptionBuilder, StringSelectMenuInteraction, ChannelSelectMenuInteraction, UserSelectMenuInteraction, MentionableSelectMenuInteraction, RoleSelectMenuInteraction } from "discord.js";
 import { ActionRowBuilder, ButtonBuilder, ThumbnailBuilder, type Interaction } from "discord.js";
 import { createHash } from 'crypto';
 
+type SelectMenuInteraction = StringSelectMenuInteraction 
+  | UserSelectMenuInteraction 
+  | RoleSelectMenuInteraction 
+  | MentionableSelectMenuInteraction 
+  | ChannelSelectMenuInteraction;
 type Element = Section | ActionRow | TextDisplay | Window | Separator | MediaGallery
-type ButtonExecution = (page: Page, interaction: Interaction, data: any) => Promise<void>;
+type ButtonExecution = (page: Page, interaction: ButtonInteraction, data: any) => Promise<void>;
+type SelectMenuExecution = (page: Page, interaction: SelectMenuInteraction, data: any) => Promise<void>;
 type DynamicProp<T> = T | ((page: Page, index: number, interaction?: Interaction) => Promise<T>);
 type DynamicButtonAttributes = {
   style: DynamicProp<ButtonStyle>,
@@ -20,6 +26,28 @@ type DynamicMediaGalleryAttributes = {
   spoiler?: DynamicProp<boolean>,
 }
 
+type DynamicSelectMenuOptionAttributes = {
+  label: DynamicProp<string>,
+  value: DynamicProp<string>,
+  description?: DynamicProp<string>,
+  emoji?: DynamicProp<string>,
+  default?: DynamicProp<string>,
+};
+export enum SelectMenuType {
+  String,
+  User,
+  Role,
+  Mentionable,
+  Channel,
+}
+type DynamicSelectMenuAttributes = {
+  placeholder: DynamicProp<string>,
+  options: DynamicSelectMenuOptionAttributes[],
+  type: SelectMenuType,
+  min?: DynamicProp<number>,
+  max?: DynamicProp<number>,
+}
+
 export enum ProgressBarSize {
   Small,
   Normal,
@@ -30,6 +58,37 @@ export enum ProgressBarSize {
 async function resolve_prop<T>(prop: DynamicProp<T>, page: Page, index: number, interaction?: Interaction): Promise<T> {
   return typeof prop === 'function' ? await (prop as Function)(page, index, interaction) : (prop as T);
 }
+export async function resolve_deep_props(
+  obj: any,
+  page: Page,
+  index: number,
+  interaction?: any
+): Promise<any> {
+  if (obj === null || typeof obj !== 'object') {
+    return obj;
+  }
+
+  if (typeof obj === 'function') {
+    return await obj(page, index, interaction);
+  }
+
+  if (Array.isArray(obj)) {
+    return await Promise.all(
+      obj.map(item => resolve_deep_props(item, page, index, interaction))
+    );
+  }
+
+  const resolvedObj: Record<string, any> = {};
+  const keys = Object.keys(obj);
+  
+  await Promise.all(
+    keys.map(async (key) => {
+      resolvedObj[key] = await resolve_deep_props(obj[key], page, index, interaction);
+    })
+  );
+
+  return resolvedObj;
+}
 
 export class Page {
   public customID: string;
@@ -38,7 +97,7 @@ export class Page {
   public isEphemeral: boolean;
   readonly staticElements: Element[];
   readonly dynamicElements: Element[];
-  readonly cache = new Map<string, ButtonExecution>;
+  readonly cache = new Map<string, ButtonExecution | SelectMenuExecution>;
   readonly data = new Map<string, any>;
 
   constructor(custom_id: string, client: Client, is_container?: boolean, is_ephemeral?: boolean, static_elements?: Element[], dynamic_elements?: Element[], dynamic_start_max?: number) {
@@ -55,6 +114,8 @@ export class Page {
 
   public addStaticElement(element: Element): Page { element.bind(this); this.staticElements.push(element); return this; }
   public addDynamicElement(element: Element): Page { element.bind(this); this.dynamicElements.push(element); return this; }
+  public setStaticElement(elements: Element[]): Page { elements.forEach((e) => e.bind(this)); this.staticElements.length = 0; this.staticElements.push(...elements); return this; }
+  public setDynamicElement(elements: Element[]): Page { elements.forEach((e) => e.bind(this)); this.dynamicElements.length = 0; this.dynamicElements.push(...elements); return this; }
 
   public async next(index: number): Promise<number> {
     return index + this.dynamicStartMax;
@@ -153,6 +214,82 @@ export class Thumbnail {
   }
 }
 
+export class SelectMenu {
+  public execution: SelectMenuExecution;
+  public page!: Page;
+  public data: DynamicProp<any>;
+  public dynAttributes: DynamicSelectMenuAttributes;
+
+  constructor (execution: SelectMenuExecution, dyn_attributes: DynamicSelectMenuAttributes, data: DynamicProp<any>) {
+    this.execution = execution;
+    this.dynAttributes = dyn_attributes;
+    this.data = data;
+  }
+
+  public bind(page: Page): SelectMenu {
+    this.page = page;
+    return this;
+  }
+
+  async compute(index: number, interaction?: Interaction): Promise<SelectMenuInteraction> {
+    // 1. Turn all functions inside your dynamic object into real static values
+    const resolved = await resolve_deep_props(this.dynAttributes, this.page, index, interaction) as any;
+
+    // 2. Lookup Map to instantiate the correct Discord.js builder type based on your enum
+    const MenuConstructors = {
+      [SelectMenuType.String]: StringSelectMenuBuilder,
+      [SelectMenuType.User]: UserSelectMenuBuilder,
+      [SelectMenuType.Role]: RoleSelectMenuBuilder,
+      [SelectMenuType.Mentionable]: MentionableSelectMenuBuilder,
+      [SelectMenuType.Channel]: ChannelSelectMenuBuilder,
+    };
+
+    const Constructor = MenuConstructors[this.dynAttributes.type];
+    if (!Constructor) {
+      throw new Error(`Unsupported select menu type: ${this.dynAttributes.type}`);
+    }
+
+    const builder = new Constructor();
+
+    // 3. Set standard properties shared by all Select Menus
+    builder.setPlaceholder(resolved.placeholder);
+    if (resolved.min !== undefined) builder.setMinValues(resolved.min);
+    if (resolved.max !== undefined) builder.setMaxValues(resolved.max);
+
+    // 4. Generate the hashed custom ID to link back to your interaction gateway
+    const localData = await resolve_prop(this.data, this.page, index, interaction);
+    const hash = this.cache(localData);
+    builder.setCustomId("ui-" + this.page.customID + "-" + hash);
+
+    // 5. If it's a String Select Menu, it requires explicit layout options mapping
+    if (builder instanceof StringSelectMenuBuilder && resolved.options) {
+      const optionBuilders = resolved.options.map((opt: any) => {
+        const option = new StringSelectMenuOptionBuilder()
+          .setLabel(opt.label)
+          .setValue(opt.value);
+
+        if (opt.description) option.setDescription(opt.description);
+        if (opt.emoji) option.setEmoji(opt.emoji);
+        if (opt.default !== undefined) option.setDefault(Boolean(opt.default));
+        
+        return option;
+      });
+      
+      builder.addOptions(optionBuilders);
+    }
+
+    return builder;
+  }
+
+  cache(data: any): string {
+    const dataIdentifier = (data && typeof data === 'object' && 'customID' in data) ? data.customID : JSON.stringify(data);
+    const hash = createHash("sha256").update(dataIdentifier + this.execution.toString()).digest('base64url');
+    this.page.cache.set(hash, this.execution);
+    this.page.data.set(hash, data);
+    return hash;
+  }
+}
+
 
 
 /*
@@ -194,7 +331,7 @@ export class Section {
 export class ActionRow {
   public builder: ActionRowBuilder<MessageActionRowComponentBuilder> = new ActionRowBuilder();
   public page!: Page;
-  constructor(public accessorys: Button[]) {}
+  constructor(public accessorys: Button[] | SelectMenu[]) {}
   public bind(page: Page) { this.page = page; for (const a of this.accessorys) a.bind(page); }
   public async apply(container: ContainerBuilder, index: number, interaction?: Interaction) {
     this.builder.setComponents(await Promise.all(this.accessorys.map(a => a.compute(index, interaction))));

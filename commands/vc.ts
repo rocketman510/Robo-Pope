@@ -1,0 +1,300 @@
+import { SlashCommandBuilder, ChatInputCommandInteraction, type Interaction, ButtonStyle, UserSelectMenuInteraction, ModalBuilder, TextInputBuilder, TextInputStyle } from "discord.js";
+import type { Command } from "../deploy";
+import { ActionRow, Button, Page, Section, SelectMenu, SelectMenuType, TextDisplay, Window } from "../functions/ui_framework/ui";
+import type { Collection, Document } from "mongodb";
+import { render } from "../functions/chapter_picker";
+import { log } from "node:console";
+
+type VcSettings = {
+  _id: string,
+  private: boolean,
+  limit: number,
+  permitted: {
+    users_id: string[],
+    roles_id: string[],
+  }
+}
+
+export default {
+  data: new SlashCommandBuilder()
+    .setName('vc')
+    .setDescription('Configure a VC to make.'),
+  async execute(interaction: ChatInputCommandInteraction) {
+    const client = interaction.client;
+    const collection = client.db.collection<VcSettings>('vc_settings');
+
+    const default_document = {
+      _id: interaction.user.id,
+      private: false,
+      limit: 0,
+      permitted: {
+        users_id: [],
+        roles_id: [],
+      }
+    };
+
+    const result = await collection.findOneAndUpdate(
+      { _id: interaction.user.id },
+      { $setOnInsert: default_document },
+      { 
+        upsert: true,
+        returnDocument: 'after'
+      }
+    ) ?? default_document;
+
+    const private_button = new Button(
+      async (p, i, d) => {
+        const is_private = (await set_result(i, [{$set:{private:{$not:"$private"}}}]))?.private ?? false;
+        await i.update(await (is_private ? private_page:public_page).render(0, i));
+      },
+      { style: ButtonStyle.Secondary, disabled: false, label: async (_, __, i) => (await get_result(i!)).private ? "Private":"Public", emoji: async (_, __, i) => (await get_result(i!)).private ? "<:lock:1516602115022258186>":"<:unlock:1516602137050878094>" },
+      null,
+    );
+
+    const add_user = new Button(
+      async (_, i) => {
+        await i.update(await vc_add_access_page.render(0, i))
+      },
+      { style: ButtonStyle.Primary, label: "Add Access", emoji: "<:add_user:1518803305151598693>"},
+      null,
+    )
+
+    const user_selection_menu = new SelectMenu(
+      async (_, i) => {
+        await set_result(i, { $addToSet: { "permitted.users_id": { $each: [...i.users.keys() ] }}})
+        await set_syn_content(i, private_page);
+        await i.update(await private_page.render(0, i))
+      },
+      { type: SelectMenuType.User, min: 0, max: 25, placeholder: "Add User", options: [] },
+      null
+    );
+
+    const role_selection_menu = new SelectMenu(
+      async (_, i) => {
+        await set_result(i, { $addToSet: { "permitted.roles_id": { $each: [...i.roles.keys() ] }}})
+        await set_syn_content(i, private_page);
+        await i.update(await private_page.render(0, i))
+      },
+      { type: SelectMenuType.Role, min: 0, max: 25, placeholder: "Add Role", options: [] },
+      null
+    );
+
+    const previous_button = new Button(
+      async (p, i, d) => {i.update(await p.render(d, i))},
+      { style: ButtonStyle.Secondary, emoji: "<:previous_button:1499160154828963940>", disabled: async (p, d, _) => (await p.previous(d)) < 0},
+      async (p: Page, d: number) => p.previous(d),
+    );
+      
+    const next_button = new Button(
+      async (p, i, d) => {i.update(await p.render(d, i))},
+      { style: ButtonStyle.Secondary, emoji: "<:next_button:1499159772258242600>", disabled: async (p, d, _) => (await p.next(d)) > p.dynamicElements.length},
+      async (p: Page, d: number) => p.next(d),
+    );
+
+    const button_1 = new Button(
+      async (p, i, d: number) => {
+        await p.update(Math.min(d, 99), i)
+      },
+      { style: ButtonStyle.Secondary, label: "1" },
+      async (_: any, d: number, __: any): Promise<number> => {
+        return ((d ?? 0) * 10) + 1;
+      }
+    )
+    const button_2 = new Button(
+      async (p, i, d: number) => {
+        await p.update(Math.min(d, 99), i)
+      },
+      { style: ButtonStyle.Secondary, label: "2" },
+      async (_: any, d: number, __: any): Promise<number> => {
+        return ((d ?? 0) * 10) + 2;
+      }
+    )
+    const button_3 = new Button(
+      async (p, i, d: number) => {
+        await p.update(Math.min(d, 99), i)
+      },
+      { style: ButtonStyle.Secondary, label: "3" },
+      async (_: any, d: number, __: any): Promise<number> => {
+        return ((d ?? 0) * 10) + 3;
+      }
+    )
+    const button_4 = new Button(
+      async (p, i, d: number) => {
+        await p.update(Math.min(d, 99), i)
+      },
+      { style: ButtonStyle.Secondary, label: "4" },
+      async (_: any, d: number, __: any): Promise<number> => {
+        return ((d ?? 0) * 10) + 4;
+      }
+    )
+    const button_5 = new Button(
+      async (p, i, d: number) => {
+        await p.update(Math.min(d, 99), i)
+      },
+      { style: ButtonStyle.Secondary, label: "5" },
+      async (_: any, d: number, __: any): Promise<number> => {
+        return ((d ?? 0) * 10) + 5;
+      }
+    )
+    const button_6 = new Button(
+      async (p, i, d: number) => {
+        await p.update(Math.min(d, 99), i)
+      },
+      { style: ButtonStyle.Secondary, label: "6" },
+      async (_: any, d: number, __: any): Promise<number> => {
+        return ((d ?? 0) * 10) + 6;
+      }
+    )
+    const button_7 = new Button(
+      async (p, i, d: number) => {
+        await p.update(Math.min(d, 99), i)
+      },
+      { style: ButtonStyle.Secondary, label: "7" },
+      async (_: any, d: number, __: any): Promise<number> => {
+        return ((d ?? 0) * 10) + 7;
+      }
+    )
+    const button_8 = new Button(
+      async (p, i, d: number) => {
+        await p.update(Math.min(d, 99), i)
+      },
+      { style: ButtonStyle.Secondary, label: "8" },
+      async (_: any, d: number, __: any): Promise<number> => {
+        return ((d ?? 0) * 10) + 8;
+      }
+    )
+    const button_9 = new Button(
+      async (p, i, d: number) => {
+        await p.update(Math.min(d, 99), i)
+      },
+      { style: ButtonStyle.Secondary, label: "9" },
+      async (_: any, d: number, __: any): Promise<number> => {
+        return ((d ?? 0) * 10) + 9;
+      }
+    )
+    const button_0 = new Button(
+      async (p, i, d: number) => {
+        await p.update(Math.min(d, 99), i)
+      },
+      { style: ButtonStyle.Secondary, label: "0" },
+      async (_: any, d: number, __: any): Promise<number> => {
+        return ((d ?? 0) * 10) + 0;
+      }
+    )
+    const button_back_space = new Button(
+      async (p, i, d: {d: number}) => {
+        await p.update(Math.min(d.d, 99), i)
+      },
+      { style: ButtonStyle.Danger, emoji: "<:back_space:1520541439698665603>" },
+      async (_: any, d: number, __: any): Promise<{d: number}> => {
+        return {d: Math.floor((d ?? 0) / 10)};
+      }
+    )
+    const submit_button = new Button(
+      async (_p, i, d) => {
+        const settings = await set_result(i, { $set: { limit: d }});
+        const page = settings?.private ? private_page:public_page;
+        page.update(0, i);
+      },
+      { style: ButtonStyle.Success, emoji: "<:check_mark:1520519880279855144>"},
+      async (_: any, d: number, __: any) => {
+        return d;
+      }
+    )
+
+    const number_display = new TextDisplay(
+      async (_p, d, _i) => "# " + (d == 0 ? '∞':d.toString()) + "\n-# Max: 99"
+    );
+
+    // const set_limit_button = new Button(
+    //   (p, i, d) => {},
+    //   { style: ButtonStyle.Secondary, label: "Set Limit"},
+    //
+    // );
+
+    const vc_add_access_page = new Page("vc_add_access", client, true, true)
+      .addStaticElement(new TextDisplay("# Add User or Role:"))
+      .addStaticElement(new ActionRow([user_selection_menu]))
+      .addStaticElement(new ActionRow([role_selection_menu]));
+
+    const vc_input_number = new Page("vc_input_number", client, true, true)
+      .addStaticElement(number_display)
+      .addStaticElement(new ActionRow([button_1, button_2, button_3]))
+      .addStaticElement(new ActionRow([button_4, button_5, button_6]))
+      .addStaticElement(new ActionRow([button_7, button_8, button_9]))
+      .addStaticElement(new ActionRow([button_back_space, button_0, submit_button]));
+
+    const private_page = new Page("vc_priv", client, true, true, [], [], 5)
+      .addStaticElement(new TextDisplay("# VC Config Settings"))
+      .addStaticElement(new Section("### Private VC:", private_button))
+      .addStaticElement(new Section(async (_p,_d,i) => {return "### Limit: " + (await get_result(i!)).limit}, new Button(async (_p,i,_d) => {await vc_input_number.update(0, i);}, {style: ButtonStyle.Secondary, label: "Edit"}, null)))
+      .addStaticElement(new TextDisplay("### Allowed Access:"))
+      .addStaticElement(new Window())
+      .addStaticElement(new ActionRow([add_user, previous_button, next_button]));
+    await set_syn_content(interaction, private_page);
+
+    const public_page = new Page("vc_pub", client, true, true)
+      .addStaticElement(new TextDisplay("# VC Config Settings"))
+      .addStaticElement(new Section("### Private VC:", private_button))
+      .addStaticElement(new Section(async (_p,_d,i) => {return "### Limit: " + (await get_result(i!)).limit}, new Button(async (_p,i,_d) => {await vc_input_number.update(0, i);}, {style: ButtonStyle.Secondary, label: "Edit"}, null)));
+
+    await interaction.reply(await (result.private ? private_page:public_page).render(0, interaction))
+  },
+} as Command;
+
+async function get_result(interaction: Interaction) {
+  const collection = interaction.client.db.collection<VcSettings>('vc_settings');
+
+  const default_document = {
+    _id: interaction.user.id,
+    private: false,
+    limit: 0,
+    permitted: {
+      users_id: [],
+      roles_id: [],
+    }
+  };
+  
+  const result = await collection.findOneAndUpdate(
+    { _id: interaction.user.id },
+    { $setOnInsert: default_document },
+    { 
+      upsert: true,
+      returnDocument: 'after'
+    }
+  ) ?? default_document;
+
+  return result;
+}
+
+async function set_result(interaction: Interaction, obj: Document) {
+  const collection = interaction.client.db.collection<VcSettings>('vc_settings');
+
+  return await collection.findOneAndUpdate({ _id: interaction.user.id }, obj, { returnDocument: 'after' });
+}
+
+async function set_syn_content(interaction: Interaction, page: Page) {
+  const users = (await get_result(interaction)).permitted.users_id ?? [];
+  const roles = (await get_result(interaction)).permitted.roles_id ?? [];
+
+  const user_entry = users.map((id) => new Section(`<@${id}>`, new Button(
+    async (p, i, d) => {
+      await set_result(i, { $pull: { "permitted.users_id": d }})
+      await set_syn_content(i, p);
+      await i.update(await p.render(0, i));
+    },
+    { style: ButtonStyle.Danger, emoji: "<:remove_user:1518803296041566293>" },
+    id
+  )))
+  const roles_entry = roles.map((id) => new Section(`<@&${id}>`, new Button(
+    async (p, i, d) => {
+      await set_result(i, { $pull: { "permitted.roles_id": d }})
+      await set_syn_content(i, p);
+      await i.update(await p.render(0, i));
+    },
+    { style: ButtonStyle.Danger, emoji: "<:remove_user:1518803296041566293>" },
+    id
+  )))
+
+  page.setDynamicElement([...user_entry, ...roles_entry]);
+}
