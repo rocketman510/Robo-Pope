@@ -1,5 +1,6 @@
-import { ChannelType, Client, type VoiceState } from "discord.js";
+import { ChannelType, Client, Guild, OverwriteResolvable, PermissionFlagsBits, VoiceChannel, type VoiceState } from "discord.js";
 import { ensure } from "..";
+import { get_result, type VcSettings } from "../commands/vc";
 
 export async function handle_join(oldState: VoiceState, newState: VoiceState) {
   const dyn_id = JSON.parse(ensure(process.env.DYNAMIC_VOICE_CHANNELS, "No DYNAMIC_VOICE_CHANNELS ENV"));
@@ -34,4 +35,56 @@ function remove_from_array(guild_id:string, channel_id: string, client: Client) 
   let channels = client.dyn_vc.get(guild_id);
   channels = channels?.filter(e => e != channel_id);
   client.dyn_vc.set(guild_id, channels!)
+}
+
+export async function make_vc(guild: Guild, make_vc_id: string, user_id: string): Promise<VoiceChannel | null> {
+
+  const settings = await get_result(guild.client, user_id);
+  console.log(settings);
+  
+
+  const client = guild.client;
+  let channels = client.dyn_vc.ensure(guild.id, () => []);
+  const make_vc = await client.channels.fetch(make_vc_id);
+  if (!make_vc || !make_vc.isVoiceBased()) return null;
+
+  const maker_perms = {
+    id: user_id,
+    allow: [
+      PermissionFlagsBits.ViewChannel,
+      PermissionFlagsBits.Connect,
+      PermissionFlagsBits.Speak,
+      PermissionFlagsBits.MuteMembers,
+      PermissionFlagsBits.DeafenMembers,
+      PermissionFlagsBits.MoveMembers,
+      PermissionFlagsBits.ManageChannels,
+      PermissionFlagsBits.ManageRoles
+    ],
+  }
+
+  let permissions: OverwriteResolvable[] = [maker_perms];
+
+  for (const e of [...settings.permitted.users_id, ...settings.permitted.roles_id]) {
+    permissions.push({
+      id: e,
+      allow: [
+        PermissionFlagsBits.Connect
+      ],
+    })
+  }
+
+  if (settings.private) {
+    permissions.push({
+      id: guild.roles.everyone.id,
+      deny: [
+        PermissionFlagsBits.Connect,
+        // PermissionFlagsBits.ViewChannel
+      ]
+    })
+  }
+
+  const new_channel = await guild.channels.create({name: `VC: ${channels.length + 1}`, type: ChannelType.GuildVoice, parent: make_vc.parent, permissionOverwrites: permissions, userLimit: settings.limit});
+  add_to_array(guild.id, new_channel.id, client)
+
+  return new_channel;
 }

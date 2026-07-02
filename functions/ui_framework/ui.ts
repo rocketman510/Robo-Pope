@@ -51,6 +51,7 @@ type DynamicSelectMenuAttributes = {
 export enum ProgressBarSize {
   Small,
   Normal,
+  Moderate,
   Medium,
   Large,
 }
@@ -126,7 +127,7 @@ export class Page {
   }
 
   public async update(index: number, interaction: Interaction): Promise<Page> {
-    if (interaction?.isButton()) await interaction.update(await this.render(index, interaction) as InteractionUpdateOptions);
+     await interaction.update(await this.render(index, interaction) as InteractionUpdateOptions);
     return this;
   }
 
@@ -315,9 +316,9 @@ export class TextDisplay {
 export class Section {
   public builder!: SectionBuilder;
   public page!: Page;
-  public dynAttributes!: { text_display: TextDisplay };
-  constructor(text: DynamicProp<string>, public accessory: Button | Thumbnail) {
-    this.dynAttributes = { text_display: new TextDisplay(text) }
+  public dynAttributes!: { text_display: TextDisplay | ProgressBar };
+  constructor(text: DynamicProp<string> | ProgressBar, public accessory: Button | Thumbnail) {
+    this.dynAttributes = { text_display: text instanceof ProgressBar ? text:new TextDisplay(text) }
   }
   public bind(page: Page) { this.page = page; this.accessory.bind(page); }
   public async apply(container: ContainerBuilder, index: number, interaction?: Interaction) {
@@ -381,10 +382,10 @@ export class MediaGallery {
 export class ProgressBar {
   public page!: Page;
 
-  constructor(public dynAttributes: { value: DynamicProp<number>, max: DynamicProp<number>, width?: DynamicProp<number>, size?: DynamicProp<ProgressBarSize> }) {}
+  constructor(public dynAttributes: { value: DynamicProp<number>, max: DynamicProp<number>, width?: DynamicProp<number>, size?: DynamicProp<ProgressBarSize>, pretext?: DynamicProp<string>, postext?: DynamicProp<string>}) {}
 
   public bind(page: Page) { this.page = page; }
-  public async apply(container: ContainerBuilder, index: number, interaction?: Interaction) {
+  public async apply(container: ContainerBuilder | SectionBuilder, index: number, interaction?: Interaction) {
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent(await this.construct(index, interaction)));
   }
   public async construct(index: number, interaction?: Interaction): Promise<string> {
@@ -398,12 +399,16 @@ export class ProgressBar {
           return "-# "
         case ProgressBarSize.Normal:
           return ""
+        case ProgressBarSize.Moderate:
+          return "### "
         case ProgressBarSize.Medium:
           return "## "
         case ProgressBarSize.Large:
           return "# "
       }
     })();
+
+    buffer += await resolve_prop(this.dynAttributes.pretext ?? "", this.page, index, interaction);
 
     for (let i = 0; i < width; i++) {
       const first = i == 0;
@@ -419,6 +424,8 @@ export class ProgressBar {
         else buffer += "<:progress_bar_full:1495868805589504261>";
       }
     }
+
+    buffer += await resolve_prop(this.dynAttributes.postext ?? "", this.page, index, interaction);
 
     return buffer;
   }

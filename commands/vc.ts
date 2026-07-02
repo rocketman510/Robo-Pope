@@ -1,11 +1,10 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction, type Interaction, ButtonStyle, UserSelectMenuInteraction, ModalBuilder, TextInputBuilder, TextInputStyle } from "discord.js";
+import { SlashCommandBuilder, ChatInputCommandInteraction, type Interaction, ButtonStyle, Client } from "discord.js";
 import type { Command } from "../deploy";
-import { ActionRow, Button, Page, Section, SelectMenu, SelectMenuType, TextDisplay, Window } from "../functions/ui_framework/ui";
-import type { Collection, Document } from "mongodb";
-import { render } from "../functions/chapter_picker";
-import { log } from "node:console";
+import { ActionRow, Button, Page, ProgressBar, ProgressBarSize, Section, SelectMenu, SelectMenuType, TextDisplay, Window } from "../functions/ui_framework/ui";
+import type { Document } from "mongodb";
+import { make_vc } from "../functions/dyn_voice_channel";
 
-type VcSettings = {
+export type VcSettings = {
   _id: string,
   private: boolean,
   limit: number,
@@ -47,7 +46,7 @@ export default {
         const is_private = (await set_result(i, [{$set:{private:{$not:"$private"}}}]))?.private ?? false;
         await (is_private ? private_page:public_page).update(0, i);
       },
-      { style: ButtonStyle.Secondary, disabled: false, label: async (_, __, i) => (await get_result(i!)).private ? "Private":"Public", emoji: async (_, __, i) => (await get_result(i!)).private ? "<:lock:1516602115022258186>":"<:unlock:1516602137050878094>" },
+      { style: ButtonStyle.Secondary, disabled: false, label: async (_, __, i) => (await get_result(i!, i!.user.id)).private ? "Private":"Public", emoji: async (_, __, i) => (await get_result(i!)).private ? "<:lock:1516602115022258186>":"<:unlock:1516602137050878094>" },
       null,
     );
 
@@ -206,6 +205,26 @@ export default {
       async (_p, d, _i) => "# " + (d == 0 ? '∞':d.toString()) + "\n-# Max: 99"
     );
 
+    const limit_progress_bar = new ProgressBar({ value: async (_,__,i) => (await get_result(i!, i!.user.id)).limit, max: 99, width: 5, size: ProgressBarSize.Moderate, pretext: async (_,__,i) => {const limit = (await get_result(i!, i!.user.id)).limit; return "Limit: " + (limit == 0 ? '∞': limit) + " "}})
+
+    const make_vc_button = new Button(
+      async (_,i,__) => {
+        if (!i.guild) return;
+        const channels = await i.guild.channels.fetch();
+        if (!channels) return;
+
+        const ids = JSON.parse(process.env.DYNAMIC_VOICE_CHANNELS ?? "[]");
+        const valid_ids = ids.filter((id: string) => channels.has(id));
+
+        if (valid_ids.length === 0) return
+
+        await make_vc(i.guild!, valid_ids[0], i.user.id)
+        await i.deferUpdate();
+      },
+      { style: ButtonStyle.Success, label: "Make VC" },
+      null,
+    )
+
     // const set_limit_button = new Button(
     //   (p, i, d) => {},
     //   { style: ButtonStyle.Secondary, label: "Set Limit"},
@@ -227,26 +246,29 @@ export default {
     const private_page = new Page("vc_priv", client, true, true, [], [], 5)
       .addStaticElement(new TextDisplay("# VC Config Settings"))
       .addStaticElement(new Section("### Private VC:", private_button))
-      .addStaticElement(new Section(async (_p,_d,i) => {return "### Limit: " + (await get_result(i!)).limit}, new Button(async (_p,i,_d) => {await vc_input_number.update(0, i);}, {style: ButtonStyle.Secondary, label: "Edit"}, null)))
+      .addStaticElement(new Section(limit_progress_bar, new Button(async (_p,i,_d) => {await vc_input_number.update(0, i);}, {style: ButtonStyle.Secondary, label: "Edit"}, null)))
       .addStaticElement(new TextDisplay("### Allowed Access:"))
       .addStaticElement(new Window())
-      .addStaticElement(new ActionRow([add_user, previous_button, next_button]));
+      .addStaticElement(new ActionRow([add_user, previous_button, next_button]))
+      .addStaticElement(new ActionRow([make_vc_button]));
+
     await set_syn_content(interaction, private_page);
 
     const public_page = new Page("vc_pub", client, true, true)
       .addStaticElement(new TextDisplay("# VC Config Settings"))
-      .addStaticElement(new Section("### Private VC:", private_button))
-      .addStaticElement(new Section(async (_p,_d,i) => {return "### Limit: " + (await get_result(i!)).limit}, new Button(async (_p,i,_d) => {await vc_input_number.update(0, i);}, {style: ButtonStyle.Secondary, label: "Edit"}, null)));
+      .addStaticElement(new Section("### Public VC:", private_button))
+      .addStaticElement(new Section(limit_progress_bar, new Button(async (_p,i,_d) => {await vc_input_number.update(0, i);}, {style: ButtonStyle.Secondary, label: "Edit"}, null)))
+      .addStaticElement(new ActionRow([make_vc_button]));
 
     await interaction.reply(await (result.private ? private_page:public_page).render(0, interaction))
   },
 } as Command;
 
-async function get_result(interaction: Interaction) {
-  const collection = interaction.client.db.collection<VcSettings>('vc_settings');
+export async function get_result(interaction: Interaction | Client, user_id: string) {
+  const collection = (interaction instanceof Client ? interaction:interaction.client).db.collection<VcSettings>('vc_settings');
 
   const default_document = {
-    _id: interaction.user.id,
+    _id: user_id,
     private: false,
     limit: 0,
     permitted: {
@@ -256,7 +278,7 @@ async function get_result(interaction: Interaction) {
   };
   
   const result = await collection.findOneAndUpdate(
-    { _id: interaction.user.id },
+    { _id: user_id },
     { $setOnInsert: default_document },
     { 
       upsert: true,
@@ -274,8 +296,8 @@ async function set_result(interaction: Interaction, obj: Document) {
 }
 
 async function set_syn_content(interaction: Interaction, page: Page) {
-  const users = (await get_result(interaction)).permitted.users_id ?? [];
-  const roles = (await get_result(interaction)).permitted.roles_id ?? [];
+  const users = (await get_result(interaction, interaction.user.id)).permitted.users_id ?? [];
+  const roles = (await get_result(interaction, interaction.user.id)).permitted.roles_id ?? [];
 
   const user_entry = users.map((id) => new Section(`<@${id}>`, new Button(
     async (p, i, d) => {
