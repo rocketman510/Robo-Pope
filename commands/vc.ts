@@ -46,7 +46,7 @@ export default {
         const is_private = (await set_result(i, [{$set:{private:{$not:"$private"}}}]))?.private ?? false;
         await (is_private ? private_page:public_page).update(0, i);
       },
-      { style: ButtonStyle.Secondary, disabled: false, label: async (_, __, i) => (await get_result(i!, i!.user.id)).private ? "Private":"Public", emoji: async (_, __, i) => (await get_result(i!)).private ? "<:lock:1516602115022258186>":"<:unlock:1516602137050878094>" },
+      { style: ButtonStyle.Secondary, disabled: false, label: async (_, __, i) => (await get_result(i!, i!.user.id)).private ? "Private":"Public", emoji: async (_, __, i) => (await get_result(i!, i!.user.id)).private ? "<:lock:1516602115022258186>":"<:unlock:1516602137050878094>" },
       null,
     );
 
