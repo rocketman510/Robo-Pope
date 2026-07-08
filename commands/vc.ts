@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction, type Interaction, ButtonStyle, Client } from "discord.js";
+import { SlashCommandBuilder, ChatInputCommandInteraction, type Interaction, ButtonStyle, Client, TextDisplayBuilder } from "discord.js";
 import type { Command } from "../deploy";
 import { ActionRow, Button, Page, ProgressBar, ProgressBarSize, Section, SelectMenu, SelectMenuType, TextDisplay, Window } from "../functions/ui_framework/ui";
 import type { Document } from "mongodb";
@@ -218,8 +218,10 @@ export default {
 
         if (valid_ids.length === 0) return
 
-        await make_vc(i.guild!, valid_ids[0], i.user.id)
-        await i.deferUpdate();
+        const vc = await make_vc(i.guild!, valid_ids[0], i.user.id);
+        if (!vc) return;
+        const invite: string = (await vc.createInvite({ maxAge: 36000, maxUses: 1, unique: true})).url
+        await i.update({ components: [new TextDisplayBuilder({content: invite})]})
       },
       { style: ButtonStyle.Success, label: "Make VC" },
       null,

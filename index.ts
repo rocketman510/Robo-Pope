@@ -6,7 +6,7 @@ import { Browser } from 'puppeteer';
 import { handleLevel, handleReaction } from "./level";
 import type { Db } from "mongodb"
 import { handleOwsMessage } from "./functions/one_word_story";
-import { handle_join } from "./functions/dyn_voice_channel";
+import { DynamicVC, handle_join } from "./functions/dyn_voice_channel";
 import { handel_bible_mention, handel_reaction_bible } from "./functions/mentions_bible";
 import fs from "fs";
 import { get_welcome_banner } from "./functions/welcome_banner";
@@ -27,7 +27,7 @@ declare module "discord.js" {
         db: Db;
         ows_last_bot_message: Collection<string, string>;
         ows_sentence_history: Collection<string, string[]>;
-        dyn_vc: Collection<string, string[]>;
+        dyn_vc: Collection<string, DynamicVC>;
         interaction_queue: Collection<string, number>;
         highlight_color: Collection<string, number>;
         ai_message_buffer: Collection<string, ChatLogEntry[]>;

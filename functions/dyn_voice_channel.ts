@@ -1,90 +1,101 @@
-import { ChannelType, Client, Guild, OverwriteResolvable, PermissionFlagsBits, VoiceChannel, type VoiceState } from "discord.js";
+import { ChannelType, Client, Guild, GuildMember, OverwriteResolvable, PermissionFlagsBits, User, VoiceChannel, type VoiceState } from "discord.js";
 import { ensure } from "..";
 import { get_result, type VcSettings } from "../commands/vc";
 
+
+
+export class DynamicVC {
+  public settings: VcSettings;
+  public channel!: VoiceChannel;
+  public made: Date;
+  public async slef_delete() {
+    const diff = 60000 - (new Date().getTime() - this.made.getTime());
+    if (diff < 0) {this.remove(); return;}
+    await new Promise(r => setTimeout(r, diff));
+    this.remove();
+  }
+  public async construct(): Promise<VoiceChannel | null> {
+    const client = this.guild.client;
+    const candidates = JSON.parse(process.env.DYNAMIC_VOICE_CHANNELS ?? "[]").filter(async (id: string)=> (await this.guild.channels.fetch()).has(id))
+    if (!candidates?.length) return null;
+    const parent_vc = await client.channels.fetch(candidates[0])
+    if (!parent_vc?.isVoiceBased()) return null;
+
+    const maker_perms = {
+      id: this.owner.user.id,
+      allow: [
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.Connect,
+        PermissionFlagsBits.Speak,
+        PermissionFlagsBits.MuteMembers,
+        PermissionFlagsBits.DeafenMembers,
+        PermissionFlagsBits.MoveMembers,
+        PermissionFlagsBits.ManageChannels,
+        PermissionFlagsBits.ManageRoles
+      ],
+    }
+
+    let permissions: OverwriteResolvable[] = [maker_perms];
+
+    for (const e of [...this.settings.permitted.users_id, ...this.settings.permitted.roles_id]) {
+      permissions.push({
+        id: e,
+        allow: [
+          PermissionFlagsBits.Connect
+        ],
+      })
+    }
+
+    if (this.settings.private) {
+      permissions.push({
+        id: this.guild.roles.everyone.id,
+        deny: [
+          PermissionFlagsBits.Connect,
+          // PermissionFlagsBits.ViewChannel
+        ]
+      })
+    }
+
+    const new_channel = await this.guild.channels.create({name: `${this.owner.displayName}'s VC`, type: ChannelType.GuildVoice, parent: parent_vc.parent, permissionOverwrites: permissions, userLimit: this.settings.limit});
+    this.channel = new_channel;
+    this.guild.client.dyn_vc.set(this.channel.id, this);
+    this.slef_delete();
+    return new_channel;
+  }
+  public async remove() {
+    await this.channel.delete();
+    this.guild.client.dyn_vc.delete(this.channel.id);
+  }
+  constructor(private guild: Guild, public owner: GuildMember, settings?: VcSettings) {
+    const default_document = {
+      _id: this.owner.user.id,
+      private: false,
+      limit: 0,
+      permitted: {
+        users_id: [],
+        roles_id: [],
+      }
+    };
+    this.settings = settings ?? default_document;
+    this.made = new Date()
+  }
+}
+
 export async function handle_join(oldState: VoiceState, newState: VoiceState) {
-  const dyn_id = JSON.parse(ensure(process.env.DYNAMIC_VOICE_CHANNELS, "No DYNAMIC_VOICE_CHANNELS ENV"));
   const client = newState.client;
-
-  let channels = client.dyn_vc.ensure(newState.guild.id, () => []);
-
-  if (oldState.channelId === newState.channelId) return;
-
-  if (oldState.channelId && channels.includes(oldState.channelId) && oldState.channel?.members.size == 0) {// Removes the channel if all users leave
-    await oldState.channel.delete();
-    remove_from_array(oldState.guild.id, oldState.channelId, client);
+  if (JSON.parse(process.env.DYNAMIC_VOICE_CHANNELS ?? "[]").includes(newState.channel?.id) && !!newState.member) {// Make new VC on join to make channle
+    const vc = new DynamicVC(newState.guild, newState.member)
+    await vc.construct();
+    await vc.owner.voice.setChannel(vc.channel);
   }
-
-  channels = client.dyn_vc.ensure(oldState.guild.id, () => []);
-
-  if (newState.channelId && dyn_id.includes(newState.channelId)) {// Make's new Channle and moves the user to it
-    const new_channel = await newState.guild.channels.create({name: `VC: ${channels.length + 1}`, type: ChannelType.GuildVoice, parent: newState.channel?.parent});
-    newState.member?.voice.setChannel(new_channel);
-
-    add_to_array(newState.guild.id, new_channel.id, client)
+  if (client.dyn_vc.has(oldState.channel?.id ?? "") && oldState.channel?.members.size === 0) {//Removes when empty
+    client.dyn_vc.get(oldState.channel.id)?.remove()
   }
-}
-
-function add_to_array(guild_id:string, channel_id: string, client: Client) {
-  let channels = client.dyn_vc.get(guild_id);
-  channels!.push(channel_id)
-  client.dyn_vc.set(guild_id, channels!)
-}
-
-function remove_from_array(guild_id:string, channel_id: string, client: Client) {
-  let channels = client.dyn_vc.get(guild_id);
-  channels = channels?.filter(e => e != channel_id);
-  client.dyn_vc.set(guild_id, channels!)
 }
 
 export async function make_vc(guild: Guild, make_vc_id: string, user_id: string): Promise<VoiceChannel | null> {
-
-  const settings = await get_result(guild.client, user_id);
-  console.log(settings);
-  
-
-  const client = guild.client;
-  let channels = client.dyn_vc.ensure(guild.id, () => []);
-  const make_vc = await client.channels.fetch(make_vc_id);
-  if (!make_vc || !make_vc.isVoiceBased()) return null;
-
-  const maker_perms = {
-    id: user_id,
-    allow: [
-      PermissionFlagsBits.ViewChannel,
-      PermissionFlagsBits.Connect,
-      PermissionFlagsBits.Speak,
-      PermissionFlagsBits.MuteMembers,
-      PermissionFlagsBits.DeafenMembers,
-      PermissionFlagsBits.MoveMembers,
-      PermissionFlagsBits.ManageChannels,
-      PermissionFlagsBits.ManageRoles
-    ],
-  }
-
-  let permissions: OverwriteResolvable[] = [maker_perms];
-
-  for (const e of [...settings.permitted.users_id, ...settings.permitted.roles_id]) {
-    permissions.push({
-      id: e,
-      allow: [
-        PermissionFlagsBits.Connect
-      ],
-    })
-  }
-
-  if (settings.private) {
-    permissions.push({
-      id: guild.roles.everyone.id,
-      deny: [
-        PermissionFlagsBits.Connect,
-        // PermissionFlagsBits.ViewChannel
-      ]
-    })
-  }
-
-  const new_channel = await guild.channels.create({name: `VC: ${channels.length + 1}`, type: ChannelType.GuildVoice, parent: make_vc.parent, permissionOverwrites: permissions, userLimit: settings.limit});
-  add_to_array(guild.id, new_channel.id, client)
-
-  return new_channel;
+  const member = await guild.members.fetch(user_id);
+  if (!member) return null;
+  const vc = new DynamicVC(guild, member, await get_result(guild.client, user_id))
+  return await vc.construct();
 }
