@@ -10,8 +10,10 @@ export class DynamicVC {
   public made: Date;
   public async slef_delete() {
     const diff = 60000 - (new Date().getTime() - this.made.getTime());
+    if (this.channel.members.size !== 0) return;
     if (diff < 0) {this.remove(); return;}
     await new Promise(r => setTimeout(r, diff));
+    if (this.channel.members.size !== 0) return;
     this.remove();
   }
   public async construct(): Promise<VoiceChannel | null> {
@@ -63,8 +65,10 @@ export class DynamicVC {
     return new_channel;
   }
   public async remove() {
-    await this.channel.delete();
-    this.guild.client.dyn_vc.delete(this.channel.id);
+    try {
+      await this.channel.delete();
+      this.guild.client.dyn_vc.delete(this.channel.id);
+    } catch (errr) {}
   }
   constructor(private guild: Guild, public owner: GuildMember, settings?: VcSettings) {
     const default_document = {
