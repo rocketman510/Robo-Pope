@@ -15,7 +15,8 @@ type DynamicButtonAttributes = {
   style: DynamicProp<ButtonStyle>,
   label?: DynamicProp<string>,
   emoji?: DynamicProp<string>,
-  disabled?: DynamicProp<boolean>
+  disabled?: DynamicProp<boolean>,
+  link?: DynamicProp<string>
 };
 type DynamicThumbnailAttributes = {
   url: DynamicProp<string>,
@@ -96,12 +97,13 @@ export class Page {
   public isContainer: boolean;
   public dynamicStartMax: number;
   public isEphemeral: boolean;
+  public globalData: any;
   readonly staticElements: Element[];
   readonly dynamicElements: Element[];
   readonly cache = new Map<string, ButtonExecution | SelectMenuExecution>;
   readonly data = new Map<string, any>;
 
-  constructor(custom_id: string, client: Client, is_container?: boolean, is_ephemeral?: boolean, static_elements?: Element[], dynamic_elements?: Element[], dynamic_start_max?: number) {
+  constructor(custom_id: string, client: Client, is_container?: boolean, is_ephemeral?: boolean, static_elements?: Element[], dynamic_elements?: Element[], dynamic_start_max?: number, public prerender?: (page: Page, index: number, interaction?: Interaction) => Promise<any>) {
     client.pages.set(custom_id, this);
     this.customID = custom_id;
     this.isContainer = is_container ?? false;
@@ -117,6 +119,10 @@ export class Page {
   public addDynamicElement(element: Element): Page { element.bind(this); this.dynamicElements.push(element); return this; }
   public setStaticElement(elements: Element[]): Page { elements.forEach((e) => e.bind(this)); this.staticElements.length = 0; this.staticElements.push(...elements); return this; }
   public setDynamicElement(elements: Element[]): Page { elements.forEach((e) => e.bind(this)); this.dynamicElements.length = 0; this.dynamicElements.push(...elements); return this; }
+  public setPreRenderFunc(func: (page: Page, index: number, interaction?: Interaction) => Promise<any>): Page { this.prerender = func; return this; }
+  public setIsContainer(is: boolean): Page { this.isContainer = is; return this; }
+  public setIsEphemeral(is: boolean): Page { this.isEphemeral = is; return this; }
+  public setWindowMax(max: number): Page { this.dynamicStartMax = max; return this; }
 
   public async next(index: number): Promise<number> {
     return index + this.dynamicStartMax;
@@ -127,11 +133,12 @@ export class Page {
   }
 
   public async update(index: number, interaction: Interaction): Promise<Page> {
-     await interaction.update(await this.render(index, interaction) as InteractionUpdateOptions);
+    await interaction.update(await this.render(index, interaction) as InteractionUpdateOptions);
     return this;
   }
 
   public async render(index: number, interaction?: Interaction) {
+    if (!!this.prerender) await this.prerender(this, index, interaction);
     const container = new ContainerBuilder();
     let flags = [];
     flags.push(MessageFlags.IsComponentsV2);
@@ -177,6 +184,7 @@ export class Button {
     if (!!attributes.label) builder.setLabel(await resolve_prop(attributes.label, this.page, index, interaction));
     if (!!attributes.emoji) builder.setEmoji(await resolve_prop(attributes.emoji, this.page, index, interaction));
     if (!!attributes.disabled) builder.setDisabled(await resolve_prop(attributes.disabled, this.page, index, interaction));
+    if (!!attributes.link) builder.setURL(await resolve_prop(attributes.link, this.page, index, interaction));
     builder.setStyle(await resolve_prop(attributes.style, this.page, index, interaction))
 
     const data = await resolve_prop(this.data, this.page, index, interaction);
