@@ -306,6 +306,7 @@ export default {
         const vc_settings = await get_result(interaction || client, i?.user.id ?? interaction.user.id);
         page.globalData = vc_settings;
       })
+      .addStaticElement(new TextDisplay("# VC Settings"))
       .addStaticElement(new Section("### Privacy:\n-# Control who can join your voice channel.", toggle_privacy_button))
       .addStaticElement(new Section("### Default:\n-# The default when makeing a VC via join making.", toggle_default_button));
 
