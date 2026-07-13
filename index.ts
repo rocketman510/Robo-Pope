@@ -62,7 +62,7 @@ client.once(Events.ClientReady, async readyClient => {
       await handleOwsMessage(message);
       await handleLevel(client, message);
       await handel_bible_mention(message);
-      await handle_message(message);
+      // await handle_message(message);
     });
 
     client.on(Events.MessageReactionAdd, async (reaction, user) => {
