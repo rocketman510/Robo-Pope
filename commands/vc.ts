@@ -3,11 +3,13 @@ import type { Command } from "../deploy";
 import { ActionRow, Button, Page, ProgressBar, ProgressBarSize, Section, SelectMenu, SelectMenuType, TextDisplay, Window } from "../functions/ui_framework/ui";
 import type { Document } from "mongodb";
 import { make_vc } from "../functions/dyn_voice_channel";
+import { render } from "../functions/chapter_picker";
 
 export type VcSettings = {
   _id: string,
   private: boolean,
   limit: number,
+  default: boolean,
   permitted: {
     users_id: string[],
     roles_id: string[],
@@ -271,6 +273,31 @@ export default {
     const client = interaction.client;
     const db = client.db.collection<VcSettings>("vc_settings");
 
+    const toggle_privacy_button = new Button(
+      async (p, i, d: number) => {
+        await set_result(i, { $set: { private: !p.globalData.private}});
+        await p.update(d, i);
+      },
+      { 
+        style: ButtonStyle.Secondary,
+        emoji: async (p, _index, _i) => {return (p.globalData as VcSettings).private ? "<:lock:1516602115022258186>":"<:unlock:1516602137050878094>"},
+        label: async (p, _index, _i) => {return (p.globalData as VcSettings).private ? "Private":"Public"}
+      },
+      async (_: any, index: number, __: any) => {return index},
+    );
+
+    const toggle_default_button = new Button(
+      async (p, i, d: number) => {
+        await set_result(i, { $set: { default: !p.globalData.default } });
+        await p.update(d, i);
+      },
+      {
+        style: async (p, _, __) => { return (p.globalData as VcSettings).default ? ButtonStyle.Primary:ButtonStyle.Secondary },
+        emoji: async (p, _, __) => { return (p.globalData as VcSettings).default ? "<:check_mark:1520519880279855144>":"<:x_mark:1520519887506772119>" },
+      },
+      async (_:any, index: number, __:any) => {return index},
+    )
+
     const private_page = new Page("vc_priv", client)
       .setIsEphemeral(true)
       .setIsContainer(true)
@@ -279,6 +306,10 @@ export default {
         const vc_settings = await get_result(interaction || client, i?.user.id ?? interaction.user.id);
         page.globalData = vc_settings;
       })
+      .addStaticElement(new Section("### Privacy:\n-# Control who can join your voice channel.", toggle_privacy_button))
+      .addStaticElement(new Section("### Default:\n-# The default when makeing a VC via join making.", toggle_default_button));
+
+    interaction.reply(await private_page.render(0, interaction));
   }
 } as Command;
 
@@ -289,6 +320,7 @@ export async function get_result(interaction: Interaction | Client, user_id: str
     _id: user_id,
     private: false,
     limit: 0,
+    default: false,
     permitted: {
       users_id: [],
       roles_id: [],
