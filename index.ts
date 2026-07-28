@@ -144,3 +144,5 @@ async function sendErr(client: Client, error: string) {
 
 
 client.login(process.env.DISCORD_TOKEN);
+
+export default client;
