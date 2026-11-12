@@ -4,3 +4,7 @@ version = "0.0.1"
 edition = "2024"
 
 [dependencies]
+anyhow = "1.0.104"
+dotenv = "0.15.0"
+serenity = { git = "https://github.com/serenity-rs/serenity", branch = "next" }
+tokio = { version = "1.54.1", features = ["full"] }
