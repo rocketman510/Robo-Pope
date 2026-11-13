@@ -8,10 +8,13 @@ pub use submission::{ModalSubmission,SubmittedValue};
 
 use std::future::Future;
 use std::sync::Arc;
+use anyhow::Context as _;
+use serenity::builder::{CreateInputText, CreateLabel, CreateModalComponent};
+use serenity::all::InputTextStyle as SerenityInputTextStyle;
+use crate::app::store::{derive_custom_id, DefinitionKind, StoreRecord};
 use serde::{Serialize,de::DeserializeOwned};
 use crate::app::{App,Ctx,Result};
 use crate::page::execution::Execution;
-use crate::page::render::RenderedMessage;
 use crate::page::value::IntoValue;
 
 /// Mutable builder for a Discord Modal form.
@@ -37,7 +40,7 @@ pub struct RegisteredModal<T> {
 pub struct ModalRender {
     pub(crate) custom_id:String,
     pub(crate) title:String,
-    pub(crate) components:Vec<serenity::all::CreateActionRow<'static>>,
+    pub(crate) components:Vec<CreateModalComponent<'static>>,
 }
 
 impl<T> Modal<T> {
@@ -214,6 +217,85 @@ where T:Serialize+DeserializeOwned+Send+Sync+'static
 {
     /// Serializes the supplied Modal data and prepares the Modal interaction response.
     pub async fn render(&self,app:&App,data:T)->Result<ModalRender> {
-        todo!("persist original Modal data and prepare Discord Modal response")
+        let serialized_data = serde_json::to_vec(&data)
+            .with_context(|| format!("Serializing data for Modal '{}'", self.definition.id))?;
+        let custom_id = derive_custom_id(
+            &self.definition.id,
+            &self.definition.submit.id,
+            &serialized_data,
+            None,
+        ).with_context(|| format!("Deriving custom ID for Modal '{}'", self.definition.id))?;
+
+        app.store().insert(StoreRecord {
+            custom_id: custom_id.0.clone(),
+            definition_kind: DefinitionKind::Modal,
+            definition_id: self.definition.id.clone(),
+            execution_id: self.definition.submit.id.clone(),
+            serialized_data: serialized_data.clone(),
+            frame_identity: None,
+            pagination_state: None,
+            schema_version: 1,
+        }).await.with_context(|| format!(
+            "Persisting submit execution for Modal '{}'",
+            self.definition.id
+        ))?;
+
+        let ctx = app.render_context(self.definition.id.clone());
+        let data = Arc::new(data);
+        let mut components = Vec::with_capacity(self.definition.inputs.len());
+
+        for input in &self.definition.inputs {
+            match input {
+                ModalInput::Text(input) => {
+                    let label = super::value::resolve(&input.label, ctx.clone(), data.clone())
+                        .await.with_context(|| format!(
+                            "Resolving label for Modal '{}' input '{}'",
+                            self.definition.id, input.id
+                        ))?;
+                    anyhow::ensure!(
+                        label.chars().count() <= crate::page::limits::MODAL_LABEL_MAX_CHARS,
+                        "Modal '{}' input '{}' label exceeds {} characters",
+                        self.definition.id,
+                        input.id,
+                        crate::page::limits::MODAL_LABEL_MAX_CHARS
+                    );
+
+                    let style = match input.style {
+                        TextInputStyle::Short => SerenityInputTextStyle::Short,
+                        TextInputStyle::Paragraph => SerenityInputTextStyle::Paragraph,
+                    };
+                    let mut text_input = CreateInputText::new(style, input.id.clone())
+                        .required(input.required);
+                    if let Some(placeholder) = &input.placeholder {
+                        let placeholder = super::value::resolve(
+                            placeholder, ctx.clone(), data.clone()
+                        ).await.with_context(|| format!(
+                            "Resolving placeholder for Modal '{}' input '{}'",
+                            self.definition.id, input.id
+                        ))?;
+                        text_input = text_input.placeholder(placeholder);
+                    }
+                    if let Some(min_length) = input.min_length {
+                        text_input = text_input.min_length(min_length);
+                    }
+                    if let Some(max_length) = input.max_length {
+                        text_input = text_input.max_length(max_length);
+                    }
+                    components.push(CreateModalComponent::Label(
+                        CreateLabel::input_text(label, text_input).into_owned()
+                    ));
+                }
+                _ => anyhow::bail!(
+                    "Rendering this input type is not implemented for Modal '{}' yet",
+                    self.definition.id
+                ),
+            }
+        }
+
+        Ok(ModalRender {
+            custom_id: custom_id.0,
+            title: self.definition.title.clone(),
+            components,
+        })
     }
 }
