@@ -4,6 +4,36 @@ use crate::app::store::derive_custom_id;
 use crate::page::{Container, Element, Frame, Page};
 use super::support::{app, component_interaction, TestData};
 
+fn find_button<'a>(value: &'a serde_json::Value, label: &str) -> Option<&'a serde_json::Value> {
+    match value {
+        serde_json::Value::Object(map) => {
+            if map.get("label").and_then(serde_json::Value::as_str) == Some(label) {
+                return Some(value);
+            }
+            map.values().find_map(|child| find_button(child, label))
+        }
+        serde_json::Value::Array(items) => items.iter().find_map(|child| find_button(child, label)),
+        _ => None,
+    }
+}
+
+fn assert_container_child_limits(value: &serde_json::Value) {
+    match value {
+        serde_json::Value::Object(map) => {
+            if map.get("type").and_then(serde_json::Value::as_u64) == Some(17) {
+                let children = map.get("components").and_then(serde_json::Value::as_array)
+                    .expect("Container must serialize its direct children");
+                assert!(children.len() <= 10, "Container direct-child limit exceeded");
+            }
+            for child in map.values() { assert_container_child_limits(child); }
+        }
+        serde_json::Value::Array(items) => {
+            for child in items { assert_container_child_limits(child); }
+        }
+        _ => {}
+    }
+}
+
 #[tokio::test]
 async fn paginated_frame_renders_framework_previous_and_next_controls() {
     // FIRST: pagination is framework-managed; controls are visible on each page.
@@ -14,13 +44,31 @@ async fn paginated_frame_renders_framework_previous_and_next_controls() {
         }).paginate()).register(&app).unwrap();
     let rendered = page.render_pages(&app, TestData::default()).await.unwrap();
     assert_eq!(rendered.pages.len(), 2);
-    for message in rendered.pages {
+    for (index, message) in rendered.pages.into_iter().enumerate() {
         let (components, _, state) = message.into_parts();
         let json = serde_json::to_value(components).unwrap();
-        assert!(json.to_string().contains("Previous"));
-        assert!(json.to_string().contains("Next"));
+        let previous = find_button(&json, "Previous").expect("Previous control must exist");
+        let next = find_button(&json, "Next").expect("Next control must exist");
+        assert_eq!(previous["disabled"].as_bool(), Some(index == 0));
+        assert_eq!(next["disabled"].as_bool(), Some(index == 1));
         assert!(state.is_some());
     }
+}
+
+#[tokio::test]
+async fn a_single_page_frame_has_no_navigation_controls() {
+    // FIRST: controls exist only when there is another page to navigate to.
+    let app = app();
+    let page = Page::<TestData>::new("pagination-single-page")
+        .add_frame(Frame::<TestData>::new("small", |_ctx, _data| async move {
+            Ok(vec![Element::text("One").keyed("one"), Element::text("Two").keyed("two")])
+        }).paginate()).register(&app).unwrap();
+    let rendered = page.render_pages(&app, TestData::default()).await.unwrap();
+    assert_eq!(rendered.pages.len(), 1);
+    let (components, _, _) = rendered.pages.into_iter().next().unwrap().into_parts();
+    let json = serde_json::to_value(components).unwrap();
+    assert!(find_button(&json, "Previous").is_none());
+    assert!(find_button(&json, "Next").is_none());
 }
 
 #[tokio::test]
@@ -82,6 +130,7 @@ async fn nested_paginated_frame_splits_inside_its_container_and_repeats_static_c
         let json = serde_json::to_value(components).unwrap();
         assert!(json.to_string().contains("Container header"));
         assert!(json.to_string().contains("Container footer"));
+        assert_container_child_limits(&json);
     }
 }
 
