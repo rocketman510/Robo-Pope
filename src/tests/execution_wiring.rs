@@ -45,18 +45,14 @@ async fn component_dispatch_restores_page_data_and_invokes_the_registered_callba
     assert!(called.load(Ordering::SeqCst));
 }
 
-fn registered_modal(app: &crate::app::App) -> crate::page::RegisteredModal<TestData> {
-    Modal::<TestData>::new("execution-modal").set_title("Submit")
-        .add_text_input("name", "Name", TextInputStyle::Short)
-        .on_submit(|_ctx, _data, _submission: ModalSubmission| async move { Ok(()) })
-        .register(app).unwrap()
-}
-
 #[test]
 fn modal_registration_indexes_its_submit_callback() {
     // FIRST: Modal registration inserts its submit closure into ExecutionRegistry.
     let app = app();
-    let _modal = registered_modal(&app);
+    let _modal = Modal::<TestData>::new("execution-modal").set_title("Submit")
+        .add_text_input("name", "Name", TextInputStyle::Short)
+        .on_submit(|_ctx, _data, _submission: ModalSubmission| async move { Ok(()) })
+        .register(&app).unwrap();
     assert!(app.executions.contains(&ExecutionKey {
         definition_id: "execution-modal".into(), execution_id: "submit".into(),
     }));
