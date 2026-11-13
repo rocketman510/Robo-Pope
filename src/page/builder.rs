@@ -117,6 +117,72 @@ fn validate_component_ids<T>(
     Ok(())
 }
 
+fn register_component_executions<T>(
+    component: &Component<T>,
+    app: &App,
+    definition_id: &str,
+    frame_identity: Option<&str>,
+) -> anyhow::Result<()>
+where
+    T: Serialize + DeserializeOwned + Send + Sync + 'static,
+{
+    use super::component::{ContainerItem, SectionAccessory};
+    match component {
+        Component::Button(button) => button.execution.register(app, definition_id, frame_identity)?,
+        Component::ButtonRow(row) => {
+            for button in [
+                row.slots.0.as_ref(), row.slots.1.as_ref(), row.slots.2.as_ref(),
+                row.slots.3.as_ref(), row.slots.4.as_ref(),
+            ].into_iter().flatten() {
+                button.execution.register(app, definition_id, frame_identity)?;
+            }
+        }
+        Component::Section(section) => {
+            if let Some(SectionAccessory::Button(button)) = &section.accessory {
+                button.execution.register(app, definition_id, frame_identity)?;
+            }
+        }
+        Component::Select(menu) => match menu {
+            SelectMenu::String(menu) => menu.execution.register(app, definition_id, frame_identity)?,
+            SelectMenu::User(menu) => menu.execution.register(app, definition_id, frame_identity)?,
+            SelectMenu::Role(menu) => menu.execution.register(app, definition_id, frame_identity)?,
+            SelectMenu::Mentionable(menu) => menu.execution.register(app, definition_id, frame_identity)?,
+            SelectMenu::Channel(menu) => menu.execution.register(app, definition_id, frame_identity)?,
+        },
+        Component::Container(container) => {
+            for child in &container.children {
+                if let ContainerItem::Component(component) = child {
+                    register_component_executions(component, app, definition_id, frame_identity)?;
+                }
+            }
+        }
+        Component::Text(_) | Component::Separator(_) | Component::MediaGallery(_)
+        | Component::File(_) | Component::LinkButton(_) => {}
+    }
+    Ok(())
+}
+
+fn contains_interactive_component<T>(component: &Component<T>) -> bool {
+    use super::component::{ContainerItem, SectionAccessory};
+    match component {
+        Component::Button(_) | Component::ButtonRow(_) | Component::Select(_) => true,
+        Component::Section(section) => matches!(&section.accessory, Some(SectionAccessory::Button(_))),
+        Component::Container(container) => container.children.iter().any(|child| match child {
+            ContainerItem::Component(component) => contains_interactive_component(component),
+            ContainerItem::Frame(_) => false,
+        }),
+        Component::Text(_) | Component::Separator(_) | Component::MediaGallery(_)
+        | Component::File(_) | Component::LinkButton(_) => false,
+    }
+}
+
+fn append_frame_identity(parent: Option<&str>, frame_id: &str, key: &str) -> String {
+    match parent {
+        Some(parent) => format!("{parent}:{frame_id}:{key}"),
+        None => format!("{frame_id}:{key}"),
+    }
+}
+
 impl<T> Page<T> {
     /// Starts a Page definition with a globally unique application-wide ID.
     pub fn new(id: impl Into<String>) -> Self {
@@ -193,12 +259,26 @@ impl<T> Page<T> {
                 }
             }
         }
+        app.reserve_definition_id(&self.id)?;
+        for item in &self.items {
+            if let PageItem::Component(component) = item {
+                if let Err(error) = register_component_executions(component, app, &self.id, None) {
+                    app.executions.remove_definition(&self.id);
+                    app.release_definition_id(&self.id);
+                    return Err(error);
+                }
+            }
+        }
         let definition = Arc::new(PageDefinition {
             id: self.id,
             items: self.items,
             paginate: self.paginate,
         });
-        app.pages.insert(definition.clone())?;
+        if let Err(error) = app.pages.insert(definition.clone()) {
+            app.executions.remove_definition(&definition.id);
+            app.release_definition_id(&definition.id);
+            return Err(error);
+        }
         Ok(RegisteredPage { definition })
     }
 }
@@ -555,16 +635,15 @@ where
                 let elements = (frame.resolver)(ctx.clone(), data.clone()).await
                     .with_context(|| format!("Resolving Frame '{}' inside Container", frame.id))?;
                 for element in elements {
-                    let key = element.key.as_deref().map(|key| format!("{}:{key}", frame.id));
-                    let needs_key = matches!(
-                        &element.component,
-                        C::Button(_) | C::ButtonRow(_) | C::Select(_)
-                    );
+                    let key = element.key.as_deref()
+                        .map(|key| append_frame_identity(frame_identity, &frame.id, key));
+                    let needs_key = contains_interactive_component(&element.component);
                     anyhow::ensure!(
                         !needs_key || key.is_some(),
                         "Interactive element in Container Frame '{}' requires a stable developer key",
                         frame.id
                     );
+                    register_component_executions(&element.component, app, definition_id, key.as_deref())?;
                     append_component(
                         &element.component, key.as_deref(), &mut children, &mut budget,
                         app, ctx, data, serialized_data, definition_id,
@@ -884,16 +963,15 @@ where
     let mut rendered = Vec::new();
     let mut budget = ComponentBudget::default();
     for element in elements {
-        let frame_identity = element.key.as_deref().map(|key| format!("{frame_id}:{key}"));
-        let has_execution = matches!(
-            &element.component,
-            Component::Button(_) | Component::ButtonRow(_) | Component::Select(_)
-        );
+        let frame_identity = element.key.as_deref()
+            .map(|key| append_frame_identity(None, frame_id, key));
+        let has_execution = contains_interactive_component(&element.component);
         anyhow::ensure!(
             !has_execution || frame_identity.is_some(),
             "Interactive Frame element in Frame '{frame_id}' requires a stable developer key"
         );
         let frame_identity = frame_identity.as_deref();
+        register_component_executions(&element.component, app, definition_id, frame_identity)?;
         let (mut parts, element_budget) = render_component(
             &element.component, app, ctx, data, serialized_data, definition_id, frame_identity,
         ).await?;

@@ -201,13 +201,23 @@ impl<T> Modal<T> {
             anyhow::ensure!(input_ids.insert(id.clone()), "Duplicate Modal input ID: {id}");
         }
         let submit = self.submit.ok_or_else(|| anyhow::anyhow!("Modal requires an on_submit callback"))?;
+        app.reserve_definition_id(&self.id)?;
+        if let Err(error) = submit.register(app, &self.id, None) {
+            app.executions.remove_definition(&self.id);
+            app.release_definition_id(&self.id);
+            return Err(error);
+        }
         let definition = Arc::new(ModalDefinition {
             id: self.id,
             title: self.title,
             inputs: self.inputs,
             submit,
         });
-        app.modals.insert(definition.clone())?;
+        if let Err(error) = app.modals.insert(definition.clone()) {
+            app.executions.remove_definition(&definition.id);
+            app.release_definition_id(&definition.id);
+            return Err(error);
+        }
         Ok(RegisteredModal { definition })
     }
 }

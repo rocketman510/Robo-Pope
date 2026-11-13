@@ -13,6 +13,13 @@ use crate::app::executions::{ExecutionKey, InteractionPayload};
 use crate::app::store::CustomId;
 use crate::app::{App, Ctx};
 use crate::page::{ModalSubmission, Selection};
+fn routed_execution_id(frame_identity: Option<&str>, execution_id: &str) -> String {
+    match frame_identity {
+        Some(identity) => format!("{identity}::{execution_id}"),
+        None => execution_id.to_owned(),
+    }
+}
+
 
 #[derive(Clone, Default)]
 /// Resolves Discord interaction IDs to the Page or Modal execution they name.
@@ -53,7 +60,7 @@ impl InteractionRouter {
 
         let key = ExecutionKey {
             definition_id: record.definition_id.clone(),
-            execution_id: record.execution_id.clone(),
+            execution_id: routed_execution_id(record.frame_identity.as_deref(), &record.execution_id),
         };
         let callback = app.executions.get(&key).ok_or_else(|| {
             anyhow::anyhow!(
