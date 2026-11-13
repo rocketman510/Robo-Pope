@@ -6,6 +6,7 @@ pub mod handler;
 pub mod registry;
 pub mod router;
 pub mod store;
+pub mod executions;
 
 use std::future::Future;
 use std::pin::Pin;
@@ -14,6 +15,7 @@ use serenity::all::Http;
 use registry::{ModalRegistry, PageRegistry};
 use router::InteractionRouter;
 use store::Store;
+use executions::ExecutionRegistry;
 
 pub use anyhow::{Context, Error, Result};
 pub use context::{Ctx, RenderCtx};
@@ -35,6 +37,8 @@ pub struct App {
     pub modals: ModalRegistry,
     pub(crate) http: Arc<Http>,
     pub(crate) router: InteractionRouter,
+    /// Process-local type-erased execution callbacks (never persisted).
+    pub(crate) executions: ExecutionRegistry,
 }
 impl Clone for App {
     fn clone(&self) -> Self {
@@ -44,6 +48,7 @@ impl Clone for App {
             modals: self.modals.clone(),
             http: self.http.clone(),
             router: self.router.clone(),
+            executions: self.executions.clone(),
         }
     }
 }
@@ -56,6 +61,7 @@ impl App {
             modals: ModalRegistry::default(),
             http,
             router: InteractionRouter::default(),
+            executions: ExecutionRegistry::default(),
         }
     }
     /// Routes an incoming Discord interaction to its registered execution.
