@@ -154,3 +154,14 @@ pub fn plan<T>(
     };
     Ok(PaginationPlan { pages, state })
 }
+
+/// Complete request decoded from a framework-generated pagination control.
+#[derive(Debug, Clone)]
+pub struct PaginationRequest {
+    pub custom_id: crate::app::store::CustomId,
+    pub expected_state: serde_json::Value,
+    pub frame_id: String,
+    pub source_page_index: usize,
+    pub target_page_index: usize,
+    pub page_count: usize,
+}

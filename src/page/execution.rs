@@ -6,6 +6,7 @@ use serde::de::DeserializeOwned;
 use crate::app::{App, BoxFuture, Ctx};
 use crate::app::executions::{ErasedCallback, ExecutionKey, InteractionPayload};
 use crate::page::ModalSubmission;
+use crate::page::frame::pagination::PaginationRequest;
 
 pub struct Execution<T, I = ()> {
     /// Stable ID within the containing Page or Modal definition.
@@ -51,6 +52,14 @@ impl FromInteractionPayload for Vec<SelectedChannel> {
 impl FromInteractionPayload for ModalSubmission {
     fn from_payload(payload: InteractionPayload) -> anyhow::Result<Self> {
         match payload { InteractionPayload::Modal(v) => Ok(v), _ => anyhow::bail!("Expected Modal submission payload") }
+    }
+}
+impl FromInteractionPayload for PaginationRequest {
+    fn from_payload(payload: InteractionPayload) -> anyhow::Result<Self> {
+        match payload {
+            InteractionPayload::Pagination(value) => Ok(value),
+            _ => anyhow::bail!("Expected framework pagination payload"),
+        }
     }
 }
 
