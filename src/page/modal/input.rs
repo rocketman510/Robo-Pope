@@ -14,7 +14,11 @@ pub struct ModalOption<T> {
 impl<T> ModalOption<T> {
     /// Creates an option whose submitted value is independent of its display label.
     pub fn new<L:IntoValue<String,T>>(label:L,value:impl Into<String>)->Self {
-        todo!("create a labelled option with a stable submitted value")
+        Self {
+            label: label.into_value(),
+            value: value.into(),
+            description: None,
+        }
     }
     /// Sets an optional static or dynamic description.
     pub fn set_description<V:IntoValue<String,T>>(mut self,value:V)->Self {

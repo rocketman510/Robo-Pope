@@ -31,5 +31,126 @@ pub fn plan<T>(
     reserved_static:ComponentBudget,
     reserved_navigation:ComponentBudget,
 )->anyhow::Result<PaginationPlan<T>> {
-    todo!("maximize complete elements per page without exceeding nested and semantic limits")
+    use crate::page::component::{Component, ContainerItem};
+    use crate::page::value::{Slot, Value};
+
+    fn add(left: ComponentBudget, right: ComponentBudget) -> ComponentBudget {
+        ComponentBudget {
+            total_components: left.total_components.saturating_add(right.total_components),
+            text_display_chars: left.text_display_chars.saturating_add(right.text_display_chars),
+            direct_container_children: left.direct_container_children.max(right.direct_container_children),
+        }
+    }
+
+    fn fits(budget: ComponentBudget) -> bool {
+        budget.total_components <= crate::page::limits::MESSAGE_MAX_COMPONENTS
+            && budget.text_display_chars <= crate::page::limits::MESSAGE_MAX_TEXT_DISPLAY_CHARS
+            && budget.direct_container_children <= crate::page::limits::CONTAINER_MAX_DIRECT_CHILDREN
+    }
+
+    fn measure<T>(component: &Component<T>) -> anyhow::Result<ComponentBudget> {
+        let mut budget = ComponentBudget {
+            total_components: 1,
+            text_display_chars: 0,
+            direct_container_children: 0,
+        };
+        match component {
+            Component::Text(text) => {
+                if let Value::Static(value) = &text.content {
+                    budget.text_display_chars = value.chars().count();
+                }
+            }
+            Component::Section(section) => {
+                let slots = [&section.text.0, &section.text.1, &section.text.2];
+                let populated = slots.iter().filter(|slot| matches!(slot, Slot::Value(_))).count();
+                anyhow::ensure!(populated > 0, "Section must contain at least one Text Display");
+                for slot in slots {
+                    if let Slot::Value(Value::Static(value)) = slot {
+                        budget.text_display_chars += value.chars().count();
+                    }
+                }
+                if let Some(accessory) = &section.accessory {
+                    match accessory {
+                        crate::page::SectionAccessory::Thumbnail(_) => budget.total_components += 1,
+                        crate::page::SectionAccessory::Button(_) => budget.total_components += 1,
+                    }
+                }
+            }
+            Component::Container(container) => {
+                anyhow::ensure!(
+                    container.children.len() <= crate::page::limits::CONTAINER_MAX_DIRECT_CHILDREN,
+                    "Container exceeds its direct-child limit"
+                );
+                budget.direct_container_children = container.children.len();
+                for child in &container.children {
+                    match child {
+                        ContainerItem::Component(child) => budget = add(budget, measure(child)?),
+                        ContainerItem::Frame(_) => anyhow::bail!("Nested Frame contents must be resolved before pagination"),
+                    }
+                }
+            }
+            Component::ButtonRow(row) => {
+                anyhow::ensure!(
+                    (crate::page::limits::BUTTON_ROW_MIN_BUTTONS..=crate::page::limits::BUTTON_ROW_MAX_BUTTONS)
+                        .contains(&row.populated()),
+                    "Button Action Row must contain between one and five buttons"
+                );
+                budget.total_components += row.populated();
+            }
+            Component::MediaGallery(gallery) => {
+                anyhow::ensure!(
+                    gallery.items.len() <= crate::page::limits::MEDIA_GALLERY_MAX_ITEMS,
+                    "Media Gallery exceeds its item limit"
+                );
+                budget.total_components += gallery.items.len();
+            }
+            Component::Select(crate::page::select::SelectMenu::String(menu)) => {
+                anyhow::ensure!(
+                    menu.options.len() <= crate::page::limits::STRING_SELECT_MAX_OPTIONS,
+                    "String Select exceeds its option limit"
+                );
+            }
+            Component::Select(_)
+            | Component::Separator(_)
+            | Component::File(_)
+            | Component::Button(_)
+            | Component::LinkButton(_) => {}
+        }
+        Ok(budget)
+    }
+
+    let reserved = add(reserved_static, reserved_navigation);
+    anyhow::ensure!(fits(reserved), "Static and navigation components exceed Discord message limits");
+
+    let frame_id = frame_id.into();
+    let mut pages: Vec<Vec<Element<T>>> = Vec::new();
+    let mut current = Vec::new();
+    let mut used = reserved;
+
+    for element in elements {
+        let cost = measure(&element.component)?;
+        let combined_alone = add(reserved, cost);
+        anyhow::ensure!(
+            fits(combined_alone),
+            "A single Frame element cannot fit within the remaining Discord message budget"
+        );
+
+        let combined = add(used, cost);
+        if !fits(combined) && !current.is_empty() {
+            pages.push(std::mem::take(&mut current));
+            used = reserved;
+        }
+        used = add(used, cost);
+        current.push(element);
+    }
+    if !current.is_empty() || pages.is_empty() {
+        pages.push(current);
+    }
+
+    let state = PaginationState {
+        frame_id,
+        page_index: 0,
+        page_count: pages.len(),
+    };
+    Ok(PaginationPlan { pages, state })
 }

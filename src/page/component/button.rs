@@ -47,7 +47,14 @@ impl<T> Button<T> {
         Fut: Future<Output = Result<()>> + Send + 'static,
         T: Send + 'static
 {
-        todo!("create the explicit execution and initialize enabled state")
+        let id = id.into();
+        Self {
+            id: id.clone(),
+            label: label.into_value(),
+            style: style.into_value(),
+            disabled: crate::page::value::Value::Static(false),
+            execution: Execution::new(id, callback),
+        }
     }
 
     /// Sets a static or dynamic disabled state.

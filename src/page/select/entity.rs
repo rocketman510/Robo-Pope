@@ -32,7 +32,16 @@ impl<T,S> EntitySelect<T,S> {
         Fut:Future<Output=Result<()>>+Send+'static,
         T:Send+'static,S:Send+'static
     {
-        todo!("construct typed entity-select execution")
+        let id = id.into();
+        Self {
+            id: id.clone(),
+            placeholder: None,
+            min_values: None,
+            max_values: None,
+            disabled: Value::Static(false),
+            channel_types: Vec::new(),
+            execution: Execution::with_input(id, callback),
+        }
     }
     /// Sets an optional static or dynamic placeholder.
     pub fn set_placeholder<V:IntoValue<String,T>>(mut self,value:V)->Self {

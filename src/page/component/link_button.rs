@@ -14,7 +14,11 @@ pub struct LinkButton<T> {
 impl<T> LinkButton<T> {
     /// Creates a URL button with static or dynamic label and URL properties.
     pub fn new<L:IntoValue<String,T>,U:IntoValue<String,T>>(label:L,url:U)->Self {
-        todo!("construct the non-interactive URL button")
+        Self {
+            label: label.into_value(),
+            url: url.into_value(),
+            disabled: Value::Static(false),
+        }
     }
     /// Sets a static or dynamic disabled state.
     pub fn set_disabled<V:IntoValue<bool,T>>(mut self,value:V)->Self {

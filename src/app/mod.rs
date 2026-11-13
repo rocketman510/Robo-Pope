@@ -50,7 +50,13 @@ impl Clone for App {
 impl App {
     /// Creates an App with empty definition registries and shared infrastructure.
     pub fn new(http: Arc<Http>, db: Database) -> Self {
-        todo!("construct shared App state and empty registries")
+        Self {
+            db: Arc::new(db),
+            pages: PageRegistry::default(),
+            modals: ModalRegistry::default(),
+            http,
+            router: InteractionRouter::default(),
+        }
     }
     /// Routes an incoming Discord interaction to its registered execution.
     ///

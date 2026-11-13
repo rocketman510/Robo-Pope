@@ -95,7 +95,19 @@ impl<T> Page<T> {
     where
         T: Serialize + DeserializeOwned + Send + Sync + 'static
 {
-        todo!("consume builder, validate static invariants, and register immutable definition")
+        anyhow::ensure!(!self.id.trim().is_empty(), "Page ID must not be empty");
+        for item in &self.items {
+            if let PageItem::Component(component) = item {
+                super::render::validate_component(component)?;
+            }
+        }
+        let definition = Arc::new(PageDefinition {
+            id: self.id,
+            items: self.items,
+            paginate: self.paginate,
+        });
+        app.pages.insert(definition.clone())?;
+        Ok(RegisteredPage { definition })
     }
 }
 

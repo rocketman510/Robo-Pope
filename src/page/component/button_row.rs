@@ -20,6 +20,10 @@ impl<T> ButtonRow<T> {
     pub fn new(slots: ButtonSlots<T>) -> Self { Self { slots } }
     /// Counts populated slots; render validation rejects an empty row.
     pub fn populated(&self) -> usize {
-        todo!("count populated slots; rendering validates one to five")
+        (self.slots.0.is_some() as usize)
+            + (self.slots.1.is_some() as usize)
+            + (self.slots.2.is_some() as usize)
+            + (self.slots.3.is_some() as usize)
+            + (self.slots.4.is_some() as usize)
     }
 }

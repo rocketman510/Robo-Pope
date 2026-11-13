@@ -18,7 +18,12 @@ pub struct SelectOption<T> {
 impl<T> SelectOption<T> {
     /// Creates an enabled option with a developer-defined submitted value.
     pub fn new<L:IntoValue<String,T>>(label:L,value:impl Into<String>)->Self {
-        todo!("create option with its stable submitted value and default enabled state")
+        Self {
+            label: label.into_value(),
+            value: value.into(),
+            description: None,
+            disabled: Value::Static(false),
+        }
     }
     /// Sets an optional static or dynamic option description.
     pub fn set_description<V:IntoValue<String,T>>(mut self,value:V)->Self {
@@ -59,7 +64,16 @@ impl<T> StringSelect<T> {
         F:Fn(Ctx,T,Vec<String>)->Fut+Send+Sync+'static,
         Fut:Future<Output=Result<()>>+Send+'static,
         T:Send+'static,{
-        todo!("construct the menu and explicit selection execution")
+        let id = id.into();
+        Self {
+            id: id.clone(),
+            placeholder: Some(placeholder.into_value()),
+            options: options.into_iter().collect(),
+            min_values: None,
+            max_values: None,
+            disabled: Value::Static(false),
+            execution: Execution::with_input(id, callback),
+        }
     }
     /// Sets the minimum number of options a user must select.
     pub fn set_min_values(mut self,value:u8)->Self { self.min_values=Some(value); self }

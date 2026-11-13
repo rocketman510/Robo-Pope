@@ -27,7 +27,11 @@ impl<T:Send+Sync+'static,> Frame<T> {
         F:Fn(RenderCtx,Arc<T>)->Fut+Send+Sync+'static,
         Fut:Future<Output=anyhow::Result<Vec<Element<T>>>>+Send+'static,
     {
-        todo!("store resolver and stable developer-defined Frame ID")
+        Self {
+            id: id.into(),
+            resolver: Arc::new(move |ctx, data| Box::pin(resolver(ctx, data))),
+            paginate: false,
+        }
     }
     /// Enables automatic pagination for this Frame.
     pub fn paginate(mut self)->Self { self.paginate=true; self }

@@ -57,38 +57,78 @@ impl<T> Modal<T> {
     pub fn add_text_input(
         self,id:impl Into<String>,label:impl IntoValue<String,T>,style:TextInputStyle,
     )->Self {
-        todo!("append a Text Input definition")
+        let mut modal = self;
+        modal.inputs.push(ModalInput::Text(TextInput {
+            id: id.into(),
+            label: label.into_value(),
+            style,
+            required: true,
+            placeholder: None,
+            min_length: None,
+            max_length: None,
+        }));
+        modal
     }
     /// Appends a String Select input using stable option values.
     pub fn add_select(
         self,id:impl Into<String>,label:impl IntoValue<String,T>,
         options:impl IntoIterator<Item=ModalOption<T>>,
     )->Self {
-        todo!("append a String Select input")
+        let mut modal = self;
+        modal.inputs.push(ModalInput::StringSelect(ModalSelectInput {
+            id: id.into(),
+            label: label.into_value(),
+            options: options.into_iter().collect(),
+        }));
+        modal
     }
     /// Appends a single Checkbox input.
     pub fn add_checkbox(self,id:impl Into<String>,label:impl IntoValue<String,T>)->Self {
-        todo!("append a Checkbox input")
+        let mut modal = self;
+        modal.inputs.push(ModalInput::Checkbox(CheckboxInput {
+            id: id.into(),
+            label: label.into_value(),
+            default: false,
+        }));
+        modal
     }
     /// Appends a Checkbox Group input.
     pub fn add_checkbox_group(
         self,id:impl Into<String>,label:impl IntoValue<String,T>,
         options:impl IntoIterator<Item=ModalOption<T>>,
     )->Self {
-        todo!("append Checkbox Group input")
+        let mut modal = self;
+        modal.inputs.push(ModalInput::CheckboxGroup(CheckboxGroupInput {
+            id: id.into(),
+            label: label.into_value(),
+            options: options.into_iter().collect(),
+        }));
+        modal
     }
     /// Appends a Radio Group input.
     pub fn add_radio_group(
         self,id:impl Into<String>,label:impl IntoValue<String,T>,
         options:impl IntoIterator<Item=ModalOption<T>>,
     )->Self {
-        todo!("append Radio Group input")
+        let mut modal = self;
+        modal.inputs.push(ModalInput::RadioGroup(RadioGroupInput {
+            id: id.into(),
+            label: label.into_value(),
+            options: options.into_iter().collect(),
+        }));
+        modal
     }
     /// Appends a File Upload input.
     pub fn add_file_upload(
         self,id:impl Into<String>,label:impl IntoValue<String,T>,
     )->Self {
-        todo!("append File Upload input")
+        let mut modal = self;
+        modal.inputs.push(ModalInput::FileUpload(FileUploadInput {
+            id: id.into(),
+            label: label.into_value(),
+            required: true,
+        }));
+        modal
     }
     /// Sets the raw submission callback. It receives Ctx, the Modal's original
     /// data, and submitted fields separately.
@@ -98,7 +138,8 @@ impl<T> Modal<T> {
         Fut:Future<Output=Result<()>>+Send+'static,
         T:Send+'static
 {
-        todo!("attach raw ModalSubmission callback")
+        self.submit = Some(Execution::with_input("submit", callback));
+        self
     }
     /// Sets a typed submission callback. Submitted fields are deserialized into
     /// `S` through Serde before the callback runs.
@@ -109,14 +150,58 @@ impl<T> Modal<T> {
         Fut:Future<Output=Result<()>>+Send+'static,
         T:Send+'static
 {
-        todo!("deserialize typed form from ModalSubmission before invoking callback")
+        self.submit = Some(Execution::with_input(
+            "submit",
+            move |ctx, data, submission| async move {
+                let form = submission.deserialize::<S>()?;
+                callback(ctx, data, form).await
+            },
+        ));
+        self
     }
     /// Validates and registers this Modal definition. Registration consumes the
     /// builder and rejects duplicate Modal IDs.
     pub fn register(self,app:&App)->Result<RegisteredModal<T>>
     where T:Serialize+DeserializeOwned+Send+Sync+'static
 {
-        todo!("consume builder, validate inputs, register immutable definition")
+        anyhow::ensure!(!self.id.trim().is_empty(), "Modal ID must not be empty");
+        anyhow::ensure!(!self.title.trim().is_empty(), "Modal title must not be empty");
+        anyhow::ensure!(
+            self.title.chars().count() <= crate::page::limits::MODAL_TITLE_MAX_CHARS,
+            "Modal title exceeds {} characters",
+            crate::page::limits::MODAL_TITLE_MAX_CHARS
+        );
+        anyhow::ensure!(
+            self.inputs.len() <= crate::page::limits::MODAL_MAX_TOP_LEVEL_COMPONENTS,
+            "A Modal must contain between one and {} inputs",
+            crate::page::limits::MODAL_MAX_TOP_LEVEL_COMPONENTS
+        );
+        let mut input_ids = std::collections::HashSet::new();
+        for input in &self.inputs {
+            let id = match input {
+                ModalInput::Text(v) => &v.id,
+                ModalInput::StringSelect(v)
+                | ModalInput::UserSelect(v)
+                | ModalInput::RoleSelect(v)
+                | ModalInput::MentionableSelect(v)
+                | ModalInput::ChannelSelect(v) => &v.id,
+                ModalInput::Checkbox(v) => &v.id,
+                ModalInput::CheckboxGroup(v) => &v.id,
+                ModalInput::RadioGroup(v) => &v.id,
+                ModalInput::FileUpload(v) => &v.id,
+            };
+            anyhow::ensure!(!id.trim().is_empty(), "Modal input IDs must not be empty");
+            anyhow::ensure!(input_ids.insert(id.clone()), "Duplicate Modal input ID: {id}");
+        }
+        let submit = self.submit.ok_or_else(|| anyhow::anyhow!("Modal requires an on_submit callback"))?;
+        let definition = Arc::new(ModalDefinition {
+            id: self.id,
+            title: self.title,
+            inputs: self.inputs,
+            submit,
+        });
+        app.modals.insert(definition.clone())?;
+        Ok(RegisteredModal { definition })
     }
 }
 

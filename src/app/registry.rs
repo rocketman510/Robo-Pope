@@ -23,16 +23,30 @@ impl Default for PageRegistry {
 impl PageRegistry {
     /// Inserts an immutable Page definition, rejecting an already-registered ID.
     pub fn insert<T: Send + Sync + 'static>(&self, definition: Arc<PageDefinition<T>>) -> anyhow::Result<()> {
-        todo!("insert atomically and reject duplicate Page IDs")
+        let id = definition.id.clone();
+        let mut entries = self.entries.write()
+            .map_err(|_| anyhow::anyhow!("Page registry lock was poisoned"))?;
+        anyhow::ensure!(!entries.contains_key(&id), "Page ID is already registered: {id}");
+        entries.insert(id, definition);
+        Ok(())
     }
     /// Retrieves a Page by ID and verifies that its stored data type is T.
     /// Returns an error for an unknown ID or a type mismatch.
     pub fn query<T: Send + Sync + 'static>(&self, id: &str) -> anyhow::Result<RegisteredPage<T>> {
-        todo!("downcast internally and return a correctly typed handle")
+        let entries = self.entries.read()
+            .map_err(|_| anyhow::anyhow!("Page registry lock was poisoned"))?;
+        let definition = entries.get(id)
+            .cloned()
+            .ok_or_else(|| anyhow::anyhow!("No Page is registered with ID: {id}"))?;
+        let definition = Arc::downcast::<PageDefinition<T>>(definition)
+            .map_err(|_| anyhow::anyhow!("Page '{id}' was registered with a different data type"))?;
+        Ok(RegisteredPage { definition })
     }
     /// Reports whether any Page definition is registered under this ID.
     pub fn contains(&self, id: &str) -> bool {
-        todo!("check definition presence")
+        self.entries.read()
+            .map(|entries| entries.contains_key(id))
+            .unwrap_or(false)
     }
 }
 
@@ -54,15 +68,29 @@ impl Default for ModalRegistry {
 impl ModalRegistry {
     /// Inserts an immutable Modal definition, rejecting an already-registered ID.
     pub fn insert<T: Send + Sync + 'static>(&self, definition: Arc<ModalDefinition<T>>) -> anyhow::Result<()> {
-        todo!("insert atomically and reject duplicate Modal IDs")
+        let id = definition.id.clone();
+        let mut entries = self.entries.write()
+            .map_err(|_| anyhow::anyhow!("Modal registry lock was poisoned"))?;
+        anyhow::ensure!(!entries.contains_key(&id), "Modal ID is already registered: {id}");
+        entries.insert(id, definition);
+        Ok(())
     }
     /// Retrieves a Modal by ID and verifies that its stored data type is T.
     /// Returns an error for an unknown ID or a type mismatch.
     pub fn query<T: Send + Sync + 'static>(&self, id: &str) -> anyhow::Result<RegisteredModal<T>> {
-        todo!("downcast internally and return a correctly typed handle")
+        let entries = self.entries.read()
+            .map_err(|_| anyhow::anyhow!("Modal registry lock was poisoned"))?;
+        let definition = entries.get(id)
+            .cloned()
+            .ok_or_else(|| anyhow::anyhow!("No Modal is registered with ID: {id}"))?;
+        let definition = Arc::downcast::<ModalDefinition<T>>(definition)
+            .map_err(|_| anyhow::anyhow!("Modal '{id}' was registered with a different data type"))?;
+        Ok(RegisteredModal { definition })
     }
     /// Reports whether any Modal definition is registered under this ID.
     pub fn contains(&self, id: &str) -> bool {
-        todo!("check definition presence")
+        self.entries.read()
+            .map(|entries| entries.contains_key(id))
+            .unwrap_or(false)
     }
 }

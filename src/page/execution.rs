@@ -24,7 +24,10 @@ impl<T> Execution<T> {
         Fut: Future<Output = anyhow::Result<()>> + Send + 'static,
         T: Send + 'static,
         {
-        todo!("store two-argument execution callback behind boxed future")
+        Self {
+            id: id.into(),
+            callback: Arc::new(move |ctx, data| Box::pin(callback(ctx, data))),
+        }
     }
 }
 impl<T, I> Execution<T, I> {
@@ -36,7 +39,10 @@ impl<T, I> Execution<T, I> {
         T: Send + 'static,
         I: Send + 'static,
     {
-        todo!("store callback with its distinct interaction payload")
+        Self {
+            id: id.into(),
+            callback: Arc::new(move |ctx, data, input| Box::pin(callback(ctx, data, input))),
+        }
     }
 }
 

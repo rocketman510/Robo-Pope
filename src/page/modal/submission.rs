@@ -24,39 +24,89 @@ pub struct ModalSubmission {
 impl ModalSubmission {
     /// Reads a Text Input value by its input ID; missing or wrong-type values are errors.
     pub fn text(&self,id:&str)->anyhow::Result<&str> {
-        todo!("retrieve a Text Input value or return contextual anyhow error")
+        match self.values.get(id) {
+            Some(SubmittedValue::Text(value)) => Ok(value.as_str()),
+            Some(_) => anyhow::bail!("Modal field '{id}' was submitted with a value that is not text"),
+            None => anyhow::bail!("Modal submission is missing field '{id}'"),
+        }
     }
     /// Reads String Select, Radio Group, or Checkbox Group selections by input ID.
     pub fn strings(&self,id:&str)->anyhow::Result<&[String]> {
-        todo!("retrieve String Select, Radio Group, or Checkbox Group selections")
+        match self.values.get(id) {
+            Some(SubmittedValue::Strings(values)) => Ok(values.as_slice()),
+            Some(_) => anyhow::bail!("Modal field '{id}' was not submitted as a string selection"),
+            None => anyhow::bail!("Modal submission is missing field '{id}'"),
+        }
     }
     /// Reads selected Users by input ID.
     pub fn users(&self,id:&str)->anyhow::Result<&[SelectedUser]> {
-        todo!("retrieve typed User Select values")
+        match self.values.get(id) {
+            Some(SubmittedValue::Users(values)) => Ok(values.as_slice()),
+            Some(_) => anyhow::bail!("Modal field '{id}' was not submitted as a User selection"),
+            None => anyhow::bail!("Modal submission is missing field '{id}'"),
+        }
     }
     /// Reads selected Roles by input ID.
     pub fn roles(&self,id:&str)->anyhow::Result<&[SelectedRole]> {
-        todo!("retrieve typed Role Select values")
+        match self.values.get(id) {
+            Some(SubmittedValue::Roles(values)) => Ok(values.as_slice()),
+            Some(_) => anyhow::bail!("Modal field '{id}' was not submitted as a Role selection"),
+            None => anyhow::bail!("Modal submission is missing field '{id}'"),
+        }
     }
     /// Reads selected Users or Roles by input ID.
     pub fn mentionables(&self,id:&str)->anyhow::Result<&[SelectedMentionable]> {
-        todo!("retrieve typed Mentionable Select values")
+        match self.values.get(id) {
+            Some(SubmittedValue::Mentionables(values)) => Ok(values.as_slice()),
+            Some(_) => anyhow::bail!("Modal field '{id}' was not submitted as a Mentionable selection"),
+            None => anyhow::bail!("Modal submission is missing field '{id}'"),
+        }
     }
     /// Reads selected Channels by input ID.
     pub fn channels(&self,id:&str)->anyhow::Result<&[SelectedChannel]> {
-        todo!("retrieve typed Channel Select values")
+        match self.values.get(id) {
+            Some(SubmittedValue::Channels(values)) => Ok(values.as_slice()),
+            Some(_) => anyhow::bail!("Modal field '{id}' was not submitted as a Channel selection"),
+            None => anyhow::bail!("Modal submission is missing field '{id}'"),
+        }
     }
     /// Reads uploaded attachment references by input ID; this does not download their bytes.
     pub fn files(&self,id:&str)->anyhow::Result<&[serenity::all::Attachment]> {
-        todo!("retrieve uploaded attachment references")
+        match self.values.get(id) {
+            Some(SubmittedValue::Files(values)) => Ok(values.as_slice()),
+            Some(_) => anyhow::bail!("Modal field '{id}' was not submitted as file uploads"),
+            None => anyhow::bail!("Modal submission is missing field '{id}'"),
+        }
     }
     /// Reads a Checkbox value by input ID.
     pub fn boolean(&self,id:&str)->anyhow::Result<bool> {
-        todo!("retrieve Checkbox state")
+        match self.values.get(id) {
+            Some(SubmittedValue::Boolean(value)) => Ok(*value),
+            Some(_) => anyhow::bail!("Modal field '{id}' was not submitted as a Boolean"),
+            None => anyhow::bail!("Modal submission is missing field '{id}'"),
+        }
     }
     /// Deserializes all submitted values into a developer-defined Serde type.
     /// Field names are matched to input IDs; missing or invalid values are errors.
     pub fn deserialize<T:DeserializeOwned>(&self)->anyhow::Result<T> {
-        todo!("map stable input IDs to a Serde representation and deserialize")
+        let mut object = serde_json::Map::new();
+        for (id, value) in &self.values {
+            let json = match value {
+                SubmittedValue::Text(value) => serde_json::Value::String(value.clone()),
+                SubmittedValue::Strings(values) => serde_json::to_value(values)
+                    .context("Serializing Modal string selections")?,
+                SubmittedValue::Boolean(value) => serde_json::Value::Bool(*value),
+                SubmittedValue::Users(_)
+                | SubmittedValue::Roles(_)
+                | SubmittedValue::Mentionables(_)
+                | SubmittedValue::Channels(_)
+                | SubmittedValue::Files(_) => {
+                    anyhow::bail!("Modal field '{id}' uses a typed value that is not supported by generic Serde deserialization")
+                }
+            };
+            object.insert(id.clone(), json);
+        }
+        serde_json::from_value(serde_json::Value::Object(object))
+            .map_err(|error| anyhow::anyhow!("Deserializing Modal submission by input ID: {error}"))
     }
 }

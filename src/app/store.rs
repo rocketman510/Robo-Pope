@@ -13,7 +13,7 @@ pub enum DefinitionKind {
 ///
 /// Callback closures are never stored. The registered Page or Modal retains
 /// the callback; this record restores its definition, execution, and data.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StoreRecord {
     /// Deterministic identifier sent to Discord as the component custom ID.
     pub custom_id: String,
@@ -62,7 +62,40 @@ pub fn derive_custom_id(
     serialized_data: &[u8],
     frame_identity: Option<&str>,
 ) -> anyhow::Result<CustomId> {
-    todo!("canonicalize identity inputs, hash deterministically, enforce Discord length")
+    let mut first = 0xcbf29ce484222325u64;
+    let mut second = 0x84222325cbf29ce4u64;
+    fn feed(hash: &mut u64, bytes: &[u8]) {
+        for byte in bytes {
+            *hash ^= u64::from(*byte);
+            *hash = hash.wrapping_mul(0x100000001b3);
+        }
+    }
+    fn field(first: &mut u64, second: &mut u64, bytes: &[u8]) {
+        let length = (bytes.len() as u64).to_le_bytes();
+        feed(first, &length);
+        feed(second, &length);
+        feed(first, bytes);
+        feed(second, bytes);
+    }
+
+    // Length-prefix each field so concatenated inputs cannot be ambiguous.
+    field(&mut first, &mut second, definition_id.as_bytes());
+    field(&mut first, &mut second, execution_id.as_bytes());
+    field(&mut first, &mut second, serialized_data);
+    match frame_identity {
+        Some(identity) => {
+            field(&mut first, &mut second, &[1]);
+            field(&mut first, &mut second, identity.as_bytes());
+        }
+        None => field(&mut first, &mut second, &[0]),
+    }
+
+    let custom_id = format!("rp:{first:016x}{second:016x}");
+    anyhow::ensure!(
+        custom_id.chars().count() <= crate::page::limits::CUSTOM_ID_MAX_CHARS,
+        "Derived Discord custom ID exceeds the maximum length"
+    );
+    Ok(CustomId(custom_id))
 }
 
 /// In-memory Store for tests and development; it is not durable across restarts.
@@ -74,16 +107,37 @@ impl Store for MemoryStore {
     fn insert<'a>(&'a self, record: StoreRecord)
         -> BoxFuture<'a, anyhow::Result<()>>
     {
-        Box::pin(async move { todo!("define idempotent insert and conflicting-record behavior") })
+        Box::pin(async move {
+            let key = CustomId(record.custom_id.clone());
+            let mut records = self.records.write()
+                .map_err(|_| anyhow::anyhow!("Memory Store lock was poisoned"))?;
+            match records.get(&key) {
+                Some(existing) if existing == &record => Ok(()),
+                Some(_) => anyhow::bail!("Conflicting Store record for custom ID '{}'", key.0),
+                None => {
+                    records.insert(key, record);
+                    Ok(())
+                }
+            }
+        })
     }
     fn resolve<'a>(&'a self, custom_id: &'a CustomId)
         -> BoxFuture<'a, anyhow::Result<Option<StoreRecord>>>
     {
-        Box::pin(async move { todo!("resolve a stored custom ID") })
+        Box::pin(async move {
+            let records = self.records.read()
+                .map_err(|_| anyhow::anyhow!("Memory Store lock was poisoned"))?;
+            Ok(records.get(custom_id).cloned())
+        })
     }
     fn remove<'a>(&'a self, custom_id: &'a CustomId)
         -> BoxFuture<'a, anyhow::Result<()>>
     {
-        Box::pin(async move { todo!("remove an expired or deleted execution record") })
+        Box::pin(async move {
+            let mut records = self.records.write()
+                .map_err(|_| anyhow::anyhow!("Memory Store lock was poisoned"))?;
+            records.remove(custom_id);
+            Ok(())
+        })
     }
 }
