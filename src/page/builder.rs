@@ -209,6 +209,27 @@ fn collect_component_frames<T>(
     }
 }
 
+fn collect_paginated_frames_in_component<T>(
+    component: &Component<T>,
+    page_paginate: bool,
+    output: &mut Vec<(usize, String)>,
+) {
+    use super::component::ContainerItem;
+    if let Component::Container(container) = component {
+        for child in &container.children {
+            match child {
+                ContainerItem::Frame(frame) if frame.paginate || page_paginate => {
+                    output.push((usize::MAX, frame.id.clone()));
+                }
+                ContainerItem::Component(component) => {
+                    collect_paginated_frames_in_component(component, page_paginate, output)
+                }
+                ContainerItem::Frame(_) => {}
+            }
+        }
+    }
+}
+
 fn collect_paginated_frames<T>(definition: &PageDefinition<T>) -> Vec<String> {
     use super::component::ContainerItem;
     let mut output = Vec::new();
@@ -1386,12 +1407,68 @@ where
         let frame_positions: Vec<usize> = self.definition.items.iter().enumerate()
             .filter_map(|(index, item)| matches!(item, PageItem::Frame(_)).then_some(index))
             .collect();
+        for (index, item) in self.definition.items.iter().enumerate() {
+            if let PageItem::Component(Component::Container(container)) = item {
+                let direct_frame_count = container.children.iter().filter(|child|
+                    matches!(child, super::component::ContainerItem::Frame(_))
+                ).count();
+                if direct_frame_count > 1 {
+                    anyhow::bail!("Container at Page item {index} has more than one Frame");
+                }
+            }
+        }
 
         anyhow::ensure!(
             frame_positions.len() <= 1,
             "Page '{}' currently supports one top-level Frame per render",
             self.id()
         );
+
+        let mut nested_frames: Vec<(usize, String)> = Vec::new();
+        for (item_index, item) in self.definition.items.iter().enumerate() {
+            if let PageItem::Component(component) = item {
+                let mut found = Vec::new();
+                collect_paginated_frames_in_component(component, self.definition.paginate, &mut found);
+                for (_, frame_id) in found { nested_frames.push((item_index, frame_id)); }
+            }
+        }
+        anyhow::ensure!(
+            frame_positions.len() + nested_frames.len() <= 1,
+            "Page '{}' cannot contain more than one paginated Frame across its component tree",
+            self.id()
+        );
+
+        if frame_positions.is_empty() && !nested_frames.is_empty() {
+            let (container_item_index, frame_id) = nested_frames[0].clone();
+            let container = match &self.definition.items[container_item_index] {
+                PageItem::Component(Component::Container(container)) => container,
+                _ => anyhow::bail!("Paginated nested Frame must be inside a top-level Container"),
+            };
+            let direct_matches = container.children.iter().filter(|child| {
+                matches!(child, super::component::ContainerItem::Frame(frame) if frame.id == frame_id)
+            }).count();
+            anyhow::ensure!(
+                direct_matches == 1,
+                "Paginated Frame '{}' must be a direct child of its Container",
+                frame_id
+            );
+            let prefix_refs: Vec<&Component<T>> = self.definition.items[..container_item_index].iter()
+                .filter_map(|item| match item { PageItem::Component(component) => Some(component), _ => None })
+                .collect();
+            let suffix_refs: Vec<&Component<T>> = self.definition.items[container_item_index + 1..].iter()
+                .filter_map(|item| match item { PageItem::Component(component) => Some(component), _ => None })
+                .collect();
+            let (page_prefix, page_prefix_budget) = render_component_list(
+                &prefix_refs, app, &ctx, &data, &serialized_data, self.id(), None,
+            ).await?;
+            let (page_suffix, page_suffix_budget) = render_component_list(
+                &suffix_refs, app, &ctx, &data, &serialized_data, self.id(), None,
+            ).await?;
+            return render_paginated_container(
+                container, app, &ctx, &data, &serialized_data, self.id(), &frame_id,
+                page_prefix, page_prefix_budget, page_suffix, page_suffix_budget,
+            ).await;
+        }
 
         let Some(&frame_position) = frame_positions.first() else {
             let components: Vec<&Component<T>> = self.definition.items.iter()
