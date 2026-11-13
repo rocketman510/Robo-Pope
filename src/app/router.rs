@@ -1,6 +1,6 @@
 //! Route interactions by stored identity, never by visual component position.
 use crate::app::App;
-use serenity::all::Interaction;
+use serenity::all::{Interaction, InteractionType};
 
 #[derive(Clone, Default)]
 /// Resolves Discord interaction IDs to the Page or Modal execution they name.
@@ -11,9 +11,9 @@ pub struct InteractionRouter;
 impl InteractionRouter {
     /// Dispatches a supported interaction kind to its specialized route.
     pub async fn dispatch(&self, app: &App, interaction: Interaction) -> anyhow::Result<()> {
-        match &interaction {
-            Interaction::Component(_) => self.dispatch_component(app, interaction).await,
-            Interaction::Modal(_) => self.dispatch_modal_submit(app, interaction).await,
+        match interaction.kind() {
+            InteractionType::Component => self.dispatch_component(app, interaction).await,
+            InteractionType::Modal => self.dispatch_modal_submit(app, interaction).await,
             _ => anyhow::bail!("Unsupported Discord interaction kind for UI routing"),
         }
     }
