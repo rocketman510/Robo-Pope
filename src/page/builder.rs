@@ -790,6 +790,7 @@ where
             ContainerItem::Frame(frame) => {
                 let elements = (frame.resolver)(ctx.clone(), data.clone()).await
                     .with_context(|| format!("Resolving Frame '{}' inside Container", frame.id))?;
+                validate_frame_elements(&elements, &frame.id)?;
                 for element in elements {
                     let key = element.key.as_deref()
                         .map(|key| append_frame_identity(frame_identity, &frame.id, key));
@@ -1104,6 +1105,30 @@ where
     Ok((rendered, budget))
 }
 
+fn validate_frame_elements<T>(
+    elements: &[super::frame::Element<T>],
+    frame_id: &str,
+) -> anyhow::Result<()> {
+    let mut element_keys = HashSet::new();
+    let mut nested_frame_ids = HashSet::new();
+    for element in elements {
+        if let Some(key) = element.key.as_deref() {
+            anyhow::ensure!(!key.trim().is_empty(),
+                "Frame '{frame_id}' contains an empty element key");
+            anyhow::ensure!(element_keys.insert(key.to_owned()),
+                "Frame '{frame_id}' contains duplicate element key '{key}'");
+        }
+        let mut execution_ids = HashSet::new();
+        validate_component_ids(&element.component, &mut execution_ids, &mut nested_frame_ids)?;
+        let interactive = contains_interactive_component(&element.component);
+        anyhow::ensure!(
+            !interactive || element.key.as_ref().is_some_and(|key| !key.trim().is_empty()),
+            "Interactive Frame element in Frame '{frame_id}' requires a non-empty stable developer key"
+        );
+    }
+    Ok(())
+}
+
 struct RenderedFrameElement {
     components: Vec<RenderedComponent>,
     budget: ComponentBudget,
@@ -1121,6 +1146,7 @@ async fn render_frame_elements<T>(
 where
     T: DeserializeOwned + Send + Sync + 'static,
 {
+    validate_frame_elements(elements, frame_id)?;
     let mut rendered = Vec::with_capacity(elements.len());
     for element in elements {
         let frame_identity = element.key.as_deref()
