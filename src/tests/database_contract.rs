@@ -52,3 +52,55 @@ fn production_store_must_advertise_restart_durability() {
     assert_eq!(MemoryStore::default().durability(), StoreDurability::ProcessLocal);
     let _ = std::fs::remove_file(path);
 }
+
+
+#[tokio::test]
+async fn file_store_recovers_execution_and_pagination_records_after_reopen() {
+    // FIRST: a new process can reopen the production Store and resolve the same
+    // custom-ID record, including the most recently committed pagination state.
+    let path = std::env::temp_dir().join(format!(
+        "robo-pope-store-restart-{}-{}.json",
+        std::process::id(),
+        std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos(),
+    ));
+    let state0 = serde_json::json!({
+        "frame_id": "users", "page_index": 0, "page_count": 2
+    });
+    let state1 = serde_json::json!({
+        "frame_id": "users", "page_index": 1, "page_count": 2
+    });
+    let record = crate::app::store::StoreRecord {
+        custom_id: "persistent-custom-id".into(),
+        definition_kind: crate::app::store::DefinitionKind::Page,
+        definition_id: "persistent-page".into(),
+        execution_id: "__frame:users:next".into(),
+        serialized_data: br#"{"owner":42}"#.to_vec(),
+        frame_identity: Some("users".into()),
+        pagination_state: Some(state0.clone()),
+        schema_version: 1,
+    };
+
+    {
+        let store = FileStore::open(&path).unwrap();
+        store.insert(record).await.unwrap();
+        assert!(store.compare_and_set_pagination_state(
+            &crate::app::store::CustomId("persistent-custom-id".into()),
+            &state0,
+            state1.clone(),
+        ).await.unwrap());
+    }
+
+    {
+        let reopened = FileStore::open(&path).unwrap();
+        let restored = reopened.resolve(
+            &crate::app::store::CustomId("persistent-custom-id".into())
+        ).await.unwrap().expect("persisted custom ID must resolve after reopening");
+        assert_eq!(restored.definition_id, "persistent-page");
+        assert_eq!(restored.execution_id, "__frame:users:next");
+        assert_eq!(restored.serialized_data, br#"{"owner":42}"#);
+        assert_eq!(restored.pagination_state, Some(state1));
+        assert_eq!(reopened.durability(), StoreDurability::Durable);
+    }
+
+    let _ = std::fs::remove_file(path);
+}
