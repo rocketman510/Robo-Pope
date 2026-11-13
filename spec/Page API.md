@@ -65,7 +65,7 @@ pub struct UserLevelInfo {
     user_id: String,
 }
 
-let page = Page::<UserLevelInfo, MyDatabase>::new("UserLevel")
+let page = Page::<UserLevelInfo>::new("UserLevel")
     .add_text(|ctx, data| async move {
         let user = ctx.app.db.users.query(data.user_id).await?;
         Ok(format!("Level: {}", user.level))
@@ -461,7 +461,7 @@ Unlike a dynamic property, which resolves one component value, a Frame resolves 
 This allows a Page to have a fixed structure while still displaying a dynamically generated list of components.
 
 ```rust
-Page::<UserListData, MyDatabase>::new("UserList")
+Page::<UserListData>::new("UserList")
     .add_text("# Users")
     .add_frame(|ctx, data| async move {
         let users = ctx.app.db.users.query_all().await?;
@@ -512,7 +512,7 @@ A Frame can contain more components than Discord permits in a single message.
 Rather than requiring developers to manually split their data into pages, the framework should automatically paginate the Frame's contents.
 
 ```rust
-Page::<UserListData, MyDatabase>::new("UserList")
+Page::<UserListData>::new("UserList")
     .add_text("# Users")
     .add_frame(|ctx, data| async move {
         let users = ctx.app.db.users.query_all().await?;
@@ -565,7 +565,7 @@ The Frame does not own the entire Page.
 Static elements before and after the Frame are part of the Page's fixed structure.
 
 ```rust
-Page::<UserListData, MyDatabase>::new("UserList")
+Page::<UserListData>::new("UserList")
     .add_text("# User Directory")
     .add_separator()
     .add_frame(dynamic_users)
@@ -624,7 +624,7 @@ pub struct EditUserData {
     user_id: String,
 }
 
-let modal = Modal::<EditUserData, MyDatabase>::new("EditUser")
+let modal = Modal::<EditUserData>::new("EditUser")
     .set_title("Edit User")
     .add_text_input(
         "username",
@@ -750,7 +750,7 @@ struct EditUserForm {
     description: String,
 }
 
-.on_submit_typed(|ctx, data, form: EditUserForm| async move {
+.on_submit(|ctx, data, form: EditUserForm| async move {
     ctx.app.db.users.update(
         data.user_id,
         form.username,
@@ -809,7 +809,7 @@ The context is temporary. It belongs to the current interaction and is never sto
 The App owns the registered Pages and Modals, the database, and the interaction router.
 
 ```rust
-struct App<E = ()> {
+struct App {
     db: Database,
     pages: PageRegistry,
     modals: ModalRegistry,
@@ -893,26 +893,32 @@ This ensures that moving an element between pagination boundaries does not chang
 
 ## 10. Errors
 
-The framework uses the Rust `anyhow` crate for error handling. Every fallible public operation returns `anyhow::Result<T>`. The framework does not define its own error enum or a custom Result alias.
+The framework should use ordinary Rust `Result` values for operations that can fail.
 
-Use `anyhow::Context` to add useful context as an error crosses framework boundaries. Context should identify the relevant Page or Modal ID, execution ID, component, Frame, or operation. For example, a rendering error should say which Page was being rendered, and a routing error should identify the definition and execution being resolved.
-
-Preserve the original error as the source. Do not convert errors to strings prematurely or discard their cause. Use `anyhow::bail!` and `anyhow::ensure!` for validation failures where appropriate.
-
-This applies to all fallible framework operations, including:
+Examples include:
 
 - Registering duplicate Page or Modal IDs.
+    
 - Registering duplicate execution IDs within a Page.
+    
 - Rendering a component with invalid configuration.
-- Resolving an unknown Page, Modal, or execution.
-- Serializing or deserializing persisted data.
+    
+- Resolving an unknown Page or Modal.
+    
+- Resolving an unknown execution.
+    
+- Deserializing persisted data.
+    
 - Retrieving a missing or invalid Modal submission value.
-- Resolving an invalid Frame or duplicate Frame key.
+    
+- Resolving an invalid Frame.
+    
 - Encountering a component that cannot fit within Discord's limits.
-- Reading from or writing to the persistence Store.
-- Sending or editing an invalid Discord component structure.
+    
+- Sending an invalid Discord component structure.
+    
 
-Do not use `unwrap()`, `expect()`, or panics for ordinary framework failures. Do not invent placeholder values when persisted data or submitted input is missing or invalid.
+Errors should preserve useful context, especially the Page or Modal ID and execution ID involved.
 
 Fixed-size component slots should prevent invalid child counts from being expressible through the ordinary public API wherever possible. Runtime validation is still necessary for constraints that depend on resolved dynamic values.
 
@@ -936,7 +942,7 @@ Fixed-size component slots should prevent invalid child counts from being expres
 
 **Persistence survives restarts.** The database stores enough information to route interactions back to the correct Rust callbacks.
 
-**Errors are explicit.** Fallible operations return `anyhow::Result`; contextual chains preserve the cause and identify the Page, Modal, execution, component, or Frame involved.
+**Errors are explicit.** Invalid persisted references, missing values, and failed executions return errors instead of panicking.
 
 ## 12. Discord constraints
 
@@ -1014,7 +1020,7 @@ This order establishes the core execution and rendering model before adding the 
 The end result should make building a Discord interface mostly ordinary composition:
 
 ```rust
-let page = Page::<UserListData, MyDatabase>::new("UserList")
+let page = Page::<UserListData>::new("UserList")
     .add_container(
         Container::new()
             .add_text("# User Directory")
