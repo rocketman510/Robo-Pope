@@ -2,7 +2,6 @@ use std::sync::Arc;
 use serenity::all::Http;
 use crate::app::{App, Database};
 use crate::app::registry::{ModalRegistry, PageRegistry};
-use crate::app::router::InteractionRouter;
 use crate::app::store::{MemoryStore, Store};
 use crate::page::{PageDefinition, PageItem};
 use super::support::{app, OtherData, TestData};
@@ -32,7 +31,7 @@ fn app_constructor_initializes_empty_registries_and_keeps_database() {
     // bypassing its responsibility with a hand-built App.
     let store: Arc<dyn Store> = Arc::new(MemoryStore::default());
     let db = Database::new(store);
-    let app = App::new(Arc::new(Http::new("Bot red-phase-test")), db);
+    let app = App::new(Arc::new(serenity::http::HttpBuilder::new("Bot red-phase-test").build()), db);
     assert!(!app.pages.contains("missing-page"));
     assert!(!app.modals.contains("missing-modal"));
 }

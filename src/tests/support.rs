@@ -1,7 +1,6 @@
 //! Shared test fixtures. These construct the App without calling its unfinished constructor.
 use std::sync::Arc;
 use serde::{Deserialize, Serialize};
-use serenity::all::Http;
 use crate::app::{App, Database};
 use crate::app::registry::{ModalRegistry, PageRegistry};
 use crate::app::router::InteractionRouter;
@@ -30,7 +29,7 @@ pub fn app() -> App {
         db: Arc::new(Database::new(store)),
         pages: PageRegistry::default(),
         modals: ModalRegistry::default(),
-        http: Arc::new(Http::new("Bot red-phase-test")),
+        http: Arc::new(serenity::http::HttpBuilder::new("Bot red-phase-test").build()),
         router: InteractionRouter::default(),
     }
 }
