@@ -150,11 +150,15 @@ impl<T> Modal<T> {
         Fut:Future<Output=Result<()>>+Send+'static,
         T:Send+'static
 {
+        let callback = Arc::new(callback);
         self.submit = Some(Execution::with_input(
             "submit",
-            move |ctx, data, submission: ModalSubmission| async move {
-                let form = submission.deserialize::<S>()?;
-                callback(ctx, data, form).await
+            move |ctx, data, submission: ModalSubmission| {
+                let callback = Arc::clone(&callback);
+                async move {
+                    let form = submission.deserialize::<S>()?;
+                    callback(ctx, data, form).await
+                }
             },
         ));
         self
