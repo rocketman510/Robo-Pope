@@ -6,10 +6,41 @@ use std::sync::{
 use crate::{
     app::{RenderCtx, store::{CustomId, DefinitionKind, derive_custom_id}},
     page::{
-        Button, ButtonStyle, Element, Frame, Modal, Page, TextInputStyle, dynamic,
+        Button, ButtonStyle, Container, Element, Frame, Modal, Page, Separator, TextInputStyle, dynamic,
     },
 };
 use super::support::{app, TestData};
+
+#[tokio::test]
+async fn page_render_renders_container_children_in_order() {
+    let app = app();
+    let page = Page::<TestData>::new("render-container")
+        .add_container(
+            Container::new()
+                .set_accent_color(0x5865F2)
+                .add_text("Container heading")
+                .add_separator(Separator::new())
+                .add_text("Container footer"),
+        )
+        .register(&app)
+        .unwrap();
+
+    let rendered = page.render(&app, TestData::default()).await.unwrap();
+
+    assert_eq!(rendered.components().len(), 1);
+    let (components, attachments, pagination) = rendered.into_parts();
+    assert_eq!(components.len(), 1);
+    assert!(attachments.is_empty());
+    assert!(pagination.is_none());
+    let serialized = serde_json::to_value(&components[0]).unwrap();
+    assert_eq!(serialized["type"], 17);
+    assert_eq!(serialized["components"].as_array().unwrap().len(), 3);
+    assert_eq!(serialized["components"][0]["content"], "Container heading");
+    assert_eq!(serialized["components"][1]["type"],  separator_type());
+    assert_eq!(serialized["components"][2]["content"], "Container footer");
+}
+
+fn separator_type() -> u64 { 14 }
 
 #[tokio::test]
 async fn page_render_resolves_dynamic_values_with_page_data_and_app_context() {
