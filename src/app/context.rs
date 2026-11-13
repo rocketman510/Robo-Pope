@@ -42,19 +42,36 @@ pub struct Ctx {
 impl Ctx {
     /// Builds a temporary context from the current interaction and resolved selection.
     pub(crate) fn new(app: App, interaction: Arc<Interaction>, selection: Option<Selection>) -> Self {
-        todo!("construct interaction context from the actual Serenity payload")
+        let http = app.http.clone();
+        Self { app, interaction, http, selection }
     }
     /// Returns the interacting user when the interaction type has one.
     pub fn user_id(&self) -> Option<serenity::all::UserId> {
-        todo!("return interacting user when present")
+        use serenity::all::Interaction;
+        match self.interaction.as_ref() {
+            Interaction::Command(value) | Interaction::Autocomplete(value) => Some(value.user.id),
+            Interaction::Component(value) => Some(value.user.id),
+            Interaction::Modal(value) => Some(value.user.id),
+            Interaction::Ping(_) => None,
+            _ => None,
+        }
     }
     /// Returns the guild containing the interaction, or no value in a DM.
     pub fn guild_id(&self) -> Option<serenity::all::GuildId> {
-        todo!("return guild ID when available")
+        self.interaction.guild_id()
     }
     /// Returns the channel containing the interaction when available.
     pub fn channel_id(&self) -> Option<serenity::all::ChannelId> {
-        todo!("return channel ID when available")
+        use serenity::all::{ChannelId, Interaction};
+        match self.interaction.as_ref() {
+            Interaction::Command(value) | Interaction::Autocomplete(value) => {
+                Some(ChannelId::new(value.channel_id.get()))
+            }
+            Interaction::Component(value) => Some(ChannelId::new(value.channel_id.get())),
+            Interaction::Modal(value) => Some(ChannelId::new(value.channel_id.get())),
+            Interaction::Ping(_) => None,
+            _ => None,
+        }
     }
     /// Sends the initial response to this interaction, not a follow-up message.
     pub fn reply(&self, content: impl Into<String>) -> BoxFuture<'_, anyhow::Result<()>> {
