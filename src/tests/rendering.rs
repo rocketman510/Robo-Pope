@@ -4,7 +4,7 @@ use std::sync::{
 };
 
 use crate::{
-    app::{RenderCtx, store::{CustomId, DefinitionKind, Store, derive_custom_id}},
+    app::{RenderCtx, store::{CustomId, DefinitionKind, derive_custom_id}},
     page::{
         Button, ButtonStyle, Element, Frame, Modal, Page, TextInputStyle, dynamic,
     },
@@ -49,7 +49,8 @@ async fn page_render_preserves_dynamic_callback_errors_and_adds_page_context() {
         .register(&app)
         .unwrap();
 
-    let error = page.render(&app, TestData::default()).await.unwrap_err();
+    let error = page.render(&app, TestData::default()).await.err()
+        .expect("this render is expected to fail");
     let chain = format!("{error:#}");
 
     assert!(chain.contains("the dynamic source failed"));
@@ -65,7 +66,8 @@ async fn page_render_validates_the_combined_text_display_budget_after_resolution
         .register(&app)
         .unwrap();
 
-    let error = page.render(&app, TestData::default()).await.unwrap_err();
+    let error = page.render(&app, TestData::default()).await.err()
+        .expect("this render is expected to fail");
     assert!(format!("{error:#}").contains("render-text-budget"));
 }
 
