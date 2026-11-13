@@ -1473,13 +1473,6 @@ where
             .context("Resolving Container accent color")?);
     }
 
-    let static_container_children = prefix.len() + suffix.len();
-    let mut accent = None;
-    if let Some(value) = &container.accent_color {
-        accent = Some(super::value::resolve(value, ctx.clone(), data.clone()).await
-            .context("Resolving Container accent color")?);
-    }
-
     // Plan once without navigation. A single-page Frame needs no controls and
     // therefore should not lose a Container child slot to an unused Action Row.
     let mut ranges = plan_container_frame_ranges(
