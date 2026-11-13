@@ -893,32 +893,26 @@ This ensures that moving an element between pagination boundaries does not chang
 
 ## 10. Errors
 
-The framework should use ordinary Rust `Result` values for operations that can fail.
+The framework uses the Rust `anyhow` crate for error handling. Every fallible public operation returns `anyhow::Result<T>`. The framework does not define its own error enum or a custom Result alias.
 
-Examples include:
+Use `anyhow::Context` to add useful context as an error crosses framework boundaries. Context should identify the relevant Page or Modal ID, execution ID, component, Frame, or operation. For example, a rendering error should say which Page was being rendered, and a routing error should identify the definition and execution being resolved.
+
+Preserve the original error as the source. Do not convert errors to strings prematurely or discard their cause. Use `anyhow::bail!` and `anyhow::ensure!` for validation failures where appropriate.
+
+This applies to all fallible framework operations, including:
 
 - Registering duplicate Page or Modal IDs.
-    
 - Registering duplicate execution IDs within a Page.
-    
 - Rendering a component with invalid configuration.
-    
-- Resolving an unknown Page or Modal.
-    
-- Resolving an unknown execution.
-    
-- Deserializing persisted data.
-    
+- Resolving an unknown Page, Modal, or execution.
+- Serializing or deserializing persisted data.
 - Retrieving a missing or invalid Modal submission value.
-    
-- Resolving an invalid Frame.
-    
+- Resolving an invalid Frame or duplicate Frame key.
 - Encountering a component that cannot fit within Discord's limits.
-    
-- Sending an invalid Discord component structure.
-    
+- Reading from or writing to the persistence Store.
+- Sending or editing an invalid Discord component structure.
 
-Errors should preserve useful context, especially the Page or Modal ID and execution ID involved.
+Do not use `unwrap()`, `expect()`, or panics for ordinary framework failures. Do not invent placeholder values when persisted data or submitted input is missing or invalid.
 
 Fixed-size component slots should prevent invalid child counts from being expressible through the ordinary public API wherever possible. Runtime validation is still necessary for constraints that depend on resolved dynamic values.
 
@@ -942,7 +936,7 @@ Fixed-size component slots should prevent invalid child counts from being expres
 
 **Persistence survives restarts.** The database stores enough information to route interactions back to the correct Rust callbacks.
 
-**Errors are explicit.** Invalid persisted references, missing values, and failed executions return errors instead of panicking.
+**Errors are explicit.** Fallible operations return `anyhow::Result`; contextual chains preserve the cause and identify the Page, Modal, execution, component, or Frame involved.
 
 ## 12. Discord constraints
 
