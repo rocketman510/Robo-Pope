@@ -327,6 +327,7 @@ where
         let (rendered, child_budget) = Box::pin(render_component(
             component, app, ctx, data, serialized_data, definition_id, key,
         )).await?;
+        let rendered_count = rendered.len();
         for part in rendered {
             let child = match part.component {
                 CreateComponent::ActionRow(row) => CreateContainerComponent::ActionRow(row),
@@ -346,7 +347,7 @@ where
         }
         budget.total_components = budget.total_components.saturating_add(child_budget.total_components);
         budget.text_display_chars = budget.text_display_chars.saturating_add(child_budget.text_display_chars);
-        budget.direct_container_children = budget.direct_container_children.saturating_add(rendered_len(&child_budget));
+        budget.direct_container_children = budget.direct_container_children.saturating_add(rendered_count);
         Ok(())
     }
 
@@ -390,6 +391,7 @@ where
         super::limits::CONTAINER_MAX_DIRECT_CHILDREN
     );
 
+    let direct_child_count = children.len();
     let mut rendered = CreateContainer::new(children);
     if let Some(accent) = &container.accent_color {
         let accent = super::value::resolve(accent, ctx.clone(), data.clone())
@@ -398,13 +400,15 @@ where
     }
     rendered = rendered.spoiler(container.spoiler);
 
+    anyhow::ensure!(
+        direct_child_count <= super::limits::CONTAINER_MAX_DIRECT_CHILDREN,
+        "Rendered Container has {direct_child_count} direct children; maximum is {}",
+        super::limits::CONTAINER_MAX_DIRECT_CHILDREN
+    );
     budget.total_components = budget.total_components.saturating_add(1);
-    budget.direct_container_children = children_len_for_budget(&rendered);
+    budget.direct_container_children = direct_child_count;
     Ok((rendered.into_owned(), budget))
 }
-
-fn rendered_len(_budget: &ComponentBudget) -> usize { 1 }
-fn children_len_for_budget(_container: &CreateContainer<'_>) -> usize { 0 }
 
 async fn render_component<T>(
     component: &Component<T>,
