@@ -2,7 +2,11 @@
 use std::sync::Arc;
 use std::collections::HashSet;
 use anyhow::Context as _;
-use serenity::builder::{CreateActionRow, CreateButton, CreateComponent, CreateTextDisplay};
+use serenity::builder::{
+    CreateActionRow, CreateButton, CreateComponent, CreateSection,
+    CreateSectionAccessory, CreateSectionComponent, CreateTextDisplay,
+    CreateThumbnail, CreateUnfurledMediaItem,
+};
 use serenity::all::ButtonStyle as SerenityButtonStyle;
 use serde::{Serialize, de::DeserializeOwned};
 use crate::app::{App, RenderCtx};
@@ -367,7 +371,80 @@ where
                 ComponentBudget { total_components: 2, text_display_chars: 0, direct_container_children: 0 },
             ))
         }
-        C::Section(_) => anyhow::bail!("Section rendering is not implemented yet"),
+        C::Section(section) => {
+            use super::value::Slot;
+
+            let mut text_components = Vec::with_capacity(3);
+            let mut text_chars = 0usize;
+
+            for slot in [&section.text.0, &section.text.1, &section.text.2] {
+                if let Slot::Value(value) = slot {
+                    let content = super::value::resolve(value, ctx.clone(), data.clone())
+                        .await.context("Resolving Section Text Display content")?;
+                    text_chars = text_chars.saturating_add(content.chars().count());
+                    text_components.push(CreateSectionComponent::TextDisplay(
+                        CreateTextDisplay::new(content).into_owned()
+                    ));
+                }
+            }
+
+            anyhow::ensure!(
+                !text_components.is_empty(),
+                "Section must contain at least one Text Display"
+            );
+            anyhow::ensure!(
+                text_chars <= super::limits::MESSAGE_MAX_TEXT_DISPLAY_CHARS,
+                "Section Text Displays exceed the message text budget"
+            );
+
+            let accessory = match &section.accessory {
+                Some(super::component::SectionAccessory::Button(button)) => {
+                    let button = render_button(
+                        app, button, ctx, data, definition_id, serialized_data, frame_identity,
+                    ).await.with_context(|| "Rendering Section Button accessory")?;
+                    CreateSectionAccessory::Button(button)
+                }
+                Some(super::component::SectionAccessory::Thumbnail(thumbnail)) => {
+                    let url = super::value::resolve(
+                        &thumbnail.url, ctx.clone(), data.clone()
+                    ).await.context("Resolving Section Thumbnail URL")?;
+                    let description = match &thumbnail.description {
+                        Some(value) => Some(
+                            super::value::resolve(value, ctx.clone(), data.clone())
+                                .await.context("Resolving Section Thumbnail description")?
+                        ),
+                        None => None,
+                    };
+                    let spoiler = super::value::resolve(
+                        &thumbnail.spoiler, ctx.clone(), data.clone()
+                    ).await.context("Resolving Section Thumbnail spoiler state")?;
+
+                    let mut rendered = CreateThumbnail::new(CreateUnfurledMediaItem::new(url));
+                    if let Some(description) = description {
+                        rendered = rendered.description(description);
+                    }
+                    if spoiler {
+                        rendered = rendered.spoiler(true);
+                    }
+                    CreateSectionAccessory::Thumbnail(rendered.into_owned())
+                }
+                None => anyhow::bail!(
+                    "Section requires a Button or Thumbnail accessory"
+                ),
+            };
+
+            let rendered = CreateSection::new(text_components, accessory).into_owned();
+            Ok((
+                vec![RenderedComponent {
+                    component: CreateComponent::Section(rendered),
+                }],
+                ComponentBudget {
+                    total_components: 1 + text_components.len(),
+                    text_display_chars: text_chars,
+                    direct_container_children: 0,
+                },
+            ))
+        },
         C::Container(_) => anyhow::bail!("Container rendering is not implemented yet"),
         C::Separator(_) => anyhow::bail!("Separator rendering is not implemented yet"),
         C::MediaGallery(_) => anyhow::bail!("Media Gallery rendering is not implemented yet"),
