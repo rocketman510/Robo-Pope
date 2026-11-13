@@ -42,7 +42,7 @@ impl InteractionRouter {
             _ => anyhow::bail!("Expected a Component interaction"),
         };
 
-        let custom_id = CustomId(component.data.custom_id.clone());
+        let custom_id = CustomId(component.data.custom_id.to_string());
         let record = app
             .store()
             .resolve(&custom_id)
@@ -88,7 +88,7 @@ impl InteractionRouter {
             _ => anyhow::bail!("Expected a Modal submit interaction"),
         };
 
-        let custom_id = CustomId(modal.data.custom_id.clone());
+        let custom_id = CustomId(modal.data.custom_id.to_string());
         let record = app
             .store()
             .resolve(&custom_id)
