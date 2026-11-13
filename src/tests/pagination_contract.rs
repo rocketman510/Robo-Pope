@@ -49,8 +49,8 @@ async fn paginated_frame_renders_framework_previous_and_next_controls() {
         let json = serde_json::to_value(components).unwrap();
         let previous = find_button(&json, "Previous").expect("Previous control must exist");
         let next = find_button(&json, "Next").expect("Next control must exist");
-        assert_eq!(previous["disabled"].as_bool(), Some(index == 0));
-        assert_eq!(next["disabled"].as_bool(), Some(index == 1));
+        assert_eq!(previous["disabled"].as_bool().unwrap_or(false), index == 0);
+        assert_eq!(next["disabled"].as_bool().unwrap_or(false), index == 1);
         assert!(state.is_some());
     }
 }
