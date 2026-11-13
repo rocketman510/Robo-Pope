@@ -16,6 +16,7 @@ use crate::app::{App, RenderCtx};
 use crate::app::store::{derive_custom_id, DefinitionKind, StoreRecord};
 use super::component::*;
 use super::frame::Frame;
+use super::frame::pagination::PaginationRequest;
 use super::render::{RenderedComponent, RenderedMessage, RenderedPage};
 use super::select::SelectMenu;
 use super::value::IntoValue;
@@ -183,6 +184,130 @@ fn append_frame_identity(parent: Option<&str>, frame_id: &str, key: &str) -> Str
     }
 }
 
+fn pagination_identity(frame_id: &str, page_index: usize) -> String {
+    if page_index == 0 { frame_id.to_owned() } else { format!("{frame_id}:page:{page_index}") }
+}
+
+fn pagination_execution_id(frame_id: &str, direction: &str) -> String {
+    format!("__frame:{frame_id}:{direction}")
+}
+
+fn collect_component_frames<T>(
+    component: &Component<T>,
+    page_paginate: bool,
+    output: &mut Vec<String>,
+) {
+    use super::component::ContainerItem;
+    if let Component::Container(container) = component {
+        for child in &container.children {
+            match child {
+                ContainerItem::Component(component) => collect_component_frames(component, page_paginate, output),
+                ContainerItem::Frame(frame) if frame.paginate || page_paginate => output.push(frame.id.clone()),
+                ContainerItem::Frame(_) => {}
+            }
+        }
+    }
+}
+
+fn collect_paginated_frames<T>(definition: &PageDefinition<T>) -> Vec<String> {
+    use super::component::ContainerItem;
+    let mut output = Vec::new();
+    for item in &definition.items {
+        match item {
+            PageItem::Frame(frame) if frame.paginate || definition.paginate => output.push(frame.id.clone()),
+            PageItem::Component(component) => collect_component_frames(component, definition.paginate, &mut output),
+            PageItem::Frame(_) => {}
+        }
+        if let PageItem::Component(Component::Container(container)) = item {
+            for child in &container.children {
+                if let ContainerItem::Frame(frame) = child {
+                    if frame.paginate || definition.paginate { output.push(frame.id.clone()); }
+                }
+            }
+        }
+    }
+    output.sort();
+    output.dedup();
+    output
+}
+
+fn register_pagination_callbacks<T>(
+    app: &App,
+    definition: Arc<PageDefinition<T>>,
+    frame_ids: &[String],
+) -> anyhow::Result<()>
+where
+    T: Serialize + DeserializeOwned + Send + Sync + 'static,
+{
+    for frame_id in frame_ids {
+        for direction in ["previous", "next"] {
+            let execution_id = pagination_execution_id(frame_id, direction);
+            let callback_definition = definition.clone();
+            let callback_frame_id = frame_id.clone();
+            let callback_direction = direction.to_owned();
+            let execution = super::execution::Execution::with_input(
+                execution_id,
+                move |ctx, data: T, request: PaginationRequest| {
+                    let definition = callback_definition.clone();
+                    let frame_id = callback_frame_id.clone();
+                    let direction = callback_direction.clone();
+                    async move {
+                        anyhow::ensure!(
+                            request.frame_id == frame_id,
+                            "Pagination request refers to the wrong Frame"
+                        );
+                        anyhow::ensure!(
+                            request.source_page_index < request.page_count
+                                && request.target_page_index < request.page_count,
+                            "Pagination request is outside the Frame's page range"
+                        );
+                        anyhow::ensure!(
+                            (direction == "next" && request.target_page_index == request.source_page_index + 1)
+                                || (direction == "previous" && request.target_page_index + 1 == request.source_page_index),
+                            "Pagination request direction does not match its target page"
+                        );
+
+                        let mut next_state = request.expected_state.clone();
+                        next_state["page_index"] = serde_json::json!(request.target_page_index);
+                        let updated = ctx.app.store()
+                            .compare_and_set_pagination_state(
+                                &request.custom_id,
+                                &request.expected_state,
+                                next_state,
+                            )
+                            .await?;
+                        anyhow::ensure!(updated, "This pagination control is stale or has already been used");
+
+                        let serialized_data = serde_json::to_vec(&data)?;
+                        for page_index in 0..request.page_count {
+                            let identity = pagination_identity(&frame_id, page_index);
+                            for name in ["previous", "next"] {
+                                let exec_id = pagination_execution_id(&frame_id, name);
+                                let id = derive_custom_id(
+                                    &definition.id,
+                                    &exec_id,
+                                    &serialized_data,
+                                    Some(&identity),
+                                )?;
+                                ctx.app.store().remove(&id).await?;
+                            }
+                        }
+
+                        let page = RegisteredPage { definition };
+                        let rendered = page.render_pages(&ctx.app, data).await?;
+                        let message = rendered.pages.into_iter()
+                            .nth(request.target_page_index)
+                            .ok_or_else(|| anyhow::anyhow!("Rendered pagination page does not exist"))?;
+                        ctx.edit_message(message).await
+                    }
+                },
+            );
+            execution.register(app, &definition.id, Some(frame_id))?;
+        }
+    }
+    Ok(())
+}
+
 impl<T> Page<T> {
     /// Starts a Page definition with a globally unique application-wide ID.
     pub fn new(id: impl Into<String>) -> Self {
@@ -274,6 +399,12 @@ impl<T> Page<T> {
             items: self.items,
             paginate: self.paginate,
         });
+        let frame_ids = collect_paginated_frames(&definition);
+        if let Err(error) = register_pagination_callbacks(app, definition.clone(), &frame_ids) {
+            app.executions.remove_definition(&definition.id);
+            app.release_definition_id(&definition.id);
+            return Err(error);
+        }
         if let Err(error) = app.pages.insert(definition.clone()) {
             app.executions.remove_definition(&definition.id);
             app.release_definition_id(&definition.id);
