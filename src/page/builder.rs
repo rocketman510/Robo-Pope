@@ -1354,6 +1354,75 @@ where
     Ok((rendered, budget))
 }
 
+fn plan_container_frame_ranges(
+    elements: &[RenderedFrameElement],
+    page_prefix_budget: ComponentBudget,
+    page_suffix_budget: ComponentBudget,
+    prefix_budget: ComponentBudget,
+    suffix_budget: ComponentBudget,
+    static_child_count: usize,
+    reserve_navigation: bool,
+) -> anyhow::Result<Vec<(usize, usize)>> {
+    let navigation_components = if reserve_navigation { 3 } else { 0 };
+    let navigation_children = usize::from(reserve_navigation);
+    let reserved = add_budgets(
+        page_prefix_budget,
+        add_budgets(page_suffix_budget, add_budgets(
+            ComponentBudget {
+                total_components: 1 + navigation_components,
+                text_display_chars: 0,
+                direct_container_children: static_child_count + navigation_children,
+            },
+            add_budgets(prefix_budget, suffix_budget),
+        )),
+    );
+    anyhow::ensure!(
+        message_budget_fits(reserved),
+        "Static and navigation content exceeds the Discord Container message budget"
+    );
+
+    let mut ranges = Vec::new();
+    let mut start = 0usize;
+    let mut count = 0usize;
+    let mut used = reserved;
+    let mut direct_children = static_child_count + navigation_children;
+
+    for (index, element) in elements.iter().enumerate() {
+        let element_children = element.components.len();
+        anyhow::ensure!(
+            static_child_count + navigation_children + element_children
+                <= super::limits::CONTAINER_MAX_DIRECT_CHILDREN,
+            "A single nested Frame element cannot fit in Container with its navigation controls"
+        );
+        let combined = add_budgets(used, element.budget);
+        let combined_children = direct_children + element_children;
+        if count > 0 && (
+            !message_budget_fits(combined)
+                || combined_children > super::limits::CONTAINER_MAX_DIRECT_CHILDREN
+        ) {
+            ranges.push((start, index));
+            start = index;
+            count = 0;
+            used = reserved;
+            direct_children = static_child_count + navigation_children;
+        }
+        let next = add_budgets(used, element.budget);
+        anyhow::ensure!(
+            message_budget_fits(next)
+                && direct_children + element_children <= super::limits::CONTAINER_MAX_DIRECT_CHILDREN,
+            "A single nested Frame element exceeds its rendered Container budget"
+        );
+        used = next;
+        direct_children += element_children;
+        count += 1;
+    }
+
+    if count > 0 || ranges.is_empty() {
+        ranges.push((start, elements.len()));
+    }
+    Ok(ranges)
+}
+
 async fn render_paginated_container<T>(
     container: &super::component::Container<T>,
     app: &App,
@@ -1404,66 +1473,54 @@ where
             .context("Resolving Container accent color")?);
     }
 
-    let mut all_pages: Vec<Vec<RenderedFrameElement>> = Vec::new();
-    let mut current: Vec<RenderedFrameElement> = Vec::new();
-    let mut current_budget = add_budgets(
+    let static_container_children = prefix.len() + suffix.len();
+    let mut accent = None;
+    if let Some(value) = &container.accent_color {
+        accent = Some(super::value::resolve(value, ctx.clone(), data.clone()).await
+            .context("Resolving Container accent color")?);
+    }
+
+    // Plan once without navigation. A single-page Frame needs no controls and
+    // therefore should not lose a Container child slot to an unused Action Row.
+    let mut ranges = plan_container_frame_ranges(
+        &rendered_elements,
         page_prefix_budget,
-        add_budgets(page_suffix_budget, add_budgets(
-            ComponentBudget { total_components: 1, text_display_chars: 0, direct_container_children: static_container_children + 1 },
-            add_budgets(prefix_budget, suffix_budget),
-        )),
-    );
-    let mut current_direct_children = static_container_children + 1; // reserve the navigation Action Row
-    let mut current_count = 0usize;
-
-    for element in rendered_elements {
-        let direct = element.components.len();
-        anyhow::ensure!(
-            static_container_children + 1 + direct <= super::limits::CONTAINER_MAX_DIRECT_CHILDREN,
-            "A single nested Frame element cannot fit in Container '{frame_id}'"
-        );
-        let next_budget = add_budgets(current_budget, element.budget);
-        let next_direct = current_direct_children + direct;
-        let fits = message_budget_fits(next_budget)
-            && next_direct <= super::limits::CONTAINER_MAX_DIRECT_CHILDREN;
-        if !fits && current_count > 0 {
-            all_pages.push(std::mem::take(&mut current));
-            current_budget = add_budgets(
-                page_prefix_budget,
-                add_budgets(page_suffix_budget, add_budgets(
-                    ComponentBudget { total_components: 1, text_display_chars: 0, direct_container_children: static_container_children + 1 },
-                    add_budgets(prefix_budget, suffix_budget),
-                )),
-            );
-            current_direct_children = static_container_children + 1;
-            current_count = 0;
-        }
-        current_budget = add_budgets(current_budget, element.budget);
-        current_direct_children += direct;
-        current.push(element);
-        current_count += 1;
+        page_suffix_budget,
+        prefix_budget,
+        suffix_budget,
+        static_container_children,
+        false,
+    )?;
+    if ranges.len() > 1 {
+        ranges = plan_container_frame_ranges(
+            &rendered_elements,
+            page_prefix_budget,
+            page_suffix_budget,
+            prefix_budget,
+            suffix_budget,
+            static_container_children,
+            true,
+        )?;
     }
-    if current_count > 0 || all_pages.is_empty() {
-        all_pages.push(current);
-    }
-
-    // With one page there is no navigation control, so recompute the message
-    // validation without its reserved Action Row.
-    let page_count = all_pages.len();
+    let page_count = ranges.len();
     let mut pages = Vec::with_capacity(page_count);
-    for (page_index, frame_elements) in all_pages.into_iter().enumerate() {
+    for (page_index, (start, end)) in ranges.into_iter().enumerate() {
         let mut children = Vec::new();
         for part in prefix.iter().cloned() { children.push(as_container_child(part)?); }
-        for element in frame_elements {
-            for part in element.components { children.push(as_container_child(part)?); }
+        for element in &rendered_elements[start..end] {
+            for part in element.components.iter().cloned() { children.push(as_container_child(part)?); }
         }
         for part in suffix.iter().cloned() { children.push(as_container_child(part)?); }
 
+        let mut frame_budget = ComponentBudget::default();
+        for element in &rendered_elements[start..end] {
+            frame_budget = add_budgets(frame_budget, element.budget);
+        }
         let mut budget = add_budgets(
             page_prefix_budget,
             add_budgets(page_suffix_budget, add_budgets(
                 ComponentBudget { total_components: 1, text_display_chars: 0, direct_container_children: children.len() },
-                add_budgets(prefix_budget, suffix_budget),
+                add_budgets(prefix_budget, add_budgets(suffix_budget, frame_budget)),
             )),
         );
         if page_count > 1 {
