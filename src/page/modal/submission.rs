@@ -97,13 +97,34 @@ impl ModalSubmission {
                 SubmittedValue::Strings(values) => serde_json::to_value(values)
                     .context("Serializing Modal string selections")?,
                 SubmittedValue::Boolean(value) => serde_json::Value::Bool(*value),
-                SubmittedValue::Users(_)
-                | SubmittedValue::Roles(_)
-                | SubmittedValue::Mentionables(_)
-                | SubmittedValue::Channels(_)
-                | SubmittedValue::Files(_) => {
-                    anyhow::bail!("Modal field '{id}' uses a typed value that is not supported by generic Serde deserialization")
-                }
+                SubmittedValue::Users(values) => serde_json::Value::Array(
+                    values.iter().map(|value| serde_json::Value::Number(value.id.get().into())).collect()
+                ),
+                SubmittedValue::Roles(values) => serde_json::Value::Array(
+                    values.iter().map(|value| serde_json::Value::Number(value.id.get().into())).collect()
+                ),
+                SubmittedValue::Channels(values) => serde_json::Value::Array(
+                    values.iter().map(|value| serde_json::Value::Number(value.id.get().into())).collect()
+                ),
+                SubmittedValue::Mentionables(values) => serde_json::Value::Array(
+                    values.iter().map(|value| match value {
+                        SelectedMentionable::User(user) => serde_json::json!({
+                            "kind": "user", "id": user.id.get()
+                        }),
+                        SelectedMentionable::Role(role) => serde_json::json!({
+                            "kind": "role", "id": role.id.get()
+                        }),
+                    }).collect()
+                ),
+                SubmittedValue::Files(values) => serde_json::Value::Array(
+                    values.iter().map(|file| serde_json::json!({
+                        "id": file.id.get(),
+                        "filename": file.filename,
+                        "url": file.url,
+                        "size": file.size,
+                        "content_type": file.content_type,
+                    })).collect()
+                )
             };
             object.insert(id.clone(), json);
         }
