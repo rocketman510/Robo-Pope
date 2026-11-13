@@ -7,7 +7,10 @@
 use std::sync::Arc;
 
 use serde_json::Value as JsonValue;
-use serenity::all::{ComponentInteractionDataKind, Interaction, InteractionType};
+use serenity::all::{
+    ComponentInteractionDataKind, Interaction, InteractionType, LabelComponent,
+    ModalComponent, SelectMenuKind,
+};
 
 use crate::app::executions::{ExecutionKey, InteractionPayload};
 use crate::app::store::CustomId;
@@ -119,11 +122,129 @@ impl InteractionRouter {
         let data: JsonValue = serde_json::from_slice(&record.serialized_data)
             .map_err(|e| anyhow::anyhow!("Deserializing stored Modal data: {e}"))?;
 
-        let submission = ModalSubmission::default();
+        let submission = extract_modal_submission(modal)?;
         let payload = InteractionPayload::Modal(submission);
         let ctx = Ctx::new(app.clone(), Arc::new(interaction), None);
         callback(ctx, data, payload).await
     }
+}
+
+
+fn parse_u64(value: &str, field: &str) -> anyhow::Result<u64> {
+    value.parse::<u64>()
+        .map_err(|error| anyhow::anyhow!("Invalid Discord ID in Modal field '{field}': {error}"))
+}
+
+/// Reconstructs every submitted Modal value from Serenity's Label components
+/// and resolved entity/attachment maps.
+fn extract_modal_submission(
+    modal: &serenity::all::ModalInteraction,
+) -> anyhow::Result<ModalSubmission> {
+    let mut submission = ModalSubmission::default();
+    for component in &modal.data.components {
+        let ModalComponent::Label(label) = component else {
+            continue;
+        };
+        match &label.component {
+            LabelComponent::InputText(input) => {
+                submission.values.insert(
+                    input.custom_id.to_string(),
+                    crate::page::SubmittedValue::Text(input.value.to_string()),
+                );
+            }
+            LabelComponent::SelectMenu(menu) => {
+                let id = menu.custom_id.to_string();
+                let values: Vec<String> = menu.values.iter().map(ToString::to_string).collect();
+                let value = match &menu.kind {
+                    SelectMenuKind::String { .. } => crate::page::SubmittedValue::Strings(values),
+                    SelectMenuKind::User { .. } => {
+                        let selected = values.iter().map(|value| {
+                            Ok(crate::page::SelectedUser {
+                                id: serenity::all::UserId::new(parse_u64(value, &id)?),
+                                resolved: None,
+                            })
+                        }).collect::<anyhow::Result<Vec<_>>>()?;
+                        crate::page::SubmittedValue::Users(selected)
+                    }
+                    SelectMenuKind::Role { .. } => {
+                        let selected = values.iter().map(|value| {
+                            Ok(crate::page::SelectedRole {
+                                id: serenity::all::RoleId::new(parse_u64(value, &id)?),
+                                resolved: None,
+                            })
+                        }).collect::<anyhow::Result<Vec<_>>>()?;
+                        crate::page::SubmittedValue::Roles(selected)
+                    }
+                    SelectMenuKind::Mentionable { .. } => {
+                        let mut selected = Vec::with_capacity(values.len());
+                        for value in &values {
+                            let raw_id = parse_u64(value, &id)?;
+                            let user_id = serenity::all::UserId::new(raw_id);
+                            let role_id = serenity::all::RoleId::new(raw_id);
+                            if modal.data.resolved.users.get(&user_id).is_some() {
+                                selected.push(crate::page::SelectedMentionable::User(
+                                    crate::page::SelectedUser { id: user_id, resolved: None }
+                                ));
+                            } else if modal.data.resolved.roles.get(&role_id).is_some() {
+                                selected.push(crate::page::SelectedMentionable::Role(
+                                    crate::page::SelectedRole { id: role_id, resolved: None }
+                                ));
+                            } else {
+                                anyhow::bail!(
+                                    "Modal field '{id}' contains a Mentionable ID absent from resolved entities"
+                                );
+                            }
+                        }
+                        crate::page::SubmittedValue::Mentionables(selected)
+                    }
+                    SelectMenuKind::Channel { .. } => {
+                        let selected = values.iter().map(|value| {
+                            Ok(crate::page::SelectedChannel {
+                                id: serenity::all::ChannelId::new(parse_u64(value, &id)?),
+                                resolved: None,
+                            })
+                        }).collect::<anyhow::Result<Vec<_>>>()?;
+                        crate::page::SubmittedValue::Channels(selected)
+                    }
+                    _ => anyhow::bail!("Unsupported Modal Select kind in field '{id}'"),
+                };
+                submission.values.insert(id, value);
+            }
+            LabelComponent::FileUpload(upload) => {
+                let id = upload.custom_id.to_string();
+                let mut attachments = Vec::with_capacity(upload.values.len());
+                for attachment_id in &upload.values {
+                    let attachment = modal.data.resolved.attachments.get(attachment_id)
+                        .cloned()
+                        .ok_or_else(|| anyhow::anyhow!(
+                            "Modal field '{id}' references an attachment missing from resolved data"
+                        ))?;
+                    attachments.push(attachment);
+                }
+                submission.values.insert(id, crate::page::SubmittedValue::Files(attachments));
+            }
+            LabelComponent::RadioGroup(group) => {
+                let value = group.value.as_ref().map(|value| vec![value.to_string()]).unwrap_or_default();
+                submission.values.insert(
+                    group.custom_id.to_string(),
+                    crate::page::SubmittedValue::Strings(value),
+                );
+            }
+            LabelComponent::CheckboxGroup(group) => {
+                submission.values.insert(
+                    group.custom_id.to_string(),
+                    crate::page::SubmittedValue::Strings(group.values.iter().map(ToString::to_string).collect()),
+                );
+            }
+            LabelComponent::Checkbox(checkbox) => {
+                submission.values.insert(
+                    checkbox.custom_id.to_string(),
+                    crate::page::SubmittedValue::Boolean(checkbox.value),
+                );
+            }
+        }
+    }
+    Ok(submission)
 }
 
 fn extract_selection(kind: &ComponentInteractionDataKind) -> Option<Selection> {
