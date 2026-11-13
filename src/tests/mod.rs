@@ -2,6 +2,7 @@
 mod app;
 mod builder;
 mod components;
+mod contract_audit;
 mod execution;
 mod frame;
 mod modal;
