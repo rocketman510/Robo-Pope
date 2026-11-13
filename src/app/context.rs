@@ -1,43 +1,63 @@
-//! Render-time and interaction-time contexts.
-//!
-//! RenderCtx is temporary and supplied while dynamic Page properties and
-//! Frames resolve. It exposes App<E>, definition identity, render-instance
-//! data, and an internal collector for discovered execution references.
-//!
-//! Ctx is temporary and belongs to one Discord interaction. It supplies the
-//! application and typed interaction information, plus common operations:
-//! reply, defer, acknowledge, edit the component message, edit the original
-//! response, follow up, delete the response, and open a Modal.
-//!
-//! Original Page/Modal data and interaction submission data are separate.
-//! Select values come from the interaction payload; ModalSubmission contains
-//! submitted form values. Neither should be silently merged into T.
-//!
-//! Accessors expose user, guild/channel, interaction ID, message, and
-//! selection values. Operations invalid for an interaction kind return
-//! descriptive errors or Option rather than panicking.
-//!
-//! A valid custom ID identifies an execution, not its authorization. The
-//! callback remains responsible for permission checks.
-//!
-//! Intended type shape (illustrative):
-//! \`\`\`rust,ignore
-//! struct RenderCtx<'a, T, E> {
-//!     app: &'a App<E>,
-//!     definition_id: &'a str,
-//!     instance_data: &'a T,
-//!     execution_collector: /* render-local collector */,
-//! }
-//! struct Ctx<'a, E> {
-//!     app: &'a App<E>,
-//!     interaction: &'a Interaction,
-//!     selection: /* optional typed interaction payload */,
-//! }
-//! \`\`\`
-//!
-//! TODO: Define RenderCtx<'a, T, E> and Ctx<'a, E>.
-//! TODO: Prefer borrowing Page data in async dynamic callbacks instead of
-//!       requiring Clone on every T, if lifetimes permit.
-//! TODO: Model response acknowledgement state to prevent multiple initial
-//!       responses.
-//! TODO: Preserve Serenity failures as framework errors.
+//! Temporary contexts supplied to dynamic values and interactive executions.
+use std::sync::Arc;
+use serenity::all::{Http,Interaction};
+use crate::app::{App,BoxFuture};
+use crate::page::{ModalRender,RenderedMessage,Selection};
+
+pub struct RenderCtx<E=()> {
+    pub app:App<E>,
+    pub definition_id:Arc<str>,
+}
+impl<E> Clone for RenderCtx<E> {
+    fn clone(&self)->Self {
+        Self { app:self.app.clone(),definition_id:self.definition_id.clone() }
+    }
+}
+impl<E> RenderCtx<E> {
+    pub(crate) fn new(app:App<E>,definition_id:Arc<str>)->Self {
+        Self { app,definition_id }
+    }
+}
+
+pub struct Ctx<E=()> {
+    pub app:App<E>,
+    pub interaction:Arc<Interaction>,
+    pub http:Arc<Http>,
+    pub selection:Option<Selection>,
+}
+impl<E:Send+Sync+'static> Ctx<E> {
+    pub(crate) fn new(app:App<E>,interaction:Arc<Interaction>,selection:Option<Selection>)->Self {
+        todo!("construct interaction context from the actual Serenity payload")
+    }
+    pub fn user_id(&self)->Option<serenity::all::UserId> {
+        todo!("return interacting user when present")
+    }
+    pub fn guild_id(&self)->Option<serenity::all::GuildId> {
+        todo!("return guild ID when available")
+    }
+    pub fn channel_id(&self)->Option<serenity::all::ChannelId> {
+        todo!("return channel ID when available")
+    }
+    pub fn reply(&self,content:impl Into<String>)->BoxFuture<'_,anyhow::Result<()>> {
+        todo!("send initial interaction response")
+    }
+    pub fn defer(&self)->BoxFuture<'_,anyhow::Result<()>> {
+        todo!("defer initial response")
+    }
+    pub fn edit_message(&self,message:RenderedMessage)->BoxFuture<'_,anyhow::Result<()>> {
+        todo!("edit component message")
+    }
+    pub fn edit_original_response(&self,message:RenderedMessage)->BoxFuture<'_,anyhow::Result<()>> {
+        todo!("edit original response")
+    }
+    pub fn followup(&self,message:RenderedMessage)->BoxFuture<'_,anyhow::Result<()>> {
+        todo!("send follow-up response")
+    }
+    pub fn delete_response(&self)->BoxFuture<'_,anyhow::Result<()>> {
+        todo!("delete interaction response")
+    }
+    pub fn open_modal(&self,modal:ModalRender)->BoxFuture<'_,anyhow::Result<()>> {
+        todo!("open Modal as initial interaction response")
+    }
+    pub fn selected(&self)->Option<&Selection> { self.selection.as_ref() }
+}

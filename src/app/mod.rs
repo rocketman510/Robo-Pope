@@ -1,39 +1,52 @@
-use serenity::{all::{Context, CreateMessage, EventHandler, FullEvent, MessageFlags }, async_trait};
+//! App ownership, typed definition registries, persistence, and interaction routing.
+pub mod context;
+pub mod database;
+pub mod error;
+pub mod handler;
+pub mod registry;
+pub mod router;
+pub mod store;
 
-use crate::page::{DomElement, Page, TextElement};
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::Arc;
+use serenity::all::Http;
+use registry::{ModalRegistry,PageRegistry};
+use router::InteractionRouter;
+use store::Store;
 
-#[derive(Debug)]
-pub struct App;
+pub use anyhow::{Context,Error,Result};
+pub use context::{Ctx,RenderCtx};
+pub use database::Database;
 
-#[async_trait]
-impl EventHandler for App {
-    async fn dispatch(&self, ctx: &Context, event: &FullEvent) {
-        match event {
-            FullEvent::Message { new_message, .. } => {
-                println!("{:#?}", new_message.content);
-                let mut page = Page::<&'static str>::new("Test");
+pub type BoxFuture<'a,T> = Pin<Box<dyn Future<Output=T>+Send+'a>>;
 
-                page.add_element(DomElement::Text(TextElement { content: "Test" }));
-
-                let render = page.render(self, &"test").await;
-
-                let message = CreateMessage::new()
-                    .reference_message(new_message)
-                    .components(vec![render])
-                    .flags(MessageFlags::from_bits_retain(1 << 15));
-
-                if let Err(error) = new_message
-                    .channel_id
-                    .send_message(&ctx.http, message)
-                    .await
-                {
-                    eprintln!("Failed to send message: {error}");
-                }            
-            },
-            FullEvent::InteractionCreate { interaction, .. } => {
-                println!("Received an interaction: {interaction:#?}");
-            }
-            _ => {}
-        }
+/// E is the host application's typed database/service bundle. T remains the
+/// only serialized per-Page instance data; E is never serialized.
+pub struct App<E=()> {
+    pub db:Arc<Database<E>>,
+    pub pages:PageRegistry<E>,
+    pub modals:ModalRegistry<E>,
+    pub(crate) http:Arc<Http>,
+    pub(crate) router:InteractionRouter<E>,
+}
+impl<E> Clone for App<E> {
+    fn clone(&self)->Self {
+        Self { db:self.db.clone(),pages:self.pages.clone(),modals:self.modals.clone(),
+            http:self.http.clone(),router:self.router.clone() }
     }
+}
+impl<E:Send+Sync+'static> App<E> {
+    pub fn new(http:Arc<Http>,db:Database<E>)->Self {
+        todo!("construct shared App state and empty registries")
+    }
+    pub async fn dispatch_interaction(
+        &self,interaction:serenity::all::Interaction
+    )->anyhow::Result<()> {
+        self.router.dispatch(self,interaction).await
+    }
+    pub fn render_context(&self,definition_id:impl Into<Arc<str>>)->RenderCtx<E> {
+        RenderCtx::new(self.clone(),definition_id.into())
+    }
+    pub fn store(&self)->&dyn Store { self.db.store.as_ref() }
 }

@@ -3,6 +3,14 @@ name = "Robo-Pope"
 version = "0.0.1"
 edition = "2024"
 
+[lib]
+name = "robo_pope"
+path = "src/lib.rs"
+
+[[bin]]
+name = "robo-pope"
+path = "src/main.rs"
+
 [dependencies]
 anyhow = "1.0.104"
 dotenv = "0.15.0"

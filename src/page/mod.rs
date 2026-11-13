@@ -1,85 +1,21 @@
-use crate::app::App;
-use serenity::{all::{CreateContainer, CreateTextDisplay}, builder::{
-    CreateComponent,
-    CreateContainerComponent,
-}, futures::future::BoxFuture};
+//! Declarative Pages, Components V2, Frames, and Modals.
+pub mod builder;
+pub mod component;
+pub mod execution;
+pub mod frame;
+pub mod limits;
+pub mod modal;
+pub mod render;
+pub mod select;
+pub mod value;
 
-#[derive(Debug)]
-pub struct Page<T> {
-    pub id: &'static str,
-    pub dom: Vec<DomElement<T>>
-}
-
-#[derive(Debug)]
-pub enum DomElement<T> {
-    Text(TextElement),
-    DynText(DynTextElement<T>),
-}
-
-#[derive(Debug)]
-pub struct TextElement {
-    pub content: &'static str,
-}
-
-pub struct DynTextElement<T> {
-    pub content: Box<dyn Fn(&App, &T) -> BoxFuture<'static, String> + Send + Sync>,
-}
-
-impl<T> std::fmt::Debug for DynTextElement<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("DynTextElement")
-            .field("content", &"<closure>")
-            .finish()
-    }
-}
-
-impl<T> Page<T> {
-    pub async fn render(&self, app: &App, data: &T) -> CreateComponent<'_> {
-        let mut components = Vec::new();
-
-        for element in &self.dom {
-            components.push(element.render(app, data).await);
-        }
-
-        CreateComponent::Container(
-            CreateContainer::new(components)
-        )
-    }
-    pub fn new(id: &'static str) -> Self {
-        Self {id, dom: Vec::new()}
-    }
-    pub fn add_element(&mut self, element: DomElement<T>) -> &mut Self {
-        self.dom.push(element);
-        self
-    }
-}
-
-trait Render<T> {
-    async fn render(&self, app: &App, data: &T) -> CreateContainerComponent<'_>;
-}
-
-impl<T> Render<T> for TextElement {
-    async fn render(&self, _: &App, _: &T) -> CreateContainerComponent<'_> {
-        CreateContainerComponent::TextDisplay(
-            CreateTextDisplay::new(self.content)
-        )
-    }
-}
-
-impl<T> Render<T> for DynTextElement<T> {
-    async fn render(&self, app: &App, data: &T) -> CreateContainerComponent<'_> {
-        let result = (self.content)(app, data).await;
-        CreateContainerComponent::TextDisplay(
-            CreateTextDisplay::new(result)
-        )
-    }
-}
-
-impl<T> Render<T> for DomElement<T> {
-    async fn render(&self, app: &App, data: &T) -> CreateContainerComponent<'_> {
-        match self {
-            Self::Text(e) => {e.render(app, data).await}
-            Self::DynText(e) => {e.render(app, data).await}
-        }
-    }
-}
+pub use builder::{Page,PageDefinition,PageItem,RegisteredPage};
+pub use component::{Button,ButtonRow,ButtonSlots,ButtonStyle,Component,Container,
+    ContainerItem,File,LinkButton,MediaGallery,MediaItem,Section,SectionAccessory,
+    Separator,SeparatorSpacing,Text,Thumbnail};
+pub use execution::{Execution,Selection,SelectedUser,SelectedRole,SelectedMentionable,SelectedChannel};
+pub use frame::{Element,Frame,FrameIdentity};
+pub use modal::{Modal,ModalRender,RegisteredModal};
+pub use render::{OutgoingAttachment,RenderedComponent,RenderedMessage,RenderedPage};
+pub use select::{ChannelSelect,MentionableSelect,RoleSelect,SelectMenu,SelectOption,StringSelect,UserSelect};
+pub use value::{dynamic,resolve,Dynamic,IntoSlot,IntoValue,Slot,Value};

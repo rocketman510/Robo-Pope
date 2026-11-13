@@ -1,29 +1,70 @@
-//! Typed registries for immutable registered Page and Modal definitions.
-//!
-//! One App may own Page<UserData>, Page<SettingsData>, and
-//! Modal<TicketData>. Public query methods recover RegisteredPage<T> or
-//! RegisteredModal<T>; callers never handle erased definitions.
-//!
-//! Each entry has a definition ID, a private erased interface for routing,
-//! and a typed handle for public queries. Erasure is an implementation
-//! detail. Registries contain callbacks, not serialized closures. Store
-//! records point to definition and execution IDs; the registered definition
-//! resolves those IDs to callbacks.
-//!
-//! Registration rejects duplicate IDs without replacing an existing
-//! definition. Page and Modal IDs participate in deterministic custom-ID
-//! identity, so their namespace policy must be explicit and collision-free.
-//!
-//! Intended shape (illustrative):
-//! \`\`\`rust,ignore
-//! struct PageRegistry<E> { entries: /* HashMap<PageId, ErasedPage<E>> */ }
-//! struct ModalRegistry<E> { entries: /* HashMap<ModalId, ErasedModal<E>> */ }
-//! trait ErasedPage<E> { /* render / invoke without exposing T */ }
-//! trait ErasedModal<E> { /* render / submit without exposing T */ }
-//! \`\`\`
-//!
-//! TODO: Define PageRegistry<E>, ModalRegistry<E>, and erased entry traits.
-//! TODO: Preserve concrete T on lookup and return DataMismatch for wrong T.
-//! TODO: Make duplicate registration atomic and non-destructive.
-//! TODO: Decide whether Page and Modal IDs share one global namespace.
-//! TODO: Define safe concurrent lookup and startup registration behavior.
+//! Heterogeneous registries; concrete T is retained by typed query handles.
+use std::any::Any;
+use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
+use crate::page::{PageDefinition, RegisteredPage};
+use crate::page::modal::{ModalDefinition, RegisteredModal};
+
+pub struct PageRegistry<E> {
+    entries: Arc<RwLock<HashMap<String, Arc<dyn Any + Send + Sync>>>>,
+    marker: std::marker::PhantomData<fn() -> E>,
+}
+impl<E> Clone for PageRegistry<E> {
+    fn clone(&self) -> Self {
+        Self { entries: self.entries.clone(), marker: std::marker::PhantomData }
+    }
+}
+impl<E: Send + Sync + 'static> Default for PageRegistry<E> {
+    fn default() -> Self {
+        Self { entries: Arc::new(RwLock::new(HashMap::new())), marker: std::marker::PhantomData }
+    }
+}
+impl<E: Send + Sync + 'static> PageRegistry<E> {
+    pub fn insert<T: Send + Sync + 'static>(
+        &self,
+        definition: Arc<PageDefinition<T, E>>,
+    ) -> anyhow::Result<()> {
+        todo!("insert atomically and reject duplicate Page IDs")
+    }
+    pub fn query<T: Send + Sync + 'static>(
+        &self,
+        id: &str,
+    ) -> anyhow::Result<RegisteredPage<T, E>> {
+        todo!("downcast internally and return a correctly typed handle")
+    }
+    pub fn contains(&self, id: &str) -> bool {
+        todo!("check definition presence")
+    }
+}
+
+pub struct ModalRegistry<E> {
+    entries: Arc<RwLock<HashMap<String, Arc<dyn Any + Send + Sync>>>>,
+    marker: std::marker::PhantomData<fn() -> E>,
+}
+impl<E> Clone for ModalRegistry<E> {
+    fn clone(&self) -> Self {
+        Self { entries: self.entries.clone(), marker: std::marker::PhantomData }
+    }
+}
+impl<E: Send + Sync + 'static> Default for ModalRegistry<E> {
+    fn default() -> Self {
+        Self { entries: Arc::new(RwLock::new(HashMap::new())), marker: std::marker::PhantomData }
+    }
+}
+impl<E: Send + Sync + 'static> ModalRegistry<E> {
+    pub fn insert<T: Send + Sync + 'static>(
+        &self,
+        definition: Arc<ModalDefinition<T, E>>,
+    ) -> anyhow::Result<()> {
+        todo!("insert atomically and reject duplicate Modal IDs")
+    }
+    pub fn query<T: Send + Sync + 'static>(
+        &self,
+        id: &str,
+    ) -> anyhow::Result<RegisteredModal<T, E>> {
+        todo!("downcast internally and return a correctly typed handle")
+    }
+    pub fn contains(&self, id: &str) -> bool {
+        todo!("check definition presence")
+    }
+}

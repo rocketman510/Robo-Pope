@@ -1,24 +1,23 @@
-//! Route Discord interactions to registered executions.
-//!
-//! Router orchestration: receive an Interaction, extract custom_id, resolve
-//! its Store record, locate the Page or Modal definition, reconstruct typed
-//! instance data, and invoke the registered callback with a temporary Ctx.
-//!
-//! Component interactions and Modal submissions are separate routes.
-//! Selection values are decoded from the Discord payload and passed as typed
-//! Selection<S> alongside original Page data; they are not persisted as part
-//! of Page data.
-//!
-//! Unknown custom IDs, missing definitions/executions, deserialization
-//! failures, and unsupported interaction kinds return contextual Result
-//! errors. Never treat a valid custom ID as authorization.
-//!
-//! Frame-generated interactions additionally resolve stable Frame and
-//! developer-provided element identity. Never route by a component's current
-//! vector position or current pagination page.
-//!
-//! TODO: Define InteractionRouter<E> and component/Modal dispatch.
-//! TODO: Centralize custom-ID lookup and record validation.
-//! TODO: Reconstruct PageData<T> separately from selection interaction data.
-//! TODO: Resolve Frame identities without relying on ordering or indices.
-//! TODO: Define stale-record behavior across deployments/schema changes.
+//! Route interactions by stored identity, never by visual component position.
+use crate::app::App;
+use serenity::all::Interaction;
+use std::marker::PhantomData;
+
+pub struct InteractionRouter<E> { marker:PhantomData<fn()->E> }
+impl<E> Clone for InteractionRouter<E> {
+    fn clone(&self)->Self { Self { marker:PhantomData } }
+}
+impl<E> Default for InteractionRouter<E> {
+    fn default()->Self { Self { marker:PhantomData } }
+}
+impl<E:Send+Sync+'static> InteractionRouter<E> {
+    pub async fn dispatch(&self,app:&App<E>,interaction:Interaction)->anyhow::Result<()> {
+        todo!("identify interaction kind and delegate to its route")
+    }
+    pub async fn dispatch_component(&self,app:&App<E>,interaction:Interaction)->anyhow::Result<()> {
+        todo!("resolve Store record, definition, execution, Page data, and selection payload")
+    }
+    pub async fn dispatch_modal_submit(&self,app:&App<E>,interaction:Interaction)->anyhow::Result<()> {
+        todo!("resolve Modal data and pass ModalSubmission separately")
+    }
+}

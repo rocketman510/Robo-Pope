@@ -1,39 +1,67 @@
-//! Persistence contract for interactive execution references.
-//!
-//! Discord returns custom_id when a component is used. Store resolves that
-//! identifier to a record containing definition kind (Page or Modal),
-//! definition ID, execution ID, serialized instance data, and optional
-//! Frame/element identity for interactive content generated inside a Frame.
-//!
-//! Custom IDs must fit Discord's 100-character limit. Hash inputs must be
-//! unambiguous and versioned, using deterministic serialization and a stable
-//! hash such as BLAKE3. A hash is an identifier, not an authorization token.
-//!
-//! Store is an abstraction, not proof of durable persistence. An in-memory
-//! implementation is useful for tests and local development but does not
-//! survive restarts. Production must supply a durable backend. Re-rendering
-//! the same identity should be idempotent; a conflicting record must not
-//! silently redirect an old custom ID to different behavior. Define expiry
-//! and cleanup so deleted messages do not leave unbounded records.
-//!
-//! Intended shape (illustrative):
-//! \`\`\`rust,ignore
-//! struct StoreRecord {
-//!     definition_kind: DefinitionKind,
-//!     definition_id: String,
-//!     execution_id: String,
-//!     instance_data: Vec<u8>,
-//!     frame_identity: Option<FrameExecutionIdentity>,
-//! }
-//! trait Store {
-//!     async fn insert(&self, id: CustomId, record: StoreRecord) -> Result<()>;
-//!     async fn resolve(&self, id: &CustomId) -> Result<Option<StoreRecord>>;
-//!     async fn delete(&self, id: &CustomId) -> Result<()>;
-//! }
-//! \`\`\`
-//!
-//! TODO: Define Store, StoreRecord, DefinitionKind, and MemoryStore.
-//! TODO: Define canonical serialization, identity versioning, and hashing.
-//! TODO: Include Page/Modal kind and Frame key in identity inputs.
-//! TODO: Define conflict, expiry, deletion, and migration semantics.
-//! TODO: Surface backend errors; never swallow failures or poisoned locks.
+//! Persistence for deterministic custom-ID to execution-reference mappings.
+use serde::{Deserialize, Serialize};
+use crate::app::BoxFuture;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DefinitionKind {
+    Page,
+    Modal,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StoreRecord {
+    pub custom_id: String,
+    pub definition_kind: DefinitionKind,
+    pub definition_id: String,
+    pub execution_id: String,
+    pub serialized_data: Vec<u8>,
+    pub frame_identity: Option<String>,
+    pub pagination_state: Option<serde_json::Value>,
+    pub schema_version: u16,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct CustomId(pub String);
+
+/// Durable adapters must survive restarts. MemoryStore is test/development-only.
+pub trait Store: Send + Sync {
+    fn insert<'a>(&'a self, record: StoreRecord)
+        -> BoxFuture<'a, anyhow::Result<()>>;
+    fn resolve<'a>(&'a self, custom_id: &'a CustomId)
+        -> BoxFuture<'a, anyhow::Result<Option<StoreRecord>>>;
+    fn remove<'a>(&'a self, custom_id: &'a CustomId)
+        -> BoxFuture<'a, anyhow::Result<()>>;
+}
+
+/// Stable identity includes definition, execution, serialized data, and an
+/// optional stable Frame identity. It is an identifier, never authorization.
+pub fn derive_custom_id(
+    definition_id: &str,
+    execution_id: &str,
+    serialized_data: &[u8],
+    frame_identity: Option<&str>,
+) -> anyhow::Result<CustomId> {
+    todo!("canonicalize identity inputs, hash deterministically, enforce Discord length")
+}
+
+#[derive(Default)]
+pub struct MemoryStore {
+    records: std::sync::RwLock<std::collections::HashMap<CustomId, StoreRecord>>,
+}
+impl Store for MemoryStore {
+    fn insert<'a>(&'a self, record: StoreRecord)
+        -> BoxFuture<'a, anyhow::Result<()>>
+    {
+        Box::pin(async move { todo!("define idempotent insert and conflicting-record behavior") })
+    }
+    fn resolve<'a>(&'a self, custom_id: &'a CustomId)
+        -> BoxFuture<'a, anyhow::Result<Option<StoreRecord>>>
+    {
+        Box::pin(async move { todo!("resolve a stored custom ID") })
+    }
+    fn remove<'a>(&'a self, custom_id: &'a CustomId)
+        -> BoxFuture<'a, anyhow::Result<()>>
+    {
+        Box::pin(async move { todo!("remove an expired or deleted execution record") })
+    }
+}

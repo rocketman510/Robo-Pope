@@ -1,24 +1,63 @@
-//! Explicit interactive executions attached to components.
-//!
-//! Display and behavior are separate. Dynamic values determine what a
-//! component looks like during rendering. Execution callbacks determine what
-//! happens after interaction. Only executions are registered/persisted.
-//!
-//! Button and selection callbacks receive Ctx plus original Page data.
-//! Selection callbacks additionally receive typed interaction data:
-//! String values or resolved user/role/channel/mentionable entities. These
-//! values are not merged into serialized Page data.
-//!
-//! Every execution ID is unique within its definition. Registration rejects
-//! duplicates and reserves a framework-only namespace for pagination
-//! controls. Frame elements additionally require stable developer-defined
-//! keys. Identity must not depend on temporary vector position.
-//!
-//! Closures are never serialized. Registered definitions own callbacks;
-//! Store records contain only stable references and serialized data.
-//!
-//! TODO: Define Exec<T, E, Selection> and callback adapter contracts.
-//! TODO: Keep callbacks explicit in Button, Select, and Modal APIs.
-//! TODO: Validate duplicate IDs at registration and dynamic Frame resolution.
-//! TODO: Define Selection<S> and entity-choice structures.
-//! TODO: A valid custom ID never grants authorization.
+//! Explicit callbacks for interactive components. Dynamic values are not executions.
+use std::future::Future;
+use std::sync::Arc;
+use crate::app::{BoxFuture, Ctx};
+
+pub struct Execution<T, E, I = ()> {
+    pub id: String,
+    pub(crate) callback: Arc<dyn Fn(Ctx<E>, T, I)
+        -> BoxFuture<'static, anyhow::Result<()>> + Send + Sync>,
+}
+
+impl<T, E> Execution<T, E, ()> {
+    pub fn new<F, Fut>(id: impl Into<String>, callback: F) -> Self
+    where
+        F: Fn(Ctx<E>, T) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = anyhow::Result<()>> + Send + 'static,
+        T: Send + 'static,
+        E: Send + Sync + 'static,
+    {
+        todo!("store two-argument execution callback behind boxed future")
+    }
+}
+impl<T, E, I> Execution<T, E, I> {
+    pub fn with_input<F, Fut>(id: impl Into<String>, callback: F) -> Self
+    where
+        F: Fn(Ctx<E>, T, I) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = anyhow::Result<()>> + Send + 'static,
+        T: Send + 'static,
+        E: Send + Sync + 'static,
+        I: Send + 'static,
+    {
+        todo!("store callback with its distinct interaction payload")
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum Selection {
+    Strings(Vec<String>),
+    Users(Vec<SelectedUser>),
+    Roles(Vec<SelectedRole>),
+    Mentionables(Vec<SelectedMentionable>),
+    Channels(Vec<SelectedChannel>),
+}
+#[derive(Debug, Clone)]
+pub struct SelectedUser {
+    pub id: serenity::all::UserId,
+    pub resolved: Option<Arc<serenity::all::User>>,
+}
+#[derive(Debug, Clone)]
+pub struct SelectedRole {
+    pub id: serenity::all::RoleId,
+    pub resolved: Option<Arc<serenity::all::Role>>,
+}
+#[derive(Debug, Clone)]
+pub enum SelectedMentionable {
+    User(SelectedUser),
+    Role(SelectedRole),
+}
+#[derive(Debug, Clone)]
+pub struct SelectedChannel {
+    pub id: serenity::all::ChannelId,
+    pub resolved: Option<Arc<serenity::all::GuildChannel>>,
+}

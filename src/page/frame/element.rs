@@ -1,27 +1,48 @@
-//! Heterogeneous Frame elements and stable developer-defined keys.
-//!
-//! Element is the common abstraction returned by a Frame callback. It lets
-//! application code return different component types without converting to
-//! Serenity builders.
-//!
-//! Interactive elements require stable keys chosen from application data,
-//! such as a user ID or record key. The key follows the logical item when it
-//! moves to another position or pagination slice. Framework identity combines
-//! definition ID, Frame ID, element key, and component execution ID.
-//!
-//! Positional index is not stable identity. Duplicate keys must produce a
-//! descriptive error rather than overwrite an earlier callback.
-//!
-//! Intended shape (illustrative):
-//! \`\`\`rust,ignore
-//! struct FrameElement<T, E> {
-//!     stable_key: ElementKey,
-//!     component: Component<T, E>,
-//! }
-//! enum Element<T, E> { /* ergonomic constructors for Component variants */ }
-//! \`\`\`
-//!
-//! TODO: Define Element<T, E> constructors for supported Component types.
-//! TODO: Define keyed FrameElement wrapper or equivalent API.
-//! TODO: Recursively collect interactive descendants before persistence.
-//! TODO: Define missing/duplicate key behavior.
+//! Heterogeneous Frame output and stable developer-defined element keys.
+use crate::page::component::*;
+use crate::page::select::SelectMenu;
+
+pub struct FrameIdentity {
+    pub frame_id:String,
+    pub element_key:String,
+    pub execution_id:String,
+}
+pub struct Element<T,E> {
+    pub component:Component<T,E>,
+    pub key:Option<String>,
+}
+impl<T,E> Element<T,E> {
+    pub fn text<V:crate::page::value::IntoValue<String,T,E>>(value:V)->Self {
+        Self { component:Component::Text(Text::new(value)), key:None }
+    }
+    pub fn section(value:Section<T,E>)->Self {
+        Self { component:Component::Section(value), key:None }
+    }
+    pub fn container(value:Container<T,E>)->Self {
+        Self { component:Component::Container(value), key:None }
+    }
+    pub fn separator(value:Separator<T,E>)->Self {
+        Self { component:Component::Separator(value), key:None }
+    }
+    pub fn button(value:Button<T,E>)->Self {
+        Self { component:Component::Button(value), key:None }
+    }
+    pub fn button_row(value:ButtonRow<T,E>)->Self {
+        Self { component:Component::ButtonRow(value), key:None }
+    }
+    pub fn link_button(value:LinkButton<T,E>)->Self {
+        Self { component:Component::LinkButton(value), key:None }
+    }
+    pub fn gallery(value:MediaGallery<T,E>)->Self {
+        Self { component:Component::MediaGallery(value), key:None }
+    }
+    pub fn file(value:File)->Self {
+        Self { component:Component::File(value), key:None }
+    }
+    pub fn selection_menu(value:SelectMenu<T,E>)->Self {
+        Self { component:Component::Select(value), key:None }
+    }
+    pub fn keyed(mut self,key:impl Into<String>)->Self {
+        self.key=Some(key.into()); self
+    }
+}
