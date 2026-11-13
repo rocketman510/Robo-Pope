@@ -808,7 +808,7 @@ where
         }
         C::File(file) => {
             anyhow::ensure!(
-                !file.filename.trim().is_empty() && !file.filename.contains('/') && !file.filename.contains('\\\\'),
+                !file.filename.trim().is_empty() && !file.filename.contains('/') && !file.filename.contains('\\'),
                 "File component requires a non-empty filename without path separators"
             );
             let rendered = CreateFile::new(CreateUnfurledMediaItem::new(
