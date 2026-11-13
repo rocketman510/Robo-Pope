@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 use serde::Deserialize;
-use crate::page::Modal;
-use crate::page::modal::{ModalInput, ModalOption, ModalSubmission, SubmittedValue, TextInputStyle};
+use crate::page::{
+    Modal, ModalInput, ModalOption, ModalSubmission, SubmittedValue, TextInputStyle,
+};
 use super::support::{app, TestData};
 
 #[test]

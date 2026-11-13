@@ -37,7 +37,7 @@ pub struct RegisteredModal<T> {
 pub struct ModalRender {
     pub(crate) custom_id:String,
     pub(crate) title:String,
-    pub(crate) components:Vec<serenity::all::CreateActionRow>,
+    pub(crate) components:Vec<serenity::all::CreateActionRow<'static>>,
 }
 
 impl<T> Modal<T> {
