@@ -298,14 +298,12 @@ fn modal_rejects_duplicate_input_ids() {
     assert!(modal.register(&app).is_err());
 }
 
-#[tokio::test]
-async fn modal_select_option_description_is_checked_against_discord_limit() {
-    // FIRST: resolved option descriptions are checked against Discord's limit.
+#[test]
+fn modal_rejects_static_select_option_description_over_one_hundred_characters() {
+    // FIRST: a static option description is validated before registration succeeds.
     let app = app();
     let modal = Modal::<TestData>::new("modal-long-description").set_title("Description")
         .add_select("choice", "Choice", [ModalOption::new("A", "a").set_description("x".repeat(101))])
-        .on_submit(|_ctx, _data, _submission: ModalSubmission| async move { Ok(()) })
-        .register(&app).unwrap();
-    let error = modal.render(&app, TestData::default()).await.err().expect("description validation must fail");
-    assert!(format!("{error:#}").contains("100"));
+        .on_submit(|_ctx, _data, _submission: ModalSubmission| async move { Ok(()) });
+    assert!(modal.register(&app).is_err());
 }

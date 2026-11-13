@@ -107,7 +107,10 @@ async fn fixed_section_slots_accept_direct_async_closures() {
         .add_section(Section::new().set_text(
             |_ctx: RenderCtx, data: Arc<TestData>| async move { Ok(format!("Dynamic {}", data.count)) },
             None, None,
-        )).register(&app).unwrap();
+        ).set_accessory(crate::page::Button::new(
+            "Open", "section-open", crate::page::ButtonStyle::Primary,
+            |_ctx, _data: TestData| async move { Ok(()) },
+        ))).register(&app).unwrap();
     let rendered = page.render(&app, TestData::default()).await.unwrap();
     let json = serde_json::to_value(rendered.into_components()).unwrap();
     assert!(json.to_string().contains("Dynamic 7"));
