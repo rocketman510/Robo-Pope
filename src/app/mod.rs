@@ -10,7 +10,8 @@ pub mod executions;
 
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
+use std::collections::HashSet;
 use serenity::all::Http;
 use registry::{ModalRegistry, PageRegistry};
 use router::InteractionRouter;
@@ -41,6 +42,7 @@ pub struct App {
     pub(crate) router: InteractionRouter,
     /// Process-local type-erased execution callbacks (never persisted).
     pub(crate) executions: ExecutionRegistry,
+    definition_ids: Arc<Mutex<HashSet<String>>>,
 }
 impl Clone for App {
     fn clone(&self) -> Self {
@@ -52,6 +54,7 @@ impl Clone for App {
             http: self.http.clone(),
             router: self.router.clone(),
             executions: self.executions.clone(),
+            definition_ids: self.definition_ids.clone(),
         }
     }
 }
@@ -66,8 +69,22 @@ impl App {
             http,
             router: InteractionRouter::default(),
             executions: ExecutionRegistry::default(),
+            definition_ids: Arc::new(Mutex::new(HashSet::new())),
         }
     }
+    /// Atomically reserves a Page or Modal ID in the shared namespace.
+    pub(crate) fn reserve_definition_id(&self, id: &str) -> anyhow::Result<()> {
+        let mut ids = self.definition_ids.lock()
+            .map_err(|_| anyhow::anyhow!("Definition ID registry lock was poisoned"))?;
+        anyhow::ensure!(ids.insert(id.to_owned()), "Page or Modal ID is already registered: {id}");
+        Ok(())
+    }
+
+    /// Releases a reservation when definition registration fails.
+    pub(crate) fn release_definition_id(&self, id: &str) {
+        if let Ok(mut ids) = self.definition_ids.lock() { ids.remove(id); }
+    }
+
     /// Routes an incoming Discord interaction to its registered execution.
     ///
     /// Unknown or malformed execution references are returned as errors. A
