@@ -10,6 +10,11 @@ pub struct AppHandler {
 impl AppHandler {
     /// Creates an event handler bound to the supplied App.
     pub fn new(app: App) -> Self { Self { app } }
+
+    /// Routes one gateway interaction through the App's interaction router.
+    pub async fn dispatch_interaction(&self, interaction: serenity::all::Interaction) -> anyhow::Result<()> {
+        self.app.dispatch_interaction(interaction).await
+    }
 }
 #[async_trait]
 impl EventHandler for AppHandler {
@@ -22,7 +27,7 @@ impl EventHandler for AppHandler {
             }
             FullEvent::InteractionCreate { interaction, .. } => {
                 // Page API §§8–9: App owns the router and receives incoming interactions.
-                if let Err(err) = self.app.dispatch_interaction(interaction.clone()).await {
+                if let Err(err) = self.dispatch_interaction(interaction.clone()).await {
                     eprintln!("Interaction routing error: {err:#}");
                 }
             }
