@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use serde_json::Value as JsonValue;
 use serenity::all::{
-    ComponentInteractionDataKind, Interaction, InteractionType, LabelComponent,
+    CommandDataResolved, ComponentInteractionDataKind, Interaction, InteractionType, LabelComponent,
     ModalComponent, SelectMenuKind,
 };
 
@@ -82,7 +82,7 @@ impl InteractionRouter {
         let data: JsonValue = serde_json::from_slice(&record.serialized_data)
             .map_err(|e| anyhow::anyhow!("Deserializing stored Page data: {e}"))?;
 
-        let selection = extract_selection(&component.data.kind);
+        let selection = extract_selection(&component.data.kind, &component.data.resolved)?;
         let payload = if record.execution_id.starts_with("__frame:") {
             let state_value = record.pagination_state.clone()
                 .ok_or_else(|| anyhow::anyhow!("Pagination record is missing its state"))?;
@@ -285,43 +285,61 @@ fn extract_modal_submission(
     Ok(submission)
 }
 
-fn extract_selection(kind: &ComponentInteractionDataKind) -> Option<Selection> {
-    match kind {
+fn extract_selection(
+    kind: &ComponentInteractionDataKind,
+    resolved: &CommandDataResolved,
+) -> anyhow::Result<Option<Selection>> {
+    Ok(match kind {
         ComponentInteractionDataKind::StringSelect { values } => {
-            Some(Selection::Strings(values.iter().map(|v| v.to_string()).collect()))
+            Some(Selection::Strings(values.iter().map(|value| value.to_string()).collect()))
         }
         ComponentInteractionDataKind::UserSelect { values } => Some(Selection::Users(
-            values
-                .iter()
-                .map(|id| crate::page::SelectedUser {
-                    id: *id,
-                    resolved: None,
-                })
-                .collect(),
+            values.iter().map(|id| crate::page::SelectedUser {
+                id: *id,
+                resolved: resolved.users.get(id).cloned().map(Arc::new),
+            }).collect(),
         )),
         ComponentInteractionDataKind::RoleSelect { values } => Some(Selection::Roles(
-            values
-                .iter()
-                .map(|id| crate::page::SelectedRole {
-                    id: *id,
-                    resolved: None,
-                })
-                .collect(),
+            values.iter().map(|id| crate::page::SelectedRole {
+                id: *id,
+                resolved: resolved.roles.get(id).cloned().map(Arc::new),
+            }).collect(),
         )),
         ComponentInteractionDataKind::MentionableSelect { values } => {
-            let _ = values;
-            Some(Selection::Mentionables(Vec::new()))
+            let mut selected = Vec::with_capacity(values.len() as usize);
+            for generic_id in values {
+                let user_id = serenity::all::UserId::new(generic_id.get());
+                let role_id = serenity::all::RoleId::new(generic_id.get());
+                if let Some(user) = resolved.users.get(&user_id) {
+                    selected.push(crate::page::SelectedMentionable::User(
+                        crate::page::SelectedUser {
+                            id: user_id,
+                            resolved: Some(Arc::new(user.clone())),
+                        }
+                    ));
+                } else if let Some(role) = resolved.roles.get(&role_id) {
+                    selected.push(crate::page::SelectedMentionable::Role(
+                        crate::page::SelectedRole {
+                            id: role_id,
+                            resolved: Some(Arc::new(role.clone())),
+                        }
+                    ));
+                } else {
+                    anyhow::bail!(
+                        "Mentionable Select returned ID '{}' without a resolved User or Role",
+                        generic_id
+                    );
+                }
+            }
+            Some(Selection::Mentionables(selected))
         }
         ComponentInteractionDataKind::ChannelSelect { values } => Some(Selection::Channels(
-            values
-                .iter()
-                .map(|id| crate::page::SelectedChannel {
-                    id: *id,
-                    resolved: None,
-                })
-                .collect(),
+            values.iter().map(|id| crate::page::SelectedChannel {
+                id: serenity::all::ChannelId::new(id.get()),
+                resolved: None,
+            }).collect(),
         )),
         ComponentInteractionDataKind::Button => None,
         _ => None,
-    }
+    })
 }
