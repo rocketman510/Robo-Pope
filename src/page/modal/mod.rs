@@ -173,7 +173,7 @@ impl<T> Modal<T> {
         );
         anyhow::ensure!(
             self.inputs.len() <= crate::page::limits::MODAL_MAX_TOP_LEVEL_COMPONENTS,
-            "A Modal must contain between one and {} inputs",
+            "A Modal cannot contain more than {} top-level inputs",
             crate::page::limits::MODAL_MAX_TOP_LEVEL_COMPONENTS
         );
         let mut input_ids = std::collections::HashSet::new();
