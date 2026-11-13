@@ -1142,6 +1142,220 @@ fn plan_rendered_frame(
     Ok((pages, page_count))
 }
 
+async fn create_pagination_navigation(
+    app: &App,
+    definition_id: &str,
+    frame_id: &str,
+    serialized_data: &[u8],
+    state: &super::frame::pagination::PaginationState,
+) -> anyhow::Result<RenderedComponent> {
+    let identity = pagination_identity(frame_id, state.page_index);
+    let mut buttons = Vec::with_capacity(2);
+    for (direction, label, disabled) in [
+        ("previous", "Previous", state.page_index == 0),
+        ("next", "Next", state.page_index + 1 == state.page_count),
+    ] {
+        let execution_id = pagination_execution_id(frame_id, direction);
+        let custom_id = derive_custom_id(
+            definition_id,
+            &execution_id,
+            serialized_data,
+            Some(&identity),
+        )?;
+        if app.store().resolve(&custom_id).await?.is_none() {
+            app.store().insert(StoreRecord {
+                custom_id: custom_id.0.clone(),
+                definition_kind: DefinitionKind::Page,
+                definition_id: definition_id.to_owned(),
+                execution_id,
+                serialized_data: serialized_data.to_vec(),
+                frame_identity: Some(identity.clone()),
+                pagination_state: Some(serde_json::to_value(state)?),
+                schema_version: 1,
+            }).await.with_context(|| format!(
+                "Persisting {label} navigation for Frame '{frame_id}'"
+            ))?;
+        }
+        buttons.push(
+            CreateButton::new(custom_id.0)
+                .label(label)
+                .style(SerenityButtonStyle::Primary)
+                .disabled(disabled)
+                .into_owned()
+        );
+    }
+    Ok(RenderedComponent {
+        component: CreateComponent::ActionRow(CreateActionRow::buttons(buttons).into()),
+    })
+}
+
+fn as_container_child(part: RenderedComponent) -> anyhow::Result<CreateContainerComponent<'static>> {
+    match part.component {
+        CreateComponent::ActionRow(row) => Ok(CreateContainerComponent::ActionRow(row)),
+        CreateComponent::Section(section) => Ok(CreateContainerComponent::Section(section)),
+        CreateComponent::TextDisplay(text) => Ok(CreateContainerComponent::TextDisplay(text)),
+        CreateComponent::MediaGallery(gallery) => Ok(CreateContainerComponent::MediaGallery(gallery)),
+        CreateComponent::File(file) => Ok(CreateContainerComponent::File(file)),
+        CreateComponent::Separator(separator) => Ok(CreateContainerComponent::Separator(separator)),
+        CreateComponent::Container(_) => anyhow::bail!("Discord does not allow a Container inside another Container"),
+        CreateComponent::Label(_) => anyhow::bail!("Labels cannot be rendered inside a message Container"),
+    }
+}
+
+async fn render_paginated_container<T>(
+    container: &super::component::Container<T>,
+    app: &App,
+    ctx: &RenderCtx,
+    data: &Arc<T>,
+    serialized_data: &[u8],
+    definition_id: &str,
+    frame_id: &str,
+    page_prefix: Vec<RenderedComponent>,
+    page_prefix_budget: ComponentBudget,
+    page_suffix: Vec<RenderedComponent>,
+    page_suffix_budget: ComponentBudget,
+) -> anyhow::Result<RenderedPage>
+where
+    T: DeserializeOwned + Send + Sync + 'static,
+{
+    use super::component::ContainerItem;
+
+    let frame_positions: Vec<usize> = container.children.iter().enumerate()
+        .filter_map(|(i, child)| match child {
+            ContainerItem::Frame(frame) if frame.id == frame_id => Some(i),
+            _ => None,
+        }).collect();
+    anyhow::ensure!(frame_positions.len() == 1, "Paginated Frame '{frame_id}' is not a direct Container child");
+    let frame_position = frame_positions[0];
+    let frame = match &container.children[frame_position] {
+        ContainerItem::Frame(frame) => frame,
+        _ => unreachable!(),
+    };
+
+    let prefix_refs: Vec<&Component<T>> = container.children[..frame_position].iter()
+        .filter_map(|item| match item { ContainerItem::Component(c) => Some(c), ContainerItem::Frame(_) => None })
+        .collect();
+    let suffix_refs: Vec<&Component<T>> = container.children[frame_position + 1..].iter()
+        .filter_map(|item| match item { ContainerItem::Component(c) => Some(c), ContainerItem::Frame(_) => None })
+        .collect();
+
+    let (prefix, prefix_budget) = render_component_list(
+        &prefix_refs, app, ctx, data, serialized_data, definition_id, None,
+    ).await.context("Rendering Container children before nested Frame")?;
+    let (suffix, suffix_budget) = render_component_list(
+        &suffix_refs, app, ctx, data, serialized_data, definition_id, None,
+    ).await.context("Rendering Container children after nested Frame")?;
+
+    let elements = (frame.resolver)(ctx.clone(), data.clone()).await
+        .with_context(|| format!("Resolving nested Frame '{frame_id}'"))?;
+    let rendered_elements = render_frame_elements(
+        &elements, app, ctx, data, serialized_data, definition_id, frame_id,
+    ).await?;
+
+    let static_container_children = prefix.len() + suffix.len();
+    let mut accent = None;
+    if let Some(value) = &container.accent_color {
+        accent = Some(super::value::resolve(value, ctx.clone(), data.clone()).await
+            .context("Resolving Container accent color")?);
+    }
+
+    let mut all_pages: Vec<Vec<RenderedFrameElement>> = Vec::new();
+    let mut current: Vec<RenderedFrameElement> = Vec::new();
+    let mut current_budget = add_budgets(
+        page_prefix_budget,
+        add_budgets(page_suffix_budget, add_budgets(
+            ComponentBudget { total_components: 1, text_display_chars: 0, direct_container_children: static_container_children + 1 },
+            add_budgets(prefix_budget, suffix_budget),
+        )),
+    );
+    let mut current_direct_children = static_container_children + 1; // reserve the navigation Action Row
+    let mut current_count = 0usize;
+
+    for element in rendered_elements {
+        let direct = element.components.len();
+        anyhow::ensure!(
+            static_container_children + 1 + direct <= super::limits::CONTAINER_MAX_DIRECT_CHILDREN,
+            "A single nested Frame element cannot fit in Container '{frame_id}'"
+        );
+        let next_budget = add_budgets(current_budget, element.budget);
+        let next_direct = current_direct_children + direct;
+        let fits = message_budget_fits(next_budget)
+            && next_direct <= super::limits::CONTAINER_MAX_DIRECT_CHILDREN;
+        if !fits && current_count > 0 {
+            all_pages.push(std::mem::take(&mut current));
+            current_budget = add_budgets(
+                page_prefix_budget,
+                add_budgets(page_suffix_budget, add_budgets(
+                    ComponentBudget { total_components: 1, text_display_chars: 0, direct_container_children: static_container_children + 1 },
+                    add_budgets(prefix_budget, suffix_budget),
+                )),
+            );
+            current_direct_children = static_container_children + 1;
+            current_count = 0;
+        }
+        current_budget = add_budgets(current_budget, element.budget);
+        current_direct_children += direct;
+        current.push(element);
+        current_count += 1;
+    }
+    if current_count > 0 || all_pages.is_empty() {
+        all_pages.push(current);
+    }
+
+    // With one page there is no navigation control, so recompute the message
+    // validation without its reserved Action Row.
+    let page_count = all_pages.len();
+    let mut pages = Vec::with_capacity(page_count);
+    for (page_index, frame_elements) in all_pages.into_iter().enumerate() {
+        let mut children = Vec::new();
+        for part in prefix.iter().cloned() { children.push(as_container_child(part)?); }
+        for element in frame_elements {
+            for part in element.components { children.push(as_container_child(part)?); }
+        }
+        for part in suffix.iter().cloned() { children.push(as_container_child(part)?); }
+
+        let mut budget = add_budgets(
+            page_prefix_budget,
+            add_budgets(page_suffix_budget, add_budgets(
+                ComponentBudget { total_components: 1, text_display_chars: 0, direct_container_children: children.len() },
+                add_budgets(prefix_budget, suffix_budget),
+            )),
+        );
+        if page_count > 1 {
+            let state = super::frame::pagination::PaginationState {
+                frame_id: frame_id.to_owned(), page_index, page_count,
+            };
+            let nav = create_pagination_navigation(app, definition_id, frame_id, serialized_data, &state).await?;
+            children.push(as_container_child(nav)?);
+            budget.total_components = budget.total_components.saturating_add(3);
+            budget.direct_container_children = children.len();
+        }
+        anyhow::ensure!(
+            children.len() <= super::limits::CONTAINER_MAX_DIRECT_CHILDREN,
+            "Rendered Container has {} direct children; maximum is {}",
+            children.len(), super::limits::CONTAINER_MAX_DIRECT_CHILDREN
+        );
+        validate_message_budget(budget).context("Validating paginated Container message")?;
+
+        let mut builder = CreateContainer::new(children);
+        if let Some(accent) = accent {
+            builder = builder.accent_color(serenity::model::prelude::Colour::new(accent));
+        }
+        builder = builder.spoiler(container.spoiler);
+        let mut components = page_prefix.clone();
+        components.push(RenderedComponent { component: CreateComponent::Container(builder.into_owned()) });
+        components.extend(page_suffix.clone());
+        pages.push(RenderedMessage {
+            components,
+            attachments: Vec::new(),
+            pagination: (page_count > 1).then_some(super::frame::pagination::PaginationState {
+                frame_id: frame_id.to_owned(), page_index, page_count,
+            }),
+        });
+    }
+    Ok(RenderedPage { pages, current_index: 0 })
+}
+
 impl<T> RegisteredPage<T>
 where
     T: Serialize + DeserializeOwned + Send + Sync + 'static
@@ -1286,45 +1500,9 @@ where
                 page_count,
             };
             if page_count > 1 {
-                let identity = pagination_identity(&frame.id, page_index);
-                let mut nav_buttons = Vec::with_capacity(2);
-                for (direction, label, disabled) in [
-                    ("previous", "Previous", page_index == 0),
-                    ("next", "Next", page_index + 1 == page_count),
-                ] {
-                    let execution_id = pagination_execution_id(&frame.id, direction);
-                    let custom_id = derive_custom_id(
-                        self.id(),
-                        &execution_id,
-                        &serialized_data,
-                        Some(&identity),
-                    )?;
-                    if app.store().resolve(&custom_id).await?.is_none() {
-                        app.store().insert(StoreRecord {
-                            custom_id: custom_id.0.clone(),
-                            definition_kind: DefinitionKind::Page,
-                            definition_id: self.id().to_owned(),
-                            execution_id,
-                            serialized_data: serialized_data.clone(),
-                            frame_identity: Some(identity.clone()),
-                            pagination_state: Some(serde_json::to_value(&pagination)?),
-                            schema_version: 1,
-                        }).await.with_context(|| format!(
-                            "Persisting {label} navigation for Frame '{}'",
-                            frame.id
-                        ))?;
-                    }
-                    nav_buttons.push(
-                        CreateButton::new(custom_id.0)
-                            .label(label)
-                            .style(SerenityButtonStyle::Primary)
-                            .disabled(disabled)
-                            .into_owned()
-                    );
-                }
-                components.push(RenderedComponent {
-                    component: CreateComponent::ActionRow(CreateActionRow::buttons(nav_buttons).into()),
-                });
+                components.push(create_pagination_navigation(
+                    app, self.id(), &frame.id, &serialized_data, &pagination,
+                ).await?);
             }
             pages.push(RenderedMessage {
                 components,
