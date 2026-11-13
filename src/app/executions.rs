@@ -1,0 +1,82 @@
+//! Type-erased execution table so the router can invoke callbacks without
+//! knowing the Page/Modal data type `T` at the dispatch site.
+//!
+//! Page API §9: routing restores serialized data, finds the definition and
+//! execution, and invokes the registered callback. Closures are never stored
+//! in the durable Store; they live here for the lifetime of the process.
+
+use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
+
+use serde_json::Value as JsonValue;
+use serenity::all::Interaction;
+
+use crate::app::{App, BoxFuture, Ctx};
+use crate::page::{ModalSubmission, Selection};
+
+/// Key that uniquely identifies a registered execution within the process.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ExecutionKey {
+    pub definition_id: String,
+    pub execution_id: String,
+}
+
+/// Interaction payload extracted from a Discord interaction for routing.
+#[derive(Debug, Clone)]
+pub enum InteractionPayload {
+    None,
+    Selection(Selection),
+    Modal(ModalSubmission),
+}
+
+type ErasedCallback = Arc<
+    dyn Fn(Ctx, JsonValue, InteractionPayload) -> BoxFuture<'static, anyhow::Result<()>>
+        + Send
+        + Sync,
+>;
+
+/// Process-local map from (definition_id, execution_id) to a type-erased callback.
+#[derive(Clone, Default)]
+pub struct ExecutionRegistry {
+    entries: Arc<RwLock<HashMap<ExecutionKey, ErasedCallback>>>,
+}
+
+impl ExecutionRegistry {
+    pub fn insert(&self, key: ExecutionKey, callback: ErasedCallback) -> anyhow::Result<()> {
+        let mut entries = self
+            .entries
+            .write()
+            .map_err(|_| anyhow::anyhow!("Execution registry lock was poisoned"))?;
+        anyhow::ensure!(
+            !entries.contains_key(&key),
+            "Execution already registered for definition '{}' execution '{}'",
+            key.definition_id,
+            key.execution_id
+        );
+        entries.insert(key, callback);
+        Ok(())
+    }
+
+    pub fn get(&self, key: &ExecutionKey) -> Option<ErasedCallback> {
+        self.entries
+            .read()
+            .ok()
+            .and_then(|entries| entries.get(key).cloned())
+    }
+
+    pub fn contains(&self, key: &ExecutionKey) -> bool {
+        self.entries
+            .read()
+            .map(|entries| entries.contains_key(key))
+            .unwrap_or(false)
+    }
+}
+
+/// Builds a Ctx for a routed interaction.
+pub fn make_ctx(
+    app: &App,
+    interaction: Interaction,
+    selection: Option<Selection>,
+) -> Ctx {
+    Ctx::new(app.clone(), Arc::new(interaction), selection)
+}

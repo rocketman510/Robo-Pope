@@ -13,8 +13,6 @@ impl AppHandler {
 }
 #[async_trait]
 impl EventHandler for AppHandler {
-    /// Reports a successful Gateway connection. Interaction routing is not
-    /// invoked here yet because the router and Page renderer are still pending.
     async fn dispatch(&self, _ctx: &Context, event: &FullEvent) {
         match event {
             FullEvent::Ready { data_about_bot, .. } => {
@@ -22,8 +20,11 @@ impl EventHandler for AppHandler {
                 println!("Demo Page registered: {}", self.app.pages.contains("framework-demo"));
                 println!("Demo Modal registered: {}", self.app.modals.contains("framework-demo-modal"));
             }
-            FullEvent::InteractionCreate { .. } => {
-                println!("Received an interaction. Framework interaction routing is not implemented yet.");
+            FullEvent::InteractionCreate { interaction, .. } => {
+                // Page API §§8–9: App owns the router and receives incoming interactions.
+                if let Err(err) = self.app.dispatch_interaction(interaction.clone()).await {
+                    eprintln!("Interaction routing error: {err:#}");
+                }
             }
             _ => {}
         }
