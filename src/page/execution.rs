@@ -3,30 +3,28 @@ use std::future::Future;
 use std::sync::Arc;
 use crate::app::{BoxFuture, Ctx};
 
-pub struct Execution<T, E, I = ()> {
+pub struct Execution<T, I = ()> {
     pub id: String,
-    pub(crate) callback: Arc<dyn Fn(Ctx<E>, T, I)
+    pub(crate) callback: Arc<dyn Fn(Ctx, T, I)
         -> BoxFuture<'static, anyhow::Result<()>> + Send + Sync>,
 }
 
-impl<T, E> Execution<T, E, ()> {
+impl<T> Execution<T> {
     pub fn new<F, Fut>(id: impl Into<String>, callback: F) -> Self
     where
-        F: Fn(Ctx<E>, T) -> Fut + Send + Sync + 'static,
+        F: Fn(Ctx, T) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = anyhow::Result<()>> + Send + 'static,
         T: Send + 'static,
-        E: Send + Sync + 'static,
-    {
+        {
         todo!("store two-argument execution callback behind boxed future")
     }
 }
-impl<T, E, I> Execution<T, E, I> {
+impl<T, I> Execution<T, I> {
     pub fn with_input<F, Fut>(id: impl Into<String>, callback: F) -> Self
     where
-        F: Fn(Ctx<E>, T, I) -> Fut + Send + Sync + 'static,
+        F: Fn(Ctx, T, I) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = anyhow::Result<()>> + Send + 'static,
         T: Send + 'static,
-        E: Send + Sync + 'static,
         I: Send + 'static,
     {
         todo!("store callback with its distinct interaction payload")

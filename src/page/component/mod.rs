@@ -23,15 +23,15 @@ pub use text::Text;
 pub use thumbnail::Thumbnail;
 
 use crate::page::select::SelectMenu;
-pub enum Component<T,E> {
-    Text(Text<T,E>),
-    Section(Section<T,E>),
-    Container(Container<T,E>),
-    Separator(Separator<T,E>),
-    MediaGallery(MediaGallery<T,E>),
+pub enum Component<T> {
+    Text(Text<T>),
+    Section(Section<T>),
+    Container(Container<T>),
+    Separator(Separator<T>),
+    MediaGallery(MediaGallery<T>),
     File(File),
-    Button(Button<T,E>),
-    LinkButton(LinkButton<T,E>),
-    Select(SelectMenu<T,E>),
-    ButtonRow(ButtonRow<T,E>),
+    Button(Button<T>),
+    LinkButton(LinkButton<T>),
+    Select(SelectMenu<T>),
+    ButtonRow(ButtonRow<T>),
 }

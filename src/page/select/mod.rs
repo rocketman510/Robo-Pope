@@ -5,10 +5,10 @@ pub mod string;
 pub use entity::{ChannelSelect, EntitySelect, MentionableSelect, RoleSelect, UserSelect};
 pub use string::{SelectOption, StringSelect};
 
-pub enum SelectMenu<T,E> {
-    String(StringSelect<T,E>),
-    User(UserSelect<T,E>),
-    Role(RoleSelect<T,E>),
-    Mentionable(MentionableSelect<T,E>),
-    Channel(ChannelSelect<T,E>),
+pub enum SelectMenu<T> {
+    String(StringSelect<T>),
+    User(UserSelect<T>),
+    Role(RoleSelect<T>),
+    Mentionable(MentionableSelect<T>),
+    Channel(ChannelSelect<T>),
 }

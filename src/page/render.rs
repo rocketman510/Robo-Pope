@@ -29,8 +29,8 @@ impl RenderedMessage {
     }
 }
 
-pub(crate) fn validate_component<T,E>(
-    _component:&super::component::Component<T,E>
+pub(crate) fn validate_component<T>(
+    _component:&super::component::Component<T>
 )->anyhow::Result<()> {
     todo!("validate resolved component tree and Discord component budgets")
 }

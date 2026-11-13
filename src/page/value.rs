@@ -8,64 +8,63 @@ use crate::app::{BoxFuture,RenderCtx};
 pub struct Dynamic<F>(pub F);
 pub fn dynamic<F>(callback:F)->Dynamic<F> { Dynamic(callback) }
 
-pub enum Value<V,T,E> {
+pub enum Value<V,T> {
     Static(V),
-    Dynamic(Arc<dyn Fn(RenderCtx<E>,Arc<T>)
+    Dynamic(Arc<dyn Fn(RenderCtx,Arc<T>)
         ->BoxFuture<'static,anyhow::Result<V>>+Send+Sync>),
 }
-pub trait IntoValue<V,T,E> { fn into_value(self)->Value<V,T,E>; }
+pub trait IntoValue<V,T> { fn into_value(self)->Value<V,T>; }
 
-impl<T,E> IntoValue<String,T,E> for String {
-    fn into_value(self)->Value<String,T,E> { Value::Static(self) }
+impl<T> IntoValue<String,T> for String {
+    fn into_value(self)->Value<String,T> { Value::Static(self) }
 }
-impl<T,E> IntoValue<String,T,E> for &'static str {
-    fn into_value(self)->Value<String,T,E> { Value::Static(self.to_owned()) }
+impl<T> IntoValue<String,T> for &'static str {
+    fn into_value(self)->Value<String,T> { Value::Static(self.to_owned()) }
 }
-impl<T,E> IntoValue<bool,T,E> for bool {
-    fn into_value(self)->Value<bool,T,E> { Value::Static(self) }
+impl<T> IntoValue<bool,T> for bool {
+    fn into_value(self)->Value<bool,T> { Value::Static(self) }
 }
-impl<T,E> IntoValue<u32,T,E> for u32 {
-    fn into_value(self)->Value<u32,T,E> { Value::Static(self) }
+impl<T> IntoValue<u32,T> for u32 {
+    fn into_value(self)->Value<u32,T> { Value::Static(self) }
 }
-impl<T,E> IntoValue<super::component::ButtonStyle,T,E> for super::component::ButtonStyle {
-    fn into_value(self)->Value<super::component::ButtonStyle,T,E> { Value::Static(self) }
+impl<T> IntoValue<super::component::ButtonStyle,T> for super::component::ButtonStyle {
+    fn into_value(self)->Value<super::component::ButtonStyle,T> { Value::Static(self) }
 }
-impl<T,E> IntoValue<super::component::SeparatorSpacing,T,E> for super::component::SeparatorSpacing {
-    fn into_value(self)->Value<super::component::SeparatorSpacing,T,E> { Value::Static(self) }
+impl<T> IntoValue<super::component::SeparatorSpacing,T> for super::component::SeparatorSpacing {
+    fn into_value(self)->Value<super::component::SeparatorSpacing,T> { Value::Static(self) }
 }
-impl<V,T,E,F,Fut> IntoValue<V,T,E> for Dynamic<F>
+impl<V,T,F,Fut> IntoValue<V,T> for Dynamic<F>
 where
-    F:Fn(RenderCtx<E>,Arc<T>)->Fut+Send+Sync+'static,
+    F:Fn(RenderCtx,Arc<T>)->Fut+Send+Sync+'static,
     Fut:Future<Output=anyhow::Result<V>>+Send+'static,
-    V:Send+Sync+'static,T:Send+Sync+'static,E:Send+Sync+'static,
-{
-    fn into_value(self)->Value<V,T,E> {
+    V:Send+Sync+'static,T:Send+Sync+'static,{
+    fn into_value(self)->Value<V,T> {
         Value::Dynamic(Arc::new(move |ctx,data|Box::pin((self.0)(ctx,data))))
     }
 }
 
-pub enum Slot<V,T,E> { Empty, Value(Value<V,T,E>) }
-pub trait IntoSlot<V,T,E> { fn into_slot(self)->Slot<V,T,E>; }
+pub enum Slot<V,T> { Empty, Value(Value<V,T>) }
+pub trait IntoSlot<V,T> { fn into_slot(self)->Slot<V,T>; }
 
-impl<V,T,E> IntoSlot<V,T,E> for Option<Value<V,T,E>> {
-    fn into_slot(self)->Slot<V,T,E> {
+impl<V,T> IntoSlot<V,T> for Option<Value<V,T>> {
+    fn into_slot(self)->Slot<V,T> {
         match self { Some(value)=>Slot::Value(value),None=>Slot::Empty }
     }
 }
-impl<T,E> IntoSlot<String,T,E> for String {
-    fn into_slot(self)->Slot<String,T,E> { Slot::Value(Value::Static(self)) }
+impl<T> IntoSlot<String,T> for String {
+    fn into_slot(self)->Slot<String,T> { Slot::Value(Value::Static(self)) }
 }
-impl<T,E> IntoSlot<String,T,E> for &'static str {
-    fn into_slot(self)->Slot<String,T,E> { Slot::Value(Value::Static(self.to_owned())) }
+impl<T> IntoSlot<String,T> for &'static str {
+    fn into_slot(self)->Slot<String,T> { Slot::Value(Value::Static(self.to_owned())) }
 }
-impl<V,T,E,F> IntoSlot<V,T,E> for Dynamic<F>
-where Dynamic<F>:IntoValue<V,T,E>
+impl<V,T,F> IntoSlot<V,T> for Dynamic<F>
+where Dynamic<F>:IntoValue<V,T>
 {
-    fn into_slot(self)->Slot<V,T,E> { Slot::Value(self.into_value()) }
+    fn into_slot(self)->Slot<V,T> { Slot::Value(self.into_value()) }
 }
 
-pub async fn resolve<V,T,E>(
-    value:&Value<V,T,E>,ctx:RenderCtx<E>,data:Arc<T>
+pub async fn resolve<V,T>(
+    value:&Value<V,T>,ctx:RenderCtx,data:Arc<T>
 )->anyhow::Result<V>
 where V:Clone
 {

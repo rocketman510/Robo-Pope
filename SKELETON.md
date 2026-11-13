@@ -19,7 +19,7 @@ Modal, execution, component, or Frame identity.
 ## API organization
 
 - `src/lib.rs`: public library entry point, separate from the Discord bot.
-- `src/app/`: App state, host database extension, render/interaction contexts,
+- `src/app/`: App state, application database, render/interaction contexts,
   typed registries, routing, Store abstraction, and Serenity event adapter.
 - `src/page/`: Page builder and registered typestate, static/dynamic values,
   explicit executions, render outputs, and Discord limits.
@@ -33,10 +33,8 @@ Modal, execution, component, or Frame identity.
 
 ## Design decisions carried forward
 
-- Page data is serialized per render; application extension state is typed
-  separately and is never serialized.
-- `Page<T, E = ()>` preserves the spec's simple `Page<T>` form while allowing
-  callbacks to access an application's typed service bundle when needed.
+- Page data is serialized per render. Application-wide state is owned by App and reached through Ctx or RenderCtx; it is never part of Page data.
+- `Page<T>` has one generic parameter: the serialized data shared by that Page's components and executions. Callbacks reach application state through `Ctx` or `RenderCtx`, which wrap the monolithic `App`.
 - Dynamic values use the explicit `dynamic(...)` adapter with the ordinary
   property methods. This avoids overlapping blanket trait implementations.
 - Fixed Section slots are independently generic; ButtonRow has five explicit

@@ -5,31 +5,22 @@ use std::sync::{Arc, RwLock};
 use crate::page::{PageDefinition, RegisteredPage};
 use crate::page::modal::{ModalDefinition, RegisteredModal};
 
-pub struct PageRegistry<E> {
+pub struct PageRegistry {
     entries: Arc<RwLock<HashMap<String, Arc<dyn Any + Send + Sync>>>>,
-    marker: std::marker::PhantomData<fn() -> E>,
 }
-impl<E> Clone for PageRegistry<E> {
-    fn clone(&self) -> Self {
-        Self { entries: self.entries.clone(), marker: std::marker::PhantomData }
-    }
+impl Clone for PageRegistry {
+    fn clone(&self) -> Self { Self { entries: self.entries.clone() } }
 }
-impl<E: Send + Sync + 'static> Default for PageRegistry<E> {
+impl Default for PageRegistry {
     fn default() -> Self {
-        Self { entries: Arc::new(RwLock::new(HashMap::new())), marker: std::marker::PhantomData }
+        Self { entries: Arc::new(RwLock::new(HashMap::new())) }
     }
 }
-impl<E: Send + Sync + 'static> PageRegistry<E> {
-    pub fn insert<T: Send + Sync + 'static>(
-        &self,
-        definition: Arc<PageDefinition<T, E>>,
-    ) -> anyhow::Result<()> {
+impl PageRegistry {
+    pub fn insert<T: Send + Sync + 'static>(&self, definition: Arc<PageDefinition<T>>) -> anyhow::Result<()> {
         todo!("insert atomically and reject duplicate Page IDs")
     }
-    pub fn query<T: Send + Sync + 'static>(
-        &self,
-        id: &str,
-    ) -> anyhow::Result<RegisteredPage<T, E>> {
+    pub fn query<T: Send + Sync + 'static>(&self, id: &str) -> anyhow::Result<RegisteredPage<T>> {
         todo!("downcast internally and return a correctly typed handle")
     }
     pub fn contains(&self, id: &str) -> bool {
@@ -37,31 +28,22 @@ impl<E: Send + Sync + 'static> PageRegistry<E> {
     }
 }
 
-pub struct ModalRegistry<E> {
+pub struct ModalRegistry {
     entries: Arc<RwLock<HashMap<String, Arc<dyn Any + Send + Sync>>>>,
-    marker: std::marker::PhantomData<fn() -> E>,
 }
-impl<E> Clone for ModalRegistry<E> {
-    fn clone(&self) -> Self {
-        Self { entries: self.entries.clone(), marker: std::marker::PhantomData }
-    }
+impl Clone for ModalRegistry {
+    fn clone(&self) -> Self { Self { entries: self.entries.clone() } }
 }
-impl<E: Send + Sync + 'static> Default for ModalRegistry<E> {
+impl Default for ModalRegistry {
     fn default() -> Self {
-        Self { entries: Arc::new(RwLock::new(HashMap::new())), marker: std::marker::PhantomData }
+        Self { entries: Arc::new(RwLock::new(HashMap::new())) }
     }
 }
-impl<E: Send + Sync + 'static> ModalRegistry<E> {
-    pub fn insert<T: Send + Sync + 'static>(
-        &self,
-        definition: Arc<ModalDefinition<T, E>>,
-    ) -> anyhow::Result<()> {
+impl ModalRegistry {
+    pub fn insert<T: Send + Sync + 'static>(&self, definition: Arc<ModalDefinition<T>>) -> anyhow::Result<()> {
         todo!("insert atomically and reject duplicate Modal IDs")
     }
-    pub fn query<T: Send + Sync + 'static>(
-        &self,
-        id: &str,
-    ) -> anyhow::Result<RegisteredModal<T, E>> {
+    pub fn query<T: Send + Sync + 'static>(&self, id: &str) -> anyhow::Result<RegisteredModal<T>> {
         todo!("downcast internally and return a correctly typed handle")
     }
     pub fn contains(&self, id: &str) -> bool {

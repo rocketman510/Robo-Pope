@@ -11,19 +11,19 @@ pub enum ButtonStyle {
     Danger,
 }
 
-impl<T, E> IntoValue<ButtonStyle, T, E> for ButtonStyle {
-    fn into_value(self) -> Value<ButtonStyle, T, E> { Value::Static(self) }
+impl<T> IntoValue<ButtonStyle, T> for ButtonStyle {
+    fn into_value(self) -> Value<ButtonStyle, T> { Value::Static(self) }
 }
 
-pub struct Button<T, E> {
+pub struct Button<T> {
     pub id: String,
-    pub label: Value<String, T, E>,
-    pub style: Value<ButtonStyle, T, E>,
-    pub disabled: Value<bool, T, E>,
-    pub(crate) execution: Execution<T, E, ()>,
+    pub label: Value<String, T>,
+    pub style: Value<ButtonStyle, T>,
+    pub disabled: Value<bool, T>,
+    pub(crate) execution: Execution<T>,
 }
 
-impl<T, E> Button<T, E> {
+impl<T> Button<T> {
     pub fn new<L, S, F, Fut>(
         label: L,
         id: impl Into<String>,
@@ -31,17 +31,16 @@ impl<T, E> Button<T, E> {
         callback: F,
     ) -> Self
     where
-        L: IntoValue<String, T, E>,
-        S: IntoValue<ButtonStyle, T, E>,
-        F: Fn(Ctx<E>, T) -> Fut + Send + Sync + 'static,
+        L: IntoValue<String, T>,
+        S: IntoValue<ButtonStyle, T>,
+        F: Fn(Ctx, T) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,
-        T: Send + 'static,
-        E: Send + Sync + 'static,
-    {
+        T: Send + 'static
+{
         todo!("create the explicit execution and initialize enabled state")
     }
 
-    pub fn set_disabled<V: IntoValue<bool, T, E>>(mut self, disabled: V) -> Self {
+    pub fn set_disabled<V: IntoValue<bool, T>>(mut self, disabled: V) -> Self {
         self.disabled = disabled.into_value();
         self
     }

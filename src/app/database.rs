@@ -1,28 +1,15 @@
-//! Framework persistence plus host-application database/services.
-use std::ops::Deref;
+//! Persistence used by the framework's execution router.
 use std::sync::Arc;
 use super::store::Store;
 
-/// Store persists framework execution references. E contains host-specific
-/// repositories/services. Deref makes ctx.app.db.users.query(...) ergonomic.
-pub struct Database<E> {
+/// The App owns this database handle alongside its other application state.
+/// Host-specific repositories belong on the concrete App, not in a framework
+/// generic threaded through every Page and Component.
+pub struct Database {
     pub store: Arc<dyn Store>,
-    pub extension: E,
 }
-impl<E> Database<E> {
-    pub fn new(store: Arc<dyn Store>, extension: E) -> Self {
-        Self { store, extension }
-    }
-    pub fn extension(&self) -> &E {
-        &self.extension
-    }
-    pub fn extension_mut(&mut self) -> &mut E {
-        &mut self.extension
-    }
-}
-impl<E> Deref for Database<E> {
-    type Target = E;
-    fn deref(&self) -> &Self::Target {
-        &self.extension
+impl Database {
+    pub fn new(store: Arc<dyn Store>) -> Self {
+        Self { store }
     }
 }

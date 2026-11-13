@@ -3,22 +3,22 @@ use crate::page::value::{IntoValue,Value};
 
 #[derive(Debug,Clone,Copy,PartialEq,Eq)]
 pub enum SeparatorSpacing { Small, Large }
-impl<T,E> IntoValue<SeparatorSpacing,T,E> for SeparatorSpacing {
-    fn into_value(self)->Value<SeparatorSpacing,T,E> { Value::Static(self) }
+impl<T> IntoValue<SeparatorSpacing,T> for SeparatorSpacing {
+    fn into_value(self)->Value<SeparatorSpacing,T> { Value::Static(self) }
 }
 
-pub struct Separator<T,E> {
-    pub spacing:Value<SeparatorSpacing,T,E>,
-    pub divider:Value<bool,T,E>,
+pub struct Separator<T> {
+    pub spacing:Value<SeparatorSpacing,T>,
+    pub divider:Value<bool,T>,
 }
-impl<T,E> Separator<T,E> {
+impl<T> Separator<T> {
     pub fn new()->Self {
         Self { spacing:Value::Static(SeparatorSpacing::Small), divider:Value::Static(true) }
     }
-    pub fn set_spacing<V:IntoValue<SeparatorSpacing,T,E>>(mut self,value:V)->Self {
+    pub fn set_spacing<V:IntoValue<SeparatorSpacing,T>>(mut self,value:V)->Self {
         self.spacing=value.into_value(); self
     }
-    pub fn set_divider<V:IntoValue<bool,T,E>>(mut self,value:V)->Self {
+    pub fn set_divider<V:IntoValue<bool,T>>(mut self,value:V)->Self {
         self.divider=value.into_value(); self
     }
 }
