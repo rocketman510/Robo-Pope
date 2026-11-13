@@ -359,7 +359,7 @@ where
     /// Store insertion is intentionally the final step. A failed dynamic value or
     /// invalid resolved component cannot leave an orphaned custom-ID record.
     pub async fn render(&self, app: &App, data: T) -> Result<ModalRender> {
-        use super::input::ModalInput as I;
+        use self::input::ModalInput as I;
 
         let serialized_data = serde_json::to_vec(&data)
             .with_context(|| format!("Serializing data for Modal '{}'", self.definition.id))?;

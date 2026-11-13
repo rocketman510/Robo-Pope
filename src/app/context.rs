@@ -50,7 +50,7 @@ impl Ctx {
             .map_err(|_| anyhow::anyhow!("This interaction has already received an initial response"))
     }
 
-    fn outgoing_attachments(message: Vec<crate::page::OutgoingAttachment>) -> Vec<CreateAttachment> {
+    fn outgoing_attachments(message: Vec<crate::page::OutgoingAttachment>) -> Vec<CreateAttachment<'static>> {
         message.into_iter().map(|attachment| {
             CreateAttachment::bytes((*attachment.bytes).clone(), attachment.filename)
         }).collect()
