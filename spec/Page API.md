@@ -67,7 +67,8 @@ pub struct UserLevelInfo {
 
 let page = Page::<UserLevelInfo>::new("UserLevel")
     .add_text(|ctx, data| async move {
-        let user = ctx.app.db.users.query(data.user_id).await?;
+        let database = ctx.app.db.get::<UserDatabase>()?;
+        let user = database.users.query(data.user_id).await?;
         Ok(format!("Level: {}", user.level))
     })
     .register(app)?;
@@ -75,6 +76,7 @@ let page = Page::<UserLevelInfo>::new("UserLevel")
 
 The data passed to `render` is serialized and persisted alongside the Page's interactive execution references. When an interaction occurs, the framework reconstructs the original data and passes it to the corresponding execution.
 
+The value stored in `App::db` is the host application's database object, not the framework's interaction Store. It is accessed through the type-erased `Database::get::<T>()` boundary; the host application supplies its own concrete database type and repositories. The framework Store is configured separately on App.
 The data type must implement `Serialize` and `DeserializeOwned`, and satisfy the concurrency requirements of the asynchronous application.
 
 ## 2. Static and dynamic values
@@ -145,6 +147,7 @@ This should apply consistently to properties that can reasonably be resolved at 
 
 The default rule is that a property accepts either its ordinary value or an asynchronous callback returning that value, unless there is a specific reason not to.
 
+A callback passed directly to a property method is treated as a dynamic value; developers must not need to wrap it in `dynamic(...)`. The `dynamic(...)` adapter may remain available when an explicit callback boundary improves inference, but it is not required by the ordinary API.
 Dynamic callbacks are evaluated when the Page is rendered. They are not interactive executions and do not need their own database entries.
 
 A dynamic value determines what a component looks like. An execution determines what happens when someone interacts with a component.
@@ -505,6 +508,9 @@ The exact representation is an implementation detail. The public API should allo
 
 Interactive components inside a Frame must receive stable execution identities. Their execution IDs should be derived from stable developer-defined identifiers or another deterministic identity mechanism, not their temporary position in a generated list.
 
+Every Frame element that contains an interactive component at any depth must have a non-empty developer-defined key, including a Button or Select nested in a Container, a Button accessory inside a Section, or a Button inside a Button Row. The key applies recursively to all interactive descendants of that element. Keys must be unique within the Frame. The framework combines the Page ID, Frame ID, element key, and execution ID to derive each execution identity. Duplicate keys and missing keys are render errors, never a reason to fall back to the element's array index.
+
+
 ### Frame pagination
 
 A Frame can contain more components than Discord permits in a single message.
@@ -546,6 +552,9 @@ The pagination algorithm must account for:
 - Any other Discord component restrictions.
     
 
+Dynamic values are resolved before pagination is planned. The measured cost uses the resolved value, not a placeholder estimate or zero cost for a callback. The same resolved component tree is used for planning and rendering so a callback is not re-evaluated into a different result between those stages.
+
+
 The framework should maximize the amount of Frame content displayed in each page without exceeding any Discord limits.
 
 ### Pagination boundaries
@@ -583,9 +592,13 @@ The pagination algorithm must reserve the component and text budget needed by th
 
 Pagination should be handled by the framework.
 
-The framework should provide navigation controls for moving between generated pages. These controls should not require the developer to define ordinary button callbacks.
+The framework should provide navigation controls for moving between generated pages. These controls should not require the developer to define ordinary button callbacks. The controls are labelled `Previous` and `Next`, and use the reserved execution IDs `__frame:{frame_id}:previous` and `__frame:{frame_id}:next`. Their custom IDs are derived from the Page ID, reserved execution ID, serialized Page data, and Frame ID, and are persisted as ordinary Store records with the current PaginationState.
 
 The current pagination position is part of the rendered Page state. Moving to another page should update that state and render the corresponding Frame contents.
+
+When a Frame produces more than one page, Previous is disabled on the first page and Next is disabled on the last page. A one-page Frame has no navigation controls. The controls are included in the component and text budgets before Frame elements are allocated to pages.
+
+Clicking a navigation control changes the persisted page index by exactly one, rerenders the requested page, and edits the message that contains the controls. The framework rejects stale or out-of-range navigation state instead of silently clamping it.
 
 The framework should prevent navigation beyond the first or last page.
 
@@ -602,6 +615,7 @@ The framework should distinguish:
 - The current pagination position.
     
 
+The navigation interaction's Store record carries the definition ID, Frame ID, serialized original Page data, and current pagination state. Advancing or returning updates the stored state before the message is edited. Store persistence is durable across process restarts; the application re-registers the Page definitions and their callbacks when it starts. The Store exposes an atomic compare-and-set operation for this field: it replaces the pagination state only when the persisted state still equals the state read by the interaction. A stale or replayed click must not overwrite a newer position. The operation changes no immutable execution-reference fields.
 The current page index must be persisted or otherwise recoverable when the user interacts with navigation controls.
 
 The framework should also avoid relying on the current array position of an interactive component as its identity. Moving an element to another page must not accidentally associate it with another execution.
@@ -609,6 +623,9 @@ The framework should also avoid relying on the current array position of an inte
 For large datasets, the Frame should eventually support a paginated data source so the framework does not need to load an enormous collection into memory before displaying the first page.
 
 The initial implementation can support a collection returned by the Frame callback, with data-source pagination added later.
+
+A Page may contain at most one paginated Frame across its complete component tree. That Frame may be a top-level Page item or be nested inside a Container. A nested Frame is expanded at its declared position inside the Container. Pagination splits only between complete Frame elements; the Container's static children before and after the Frame are repeated on every generated page. Each generated Container must remain within its direct-child limit. Unsupported multiple-Frame arrangements return a descriptive registration or render error.
+
 
 ## 6. Modals
 
@@ -765,6 +782,16 @@ This avoids requiring developers to manually retrieve strings by component ID an
 
 The framework should map component IDs to struct fields and convert submitted values into the appropriate Rust types. Missing or invalid values should return errors.
 
+The field-name mapping is normative:
+
+- Text Input values deserialize as `String`.
+- String Select, Radio Group, and Checkbox Group values deserialize as `Vec<String>`, containing submitted option values.
+- Checkbox values deserialize as `bool`.
+- User, Role, and Channel Select values deserialize as arrays of their Discord ID types (`Vec<UserId>`, `Vec<RoleId>`, and `Vec<ChannelId>`).
+- Mentionable Select values deserialize as arrays of tagged values containing the selected kind (`user` or `role`) and its Discord ID.
+- File Upload values deserialize as arrays of attachment metadata containing the attachment ID, filename, URL, size, and optional content type. The framework does not download file bytes as part of deserialization.
+
+The raw `ModalSubmission` accessors remain available when application code needs complete typed Serenity entities or attachment objects. A Serde type mismatch, missing required field, or malformed ID is an error; typed values must not be silently discarded or coerced to strings.
 The exact mechanism for this should be designed around Serde rather than inventing a second serialization system.
 
 ## 7. Interaction Context
@@ -800,6 +827,11 @@ The context should expose operations relevant to the interaction type:
 - Open a Modal.
     
 
+Response operations have distinct Discord semantics. `reply`, `defer`, `edit_message`, and `open_modal` are initial interaction responses and may be used only while the interaction has not already been acknowledged. They map respectively to a message response, deferred response, message update, and Modal response. `edit_original_response`, `followup`, and `delete_response` operate on the original interaction webhook response; `followup` creates a separate webhook message. Each method sends its documented payload through the App's configured HTTP client and returns Discord/API errors to the callback. Calling an initial-response method after the interaction has already been acknowledged returns an error. The framework does not silently substitute one response kind for another.
+
+These response operations must be testable through an injected or local HTTP test double. Unit tests must not require a live Discord connection or a real bot token.
+
+
 The context also exposes interaction information, such as the user who interacted, the guild and channel, selected values, and submitted Modal data.
 
 The context is temporary. It belongs to the current interaction and is never stored inside a Page or persisted in the database.
@@ -810,7 +842,8 @@ The App owns the registered Pages and Modals, the database, and the interaction 
 
 ```rust
 struct App {
-    db: Database,
+    db: Arc<Database>,
+    store: Arc<dyn Store>,
     pages: PageRegistry,
     modals: ModalRegistry,
 }
@@ -831,13 +864,18 @@ let message = app.pages
     .await?;
 ```
 
+`Database` is a type-erased, host-owned application database handle. `Database::new(value)` stores a concrete host database value, and `db.get::<T>()` returns a typed reference when the stored value is `T`, or an error for a type mismatch. It does not own the framework Store and does not define application repositories. The Store is a separate App dependency, supplied when App is constructed and accessed through `app.store()`. Page code accesses host repositories through `ctx.app.db.get::<YourDatabaseType>()?`; it never accesses the framework Store through `ctx.app.db`.
+
+Page IDs and Modal IDs share one application-wide identifier namespace. Registering a Page whose ID is already used by a Modal, or a Modal whose ID is already used by a Page, is an error. The uniqueness check and insertion are atomic from the App's perspective.
+
+
 The App should not be stored inside the Page. The App is supplied when registration or rendering requires application services.
 
 ## 9. Persistence and interaction routing
 
 Discord returns a component's `custom_id` when a user interacts with it. The framework uses that value to locate the execution.
 
-The database stores the mapping between the custom ID and the execution definition.
+The framework Store stores the mapping between the custom ID and the execution definition. This Store is separate from the host application's `Database` and must be durable in production: a record written before process shutdown must still resolve after the process is recreated and the same Page/Modal definitions are registered again. `MemoryStore` is suitable only for isolated tests and development; it does not satisfy the production persistence contract.
 
 Each record contains:
 
@@ -850,6 +888,7 @@ Each record contains:
 4. The serialized data associated with the rendered instance.
     
 
+The persisted record also contains the stable Frame element identity, when applicable, and the pagination state needed to restore framework-generated navigation.
 The hash is derived from the Page or Modal ID, execution ID, and serialized data. The same definition and data should produce the same hash.
 
 This allows repeated renders of the same definition and data to reuse the same database record.
@@ -944,6 +983,9 @@ Fixed-size component slots should prevent invalid child counts from being expres
 
 **Errors are explicit.** Invalid persisted references, missing values, and failed executions return errors instead of panicking.
 
+A String Select option has no independent disabled state in Discord's component payload. The framework must reject an option configured with `SelectOption::set_disabled(true)` rather than silently omit the setting or render an invalid component. A dynamic option-disabled value is checked after it is resolved. Disabling the complete select menu remains supported.
+
+
 ## 12. Discord constraints
 
 The implementation must respect Discord's actual component limits.
@@ -989,6 +1031,9 @@ For Modals:
 These constraints should be validated by the framework, including after dynamic values and Frame contents have been resolved.
 
 The framework should not assume that a Page is valid merely because its static definition is valid. Dynamic content can exceed the limits at render time.
+
+A Text Input's configured `max_length` cannot exceed 4,000, and its `min_length` cannot exceed its `max_length`. Each Modal Select, Radio Group, and Checkbox Group supports no more than 25 options. Static violations are rejected during registration; dynamic label, placeholder, description, and option values are validated after resolution during rendering.
+
 
 ## 13. Implementation priorities
 
