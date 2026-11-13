@@ -36,6 +36,12 @@ impl RenderedMessage {
         self.attachments.push(OutgoingAttachment { filename:filename.into(),bytes:Arc::new(bytes) });
         self
     }
+    pub fn into_components(self) -> Vec<CreateComponent<'static>> {
+        self.components
+            .into_iter()
+            .map(|component| component.component)
+            .collect()
+    }
 }
 
 /// Validates a resolved component tree against the Discord component and text budgets.

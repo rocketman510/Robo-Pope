@@ -1,15 +1,20 @@
-//! Runnable framework showcase and Discord Gateway startup.
+// Runnable framework showcase and Discord Gateway startup.
+
 use std::sync::Arc;
 
 use anyhow::Context as _;
 use serde::{Deserialize, Serialize};
 use serenity::{
-    all::{GatewayIntents, Http, Token},
+    all::{
+        Context, CreateMessage, EventHandler, FullEvent, GatewayIntents, Http,
+        MessageFlags, Token,
+    },
+    async_trait,
     Client,
 };
 
 use robo_pope::{
-    app::{handler::AppHandler, store::MemoryStore, App, Database},
+    app::{store::MemoryStore, App, Database},
     page::{
         dynamic, Button, ButtonStyle, Container, Element, Frame, LinkButton,
         MediaGallery, Modal, Page, Section, SelectOption, Separator, StringSelect,
@@ -93,16 +98,20 @@ fn register_demo_page(app: &App) -> anyhow::Result<()> {
         .add_frame(
             Frame::<DemoData>::new("demo-frame", |_ctx, data| async move {
                 Ok(vec![
-                    Element::text(format!("Generated Frame content for {}.", data.username))
-                        .keyed("demo-frame-entry"),
+                    Element::text(format!(
+                        "Generated Frame content for {}.",
+                        data.username
+                    ))
+                    .keyed("demo-frame-entry"),
                 ])
             })
             .paginate(),
         )
         .paginate();
 
-    let _registered_page = page.register(app)?;
+    page.register(app)?;
     println!("Registered demo Page: framework-demo");
+
     Ok(())
 }
 
@@ -117,16 +126,91 @@ fn register_demo_modal(app: &App) -> anyhow::Result<()> {
             },
         );
 
-    let _registered_modal = modal.register(app)?;
+    modal.register(app)?;
     println!("Registered demo Modal: framework-demo-modal");
+
     Ok(())
+}
+
+struct DemoHandler {
+    app: App,
+}
+
+impl DemoHandler {
+    fn new(app: App) -> Self {
+        Self { app }
+    }
+}
+
+#[async_trait]
+impl EventHandler for DemoHandler {
+    async fn dispatch(&self, ctx: &Context, event: &FullEvent) {
+        match event {
+            FullEvent::Ready { data_about_bot, .. } => {
+                println!("{} is connected.", data_about_bot.user.name);
+                println!("Send !test in a channel I can read.");
+            }
+
+            FullEvent::Message { new_message, .. } => {
+                if new_message.author.bot() {
+                    return;
+                }
+
+                if new_message.content.trim() != "!test" {
+                    return;
+                }
+
+                let data = DemoData {
+                    username: new_message.author.name.to_string(),
+                    visits: 1,
+                };
+
+                // Retrieve the immutable registered Page definition.
+                let page = match self.app.pages.query("framework-demo") {
+                    Ok(page) => page,
+                    Err(error) => {
+                        eprintln!("Failed to query demo Page: {error:#}");
+                        return;
+                    }
+                };
+
+                // Render the registered Page with this message's data.
+                let rendered = match page.render(&self.app, data).await {
+                    Ok(rendered) => rendered,
+                    Err(error) => {
+                        eprintln!("Failed to render demo Page: {error:#}");
+                        return;
+                    }
+                };
+
+                let components = rendered.into_components();
+
+                // Send the rendered Components V2 message as a reply.
+                let response = CreateMessage::new()
+                    .components(components)
+                    .flags(MessageFlags::from_bits_retain(1 << 15))
+                    .reference_message(new_message);
+
+                if let Err(error) = new_message
+                    .channel_id
+                    .send_message(&ctx.http, response)
+                    .await
+                {
+                    eprintln!("Failed to send demo Page: {error}");
+                } else {
+                    println!("Demo Page sent successfully.");
+                }
+            }
+
+            _ => {}
+        }
+    }
 }
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     dotenv::dotenv().ok();
 
-    // Serenity Next expects its validated Token type, not a String.
     let token = Token::from_env("DISCORD_TOKEN")
         .context("Could not load a valid DISCORD_TOKEN from .env")?;
 
@@ -137,8 +221,12 @@ async fn main() -> anyhow::Result<()> {
     register_demo_page(&app)?;
     register_demo_modal(&app)?;
 
-    let mut client = Client::builder(token, GatewayIntents::GUILDS)
-        .event_handler(Arc::new(AppHandler::new(app)))
+    let intents = GatewayIntents::GUILDS
+        | GatewayIntents::GUILD_MESSAGES
+        | GatewayIntents::MESSAGE_CONTENT;
+
+    let mut client = Client::builder(token, intents)
+        .event_handler(Arc::new(DemoHandler::new(app)))
         .await
         .context("Failed to create the Serenity client")?;
 
