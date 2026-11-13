@@ -1,20 +1,21 @@
 use std::sync::Arc;
 
-use serde_json::json;
 use serenity::all::Interaction;
 
 use crate::app::{App, Ctx};
 use super::support::app;
 
 fn ping_interaction() -> Interaction {
-    serde_json::from_str(r#"{"
-type": 1,
-        "id": "100",
-        "application_id": "200",
-        "token": "test-interaction-token",
-        "version": 1,
-        "app_permissions": "0"
-    }"#)
+    serde_json::from_str(
+        r#"{
+            "type": 1,
+            "id": "100",
+            "application_id": "200",
+            "token": "test-interaction-token",
+            "version": 1,
+            "app_permissions": "0"
+        }"#,
+    )
     .expect("minimal Ping interaction fixture must deserialize")
 }
 
