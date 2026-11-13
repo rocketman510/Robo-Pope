@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use crate::app::{App, Database};
 use crate::app::registry::{ModalRegistry, PageRegistry};
 use crate::app::router::InteractionRouter;
+use crate::app::executions::ExecutionRegistry;
 use crate::app::store::{MemoryStore, Store};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -31,5 +32,6 @@ pub fn app() -> App {
         modals: ModalRegistry::default(),
         http: Arc::new(serenity::http::HttpBuilder::without_token().build()),
         router: InteractionRouter::default(),
+        executions: ExecutionRegistry::default(),
     }
 }
