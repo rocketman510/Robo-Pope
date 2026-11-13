@@ -36,11 +36,31 @@ impl RenderedMessage {
         self.attachments.push(OutgoingAttachment { filename:filename.into(),bytes:Arc::new(bytes) });
         self
     }
-    pub fn into_components(self) -> Vec<CreateComponent<'static>> {
-        self.components
+    /// Consumes the rendered message without losing attachment or pagination data.
+    ///
+    /// The returned tuple contains Serenity components, the outgoing file
+    /// attachments, and the optional pagination metadata, in that order.
+    pub fn into_parts(
+        self,
+    ) -> (
+        Vec<CreateComponent<'static>>,
+        Vec<OutgoingAttachment>,
+        Option<PaginationState>,
+    ) {
+        let components = self.components
             .into_iter()
             .map(|component| component.component)
-            .collect()
+            .collect();
+
+        (components, self.attachments, self.pagination)
+    }
+
+    /// Extracts only the Serenity components.
+    ///
+    /// This intentionally discards attachments and pagination metadata. Use
+    /// `into_parts` when the complete rendered payload must be sent or retained.
+    pub fn into_components(self) -> Vec<CreateComponent<'static>> {
+        self.into_parts().0
     }
 }
 
