@@ -1272,9 +1272,16 @@ where
             });
         }
 
+        // Reserve the navigation row before splitting. A Frame whose output fits
+        // only without navigation must paginate to make room for those controls.
+        let navigation_budget = ComponentBudget {
+            total_components: 3, // one Action Row plus two Buttons
+            text_display_chars: 0,
+            direct_container_children: 0,
+        };
         let (planned_pages, page_count) = plan_rendered_frame(
             rendered_elements,
-            reserved,
+            add_budgets(reserved, navigation_budget),
         ).with_context(|| format!("Paginating Frame '{}' in Page '{}'", frame.id, self.id()))?;
 
         let mut pages = Vec::with_capacity(page_count);
@@ -1287,14 +1294,55 @@ where
             let mut components = prefix_components.clone();
             components.extend(frame_components);
             components.extend(suffix_components.clone());
+
+            let pagination = super::frame::pagination::PaginationState {
+                frame_id: frame.id.clone(),
+                page_index,
+                page_count,
+            };
+            if page_count > 1 {
+                let identity = pagination_identity(&frame.id, page_index);
+                let mut nav_buttons = Vec::with_capacity(2);
+                for (direction, label, disabled) in [
+                    ("previous", "Previous", page_index == 0),
+                    ("next", "Next", page_index + 1 == page_count),
+                ] {
+                    let execution_id = pagination_execution_id(&frame.id, direction);
+                    let custom_id = derive_custom_id(
+                        self.id(),
+                        &execution_id,
+                        &serialized_data,
+                        Some(&identity),
+                    )?;
+                    app.store().insert(StoreRecord {
+                        custom_id: custom_id.0.clone(),
+                        definition_kind: DefinitionKind::Page,
+                        definition_id: self.id().to_owned(),
+                        execution_id,
+                        serialized_data: serialized_data.clone(),
+                        frame_identity: Some(identity.clone()),
+                        pagination_state: Some(serde_json::to_value(&pagination)?),
+                        schema_version: 1,
+                    }).await.with_context(|| format!(
+                        "Persisting {label} navigation for Frame '{}'",
+                        frame.id
+                    ))?;
+                    nav_buttons.push(
+                        CreateButton::new(custom_id.0)
+                            .label(label)
+                            .style(SerenityButtonStyle::Primary)
+                            .disabled(disabled)
+                            .into_owned()
+                    );
+                }
+                components.push(RenderedComponent {
+                    component: CreateComponent::ActionRow(CreateActionRow::buttons(nav_buttons).into()),
+                });
+            }
             pages.push(RenderedMessage {
                 components,
                 attachments: Vec::new(),
-                pagination: Some(super::frame::pagination::PaginationState {
-                    frame_id: frame.id.clone(),
-                    page_index,
-                    page_count,
-                }),
+                pagination: (page_count > 1).then_some(pagination),
             });
         }
 
