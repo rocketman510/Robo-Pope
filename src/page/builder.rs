@@ -433,13 +433,14 @@ where
                 ),
             };
 
+            let text_component_count = text_components.len();
             let rendered = CreateSection::new(text_components, accessory).into_owned();
             Ok((
                 vec![RenderedComponent {
                     component: CreateComponent::Section(rendered),
                 }],
                 ComponentBudget {
-                    total_components: 1 + text_components.len(),
+                    total_components: 1 + text_component_count,
                     text_display_chars: text_chars,
                     direct_container_children: 0,
                 },
