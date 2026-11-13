@@ -17,7 +17,7 @@ The framework has four main concepts:
 - `Modal<T>`: A blueprint for a form submitted through a Discord interaction.
     
 - `Frame<T>`: A dynamic region inside a Page that resolves its own component hierarchy at render time and can paginate its contents.
-    
+	
 
 ## 1. Page
 
@@ -25,7 +25,7 @@ A Page is a reusable blueprint. It defines the structure of a message, not a par
 
 Each Page has a globally unique ID and a single generic data type, `T`. This data is available to every dynamic component and interactive execution belonging to the Page.
 
-```
+```rust
 use serde::{Serialize, Deserialize};
 
 #[derive(Serialize, Deserialize)]
@@ -38,7 +38,7 @@ let page = Page::<Dataless>::new("TheIdOfThePage")
 
 Pages are built before they are registered. Registration consumes the builder and produces a `RegisteredPage<T>`.
 
-```
+```rust
 let page: RegisteredPage<Dataless> =
     Page::<Dataless>::new("TheIdOfThePage")
         .add_text("Hello, world!")
@@ -49,7 +49,7 @@ A regular `Page<T>` can be modified. A `RegisteredPage<T>` cannot. This is a typ
 
 Rendering is only available on registered Pages.
 
-```
+```rust
 let message = page.render(app, Dataless).await?;
 ```
 
@@ -59,7 +59,7 @@ Rendering requires the App because interactive components must be registered wit
 
 The Page's generic type is the shared data scope for its components and executions.
 
-```
+```rust
 #[derive(Serialize, Deserialize)]
 pub struct UserLevelInfo {
     user_id: String,
@@ -83,7 +83,7 @@ A component property should accept either a static value or a callback that reso
 
 The public API should not require separate constructors or methods for static and dynamic values.
 
-```
+```rust
 Page::<Dataless>::new("Example")
     .add_text("This is static text.")
     .add_text(|ctx, data| async move {
@@ -93,7 +93,7 @@ Page::<Dataless>::new("Example")
 
 The same principle applies to component properties.
 
-```
+```rust
 Button::new(
     "Show Level",
     "ButtonId",
@@ -112,7 +112,7 @@ The implementation should use a common internal representation for values that c
 
 Conceptually:
 
-```
+```rust
 enum Value<T> {
     Static(T),
     Dynamic(/* asynchronous callback returning T */),
@@ -121,7 +121,7 @@ enum Value<T> {
 
 Component methods should accept values convertible into this representation.
 
-```
+```rust
 .add_text("Hello")
 .add_text(dynamic_callback)
 ```
@@ -159,7 +159,7 @@ Each slot can contain a static value, a dynamic callback, or nothing.
 
 For example, a Section supports up to three Text Displays:
 
-```
+```rust
 Section::new()
     .set_text(
         "User information",
@@ -170,7 +170,7 @@ Section::new()
 
 A Section with three text blocks:
 
-```
+```rust
 Section::new()
     .set_text(
         "User information",
@@ -181,7 +181,7 @@ Section::new()
 
 The same idea applies to button rows:
 
-```
+```rust
 .add_button_row((
     Some(button1),
     Some(button2),
@@ -193,7 +193,7 @@ The same idea applies to button rows:
 
 A fully populated row:
 
-```
+```rust
 .add_button_row((
     Some(button1),
     Some(button2),
@@ -219,7 +219,7 @@ The API should model how developers build interfaces, rather than mechanically e
 
 A Text Display presents Markdown-formatted text.
 
-```
+```rust
 Page::<Dataless>::new("Example")
     .add_text("# Welcome")
     .add_text("This is another text block.");
@@ -229,7 +229,7 @@ Each call adds a separate Text Display. Text should not be silently concatenated
 
 Dynamic content uses the same method:
 
-```
+```rust
 .add_text(|ctx, data| async move {
     Ok(format!("Welcome, {}!", data.username))
 })
@@ -241,7 +241,7 @@ A Section places text alongside an accessory. Discord supports one to three Text
 
 The public API should expose three explicit text slots.
 
-```
+```rust
 Section::new()
     .set_text(
         "User information",
@@ -257,7 +257,7 @@ Each text slot can independently be static, dynamic, or absent.
 
 The accessory can be a Thumbnail or a Button.
 
-```
+```rust
 Section::new()
     .set_text(
         "View additional information.",
@@ -282,7 +282,7 @@ The framework should ensure that the resulting Section satisfies Discord's requi
 
 A Container groups components into a visually distinct block. It can have an accent color and spoiler behavior.
 
-```
+```rust
 Container::new()
     .set_accent_color(0x5865F2)
     .add_text("Account information")
@@ -296,7 +296,7 @@ Containers should support the component types permitted by Discord.
 
 A Separator provides visual spacing and can optionally display a divider.
 
-```
+```rust
 Separator::new()
     .set_spacing(SeparatorSpacing::Large)
     .set_divider(true)
@@ -306,7 +306,7 @@ Separator::new()
 
 A Thumbnail displays a small image, usually as a Section accessory.
 
-```
+```rust
 Thumbnail::new("https://example.com/avatar.png")
     .set_description("User avatar")
 ```
@@ -317,7 +317,7 @@ The image source and description should support static or dynamic values.
 
 A Media Gallery displays a collection of images or videos.
 
-```
+```rust
 MediaGallery::new()
     .add_media("https://example.com/image1.png")
     .add_media("https://example.com/image2.png")
@@ -329,7 +329,7 @@ Individual media items may have descriptions.
 
 A File component displays an uploaded attachment within a Components V2 message.
 
-```
+```rust
 File::new("document.pdf")
 ```
 
@@ -341,7 +341,7 @@ Interactive components create executions. Each execution has an ID unique within
 
 ### Button
 
-```
+```rust
 Button::new(
     "Show Level",
     "ButtonId",
@@ -373,7 +373,7 @@ A Link Button opens a URL rather than invoking an application execution.
 
 It should be a separate component because it does not produce an interaction.
 
-```
+```rust
 LinkButton::new(
     "Visit Website",
     "https://example.com",
@@ -386,7 +386,7 @@ Its label and URL should support static or dynamic values.
 
 Developers should not have to manually create Action Rows.
 
-```
+```rust
 Page::<Dataless>::new("Example")
     .add_button_row((
         Some(button1),
@@ -405,7 +405,7 @@ Discord supports up to five buttons in an Action Row. Empty slots are explicitly
 
 A Page should expose one method for adding a selection menu.
 
-```
+```rust
 .add_selection_menu(selection_menu)
 ```
 
@@ -430,7 +430,7 @@ The important point is that the Page API accepts one selection-menu abstraction 
 
 A String Select might look like this:
 
-```
+```rust
 StringSelect::new(
     "Choose a class",
     "ClassSelect",
@@ -460,7 +460,7 @@ Unlike a dynamic property, which resolves one component value, a Frame resolves 
 
 This allows a Page to have a fixed structure while still displaying a dynamically generated list of components.
 
-```
+```rust
 Page::<UserListData>::new("UserList")
     .add_text("# Users")
     .add_frame(|ctx, data| async move {
@@ -490,7 +490,7 @@ For example, a Frame may contain Text Displays, Sections, Containers, Separators
 
 Conceptually, these components should be represented by a common `Element` abstraction.
 
-```
+```rust
 Ok(vec![
     Element::text("User information"),
     Element::separator(),
@@ -511,7 +511,7 @@ A Frame can contain more components than Discord permits in a single message.
 
 Rather than requiring developers to manually split their data into pages, the framework should automatically paginate the Frame's contents.
 
-```
+```rust
 Page::<UserListData>::new("UserList")
     .add_text("# Users")
     .add_frame(|ctx, data| async move {
@@ -564,7 +564,7 @@ The Frame does not own the entire Page.
 
 Static elements before and after the Frame are part of the Page's fixed structure.
 
-```
+```rust
 Page::<UserListData>::new("UserList")
     .add_text("# User Directory")
     .add_separator()
@@ -618,7 +618,7 @@ A Modal is not a message component. It is opened in response to an interaction a
 
 A Modal should be its own blueprint type.
 
-```
+```rust
 #[derive(Serialize, Deserialize)]
 pub struct EditUserData {
     user_id: String,
@@ -661,7 +661,7 @@ The submitted form values are separate. They come from Discord and are provided 
 
 A Modal is opened by an existing interaction, usually a button execution.
 
-```
+```rust
 Button::new(
     "Edit User",
     "EditUserButton",
@@ -710,7 +710,7 @@ The Modal API should support the input components Discord permits:
 
 The API should use simple input definitions and handle Discord's required Label structures internally.
 
-```
+```rust
 Modal::<Dataless>::new("CreateTicket")
     .set_title("Create a Ticket")
     .add_text_input(
@@ -743,7 +743,7 @@ Modal inputs should have stable developer-defined IDs. Those IDs are used to ret
 
 The long-term goal should be to support deserializing Modal submissions into a developer-defined Rust struct.
 
-```
+```rust
 #[derive(Deserialize)]
 struct EditUserForm {
     username: String,
@@ -773,7 +773,7 @@ Every execution receives an interaction context.
 
 The context represents the current Discord interaction and provides access to both the App and interaction-specific operations.
 
-```
+```rust
 |ctx, data| async move {
     let user = ctx.app.db.users.query(data.user_id).await?;
 
@@ -808,7 +808,7 @@ The context is temporary. It belongs to the current interaction and is never sto
 
 The App owns the registered Pages and Modals, the database, and the interaction router.
 
-```
+```rust
 struct App {
     db: Database,
     pages: PageRegistry,
@@ -824,7 +824,7 @@ A registered Page is immutable. The App owns its registered definition and uses 
 
 Rendering a Page requires the App:
 
-```
+```rust
 let message = app.pages
     .query("UserLevel")?
     .render(&app, user_data)
@@ -1019,7 +1019,7 @@ This order establishes the core execution and rendering model before adding the 
 
 The end result should make building a Discord interface mostly ordinary composition:
 
-```
+```rust
 let page = Page::<UserListData>::new("UserList")
     .add_container(
         Container::new()
