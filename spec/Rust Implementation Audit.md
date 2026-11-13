@@ -38,13 +38,15 @@ The end-to-end interaction path remains incomplete: Page and Modal registration 
 
 The former open questions are now explicit in `Page API.md`:
 
-1. Host database access uses `Database::get::<T>()`; framework persistence is a separate Store dependency.
-2. Production Store durability is required; MemoryStore is test/development only.
-3. String Select per-option disabled state is rejected because Discord does not support it; whole-menu disabled remains supported.
-4. Direct asynchronous property closures are accepted; `dynamic(...)` is optional.
-5. One paginated Frame may appear at the top level or inside a Container. Nested pagination preserves the Container and its static siblings. Multiple paginated Frames in one Page tree are rejected.
-6. Frame navigation uses reserved Previous/Next execution IDs and atomically compare-and-sets persisted state.
-7. Modal Serde mapping for each supported submitted value category is specified.
+1. Registration indexes all Page/Modal callbacks in a process-local execution registry; the gateway handler routes InteractionCreate through App dispatch.
+2. Modal rendering persists its submit record only after successful resolution, validation, and payload construction.
+3. Host database access uses `Database::get::<T>()`; framework persistence is a separate Store dependency.
+4. Production Store durability is required; MemoryStore is test/development only.
+5. String Select per-option disabled state is rejected because Discord does not support it; whole-menu disabled remains supported.
+6. Direct asynchronous property closures are accepted; `dynamic(...)` is optional.
+7. One paginated Frame may appear at the top level or inside a Container. Nested pagination preserves the Container and its static siblings. Multiple paginated Frames in one Page tree are rejected.
+8. Frame navigation uses reserved Previous/Next execution IDs and atomically compare-and-sets persisted state.
+9. Modal Serde mapping for each supported submitted value category is specified.
 
 ## Test discipline
 

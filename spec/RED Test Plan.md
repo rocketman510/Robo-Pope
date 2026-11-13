@@ -10,6 +10,8 @@ The suite must compile before runtime RED failures are evaluated. A compilation 
 
 ## Contract decisions recorded in Page API.md
 
+- Every Page/Modal execution callback is indexed during registration, and the gateway handler forwards InteractionCreate to App dispatch.
+- Modal rendering validates and builds the complete payload before persisting its submit record; failed rendering leaves no orphan.
 - Host application database state is separate from the framework interaction Store. `Database::get::<T>()` retrieves the host application's concrete database aggregate.
 - Production Store records must survive process restart. `MemoryStore` is process-local and development/test only.
 - Direct asynchronous closures are valid inputs to dynamic component properties and fixed Section slots. `dynamic(...)` is optional.
