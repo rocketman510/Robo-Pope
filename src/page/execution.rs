@@ -5,6 +5,7 @@ use serde::de::DeserializeOwned;
 
 use crate::app::{App, BoxFuture, Ctx};
 use crate::app::executions::{ErasedCallback, ExecutionKey, InteractionPayload};
+use crate::page::{ModalSubmission, Selection};
 
 pub struct Execution<T, I = ()> {
     /// Stable ID within the containing Page or Modal definition.
