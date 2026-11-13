@@ -209,6 +209,57 @@ async fn page_rejects_more_than_one_paginated_frame_across_nested_components() {
 }
 
 #[tokio::test]
+async fn multiple_ordinary_frames_render_in_page_order_without_pagination() {
+    // FIRST: a Page may compose multiple dynamic Frames when none requests pagination.
+    let app = app();
+    let page = Page::<TestData>::new("ordinary-frames")
+        .add_frame(Frame::<TestData>::new("first", |_ctx, _data| async move {
+            Ok(vec![Element::text("First Frame")])
+        }))
+        .add_frame(Frame::<TestData>::new("second", |_ctx, _data| async move {
+            Ok(vec![Element::text("Second Frame")])
+        }))
+        .register(&app).unwrap();
+
+    let rendered = page.render_pages(&app, TestData::default()).await.unwrap();
+    assert_eq!(rendered.pages.len(), 1);
+    let (components, _, pagination) = rendered.pages.into_iter().next().unwrap().into_parts();
+    let json = serde_json::to_value(components).unwrap();
+    let output = json.to_string();
+    assert!(output.contains("First Frame"));
+    assert!(output.contains("Second Frame"));
+    assert!(output.find("First Frame").unwrap() < output.find("Second Frame").unwrap());
+    assert!(pagination.is_none());
+}
+
+#[tokio::test]
+async fn ordinary_frames_before_and_after_the_paginated_frame_repeat_on_every_page() {
+    // FIRST: only the opted-in Frame paginates; other dynamic Frames remain static Page structure.
+    let app = app();
+    let page = Page::<TestData>::new("surrounding-ordinary-frames")
+        .add_frame(Frame::<TestData>::new("before", |_ctx, _data| async move {
+            Ok(vec![Element::text("Before Frame")])
+        }))
+        .add_frame(Frame::<TestData>::new("paged", |_ctx, _data| async move {
+            Ok((0..41).map(|index| Element::text(format!("Paged {index}")).keyed(format!("row-{index}"))).collect())
+        }).paginate())
+        .add_frame(Frame::<TestData>::new("after", |_ctx, _data| async move {
+            Ok(vec![Element::text("After Frame")])
+        }))
+        .register(&app).unwrap();
+
+    let rendered = page.render_pages(&app, TestData::default()).await.unwrap();
+    assert!(rendered.pages.len() > 1);
+    for message in rendered.pages {
+        let (components, _, pagination) = message.into_parts();
+        let json = serde_json::to_value(components).unwrap().to_string();
+        assert!(json.contains("Before Frame"));
+        assert!(json.contains("After Frame"));
+        assert!(pagination.is_some());
+    }
+}
+
+#[tokio::test]
 async fn dynamic_frame_properties_are_counted_before_page_boundaries_are_chosen() {
     // FIRST: resolved dynamic property output consumes the message-wide text budget.
     let app = app();
