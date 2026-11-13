@@ -279,6 +279,7 @@ fn extract_modal_submission(
                     crate::page::SubmittedValue::Boolean(checkbox.value),
                 );
             }
+            _ => anyhow::bail!("Unsupported or future Modal Label component type"),
         }
     }
     Ok(submission)
