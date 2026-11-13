@@ -78,3 +78,24 @@ async fn removing_a_missing_record_is_harmless() {
     let store = MemoryStore::default();
     store.remove(&CustomId("missing".into())).await.unwrap();
 }
+
+
+#[tokio::test]
+async fn pagination_state_compare_and_set_updates_only_the_expected_current_state() {
+    // FIRST: concurrent or replayed clicks must not overwrite a newer page index.
+    let store = MemoryStore::default();
+    let mut initial = record("page-next");
+    initial.pagination_state = Some(serde_json::json!({
+        "frame_id":"users","page_index":0,"page_count":3
+    }));
+    store.insert(initial).await.unwrap();
+    let id = CustomId("page-next".into());
+    let expected = serde_json::json!({"frame_id":"users","page_index":0,"page_count":3});
+    let next = serde_json::json!({"frame_id":"users","page_index":1,"page_count":3});
+    assert!(store.compare_and_set_pagination_state(&id,&expected,next.clone()).await.unwrap());
+    assert!(!store.compare_and_set_pagination_state(&id,&expected,serde_json::json!({
+        "frame_id":"users","page_index":1,"page_count":3
+    })).await.unwrap());
+    let saved = store.resolve(&id).await.unwrap().unwrap();
+    assert_eq!(saved.pagination_state.unwrap(), next);
+}

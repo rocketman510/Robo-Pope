@@ -30,8 +30,8 @@ fn app_constructor_initializes_empty_registries_and_keeps_database() {
     // First-principles check: this exercises the public constructor rather than
     // bypassing its responsibility with a hand-built App.
     let store: Arc<dyn Store> = Arc::new(MemoryStore::default());
-    let db = Database::new(store);
-    let app = App::new(Arc::new(serenity::http::HttpBuilder::without_token().build()), db);
+    let db = Database::new(());
+    let app = App::new(Arc::new(serenity::http::HttpBuilder::without_token().build()), db, store);
     assert!(!app.pages.contains("missing-page"));
     assert!(!app.modals.contains("missing-modal"));
 }

@@ -1,15 +1,19 @@
-//! RED-phase unit tests. Each module has a narrow contract focus.
 mod app;
 mod builder;
 mod components;
-mod contract_audit;
+mod ctx_http;
+mod database_contract;
 mod execution;
+mod execution_wiring;
 mod frame;
+mod interaction;
 mod modal;
+mod modal_contract;
+mod pagination_contract;
+mod rendering;
 mod selection;
+mod selection_contract;
 mod store;
 mod support;
-mod value;
 mod validation;
-mod rendering;
-mod interaction;
+mod value;

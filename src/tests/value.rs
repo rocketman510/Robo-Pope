@@ -79,3 +79,54 @@ fn optional_slot_converts_static_and_dynamic_values() {
     assert!(matches!(static_slot, Slot::Value(Value::Static(_))));
     assert!(matches!(dynamic_slot, Slot::Value(Value::Dynamic(_))));
 }
+
+
+#[tokio::test]
+async fn direct_async_closure_is_accepted_without_dynamic_adapter() {
+    // FIRST: developers can pass asynchronous property resolvers directly.
+    use crate::page::Page;
+    use std::sync::Arc;
+    let app = app();
+    let page = Page::<TestData>::new("direct-closure")
+        .add_text(|ctx: RenderCtx, data: Arc<TestData>| async move {
+            assert_eq!(ctx.definition_id.as_ref(), "direct-closure");
+            Ok(format!("{}:{}", data.label, data.count))
+        }).register(&app).unwrap();
+    let rendered = page.render(&app, TestData::default()).await.unwrap();
+    let json = serde_json::to_value(rendered.into_components()).unwrap();
+    assert!(json.to_string().contains("sample:7"));
+}
+
+#[tokio::test]
+async fn fixed_section_slots_accept_direct_async_closures() {
+    // FIRST: direct closures also work in fixed Section slots.
+    use crate::page::{Page, Section};
+    use std::sync::Arc;
+    let app = app();
+    let page = Page::<TestData>::new("direct-section-slot")
+        .add_section(Section::new().set_text(
+            |_ctx: RenderCtx, data: Arc<TestData>| async move { Ok(format!("Dynamic {}", data.count)) },
+            None, None,
+        )).register(&app).unwrap();
+    let rendered = page.render(&app, TestData::default()).await.unwrap();
+    let json = serde_json::to_value(rendered.into_components()).unwrap();
+    assert!(json.to_string().contains("Dynamic 7"));
+}
+
+#[tokio::test]
+async fn button_labels_and_styles_accept_direct_async_closures() {
+    // FIRST: all display properties share the static-or-dynamic input interface.
+    use crate::page::{Button, ButtonStyle, Page};
+    use std::sync::Arc;
+    let app = app();
+    let page = Page::<TestData>::new("direct-button-properties")
+        .add_button(Button::new(
+            |_ctx: RenderCtx, data: Arc<TestData>| async move { Ok(format!("Hello {}", data.label)) },
+            "dynamic-button",
+            |_ctx: RenderCtx, _data: Arc<TestData>| async move { Ok(ButtonStyle::Success) },
+            |_ctx, _data: TestData| async move { Ok(()) },
+        )).register(&app).unwrap();
+    let rendered = page.render(&app, TestData::default()).await.unwrap();
+    let json = serde_json::to_value(rendered.into_components()).unwrap();
+    assert!(json.to_string().contains("Hello sample"));
+}
