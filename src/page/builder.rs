@@ -3,8 +3,9 @@ use std::sync::Arc;
 use std::collections::HashSet;
 use anyhow::Context as _;
 use serenity::builder::{
-    CreateActionRow, CreateButton, CreateComponent, CreateSection,
-    CreateSectionAccessory, CreateSectionComponent, CreateTextDisplay,
+    CreateActionRow, CreateButton, CreateComponent, CreateContainer,
+    CreateContainerComponent, CreateSection, CreateSectionAccessory,
+    CreateSectionComponent, CreateSeparator, CreateTextDisplay,
     CreateThumbnail, CreateUnfurledMediaItem,
 };
 use serenity::all::ButtonStyle as SerenityButtonStyle;
@@ -292,6 +293,119 @@ where
         .into_owned())
 }
 
+async fn render_container<T>(
+    container: &super::component::Container<T>,
+    app: &App,
+    ctx: &RenderCtx,
+    data: &Arc<T>,
+    serialized_data: &[u8],
+    definition_id: &str,
+    frame_identity: Option<&str>,
+) -> anyhow::Result<(CreateContainer<'static>, ComponentBudget)>
+where
+    T: Send + Sync + 'static,
+{
+    use super::component::{Component as C, ContainerItem};
+
+    let mut children = Vec::new();
+    let mut budget = ComponentBudget::default();
+
+    async fn append_component<T>(
+        component: &C<T>,
+        key: Option<&str>,
+        children: &mut Vec<CreateContainerComponent<'static>>,
+        budget: &mut ComponentBudget,
+        app: &App,
+        ctx: &RenderCtx,
+        data: &Arc<T>,
+        serialized_data: &[u8],
+        definition_id: &str,
+    ) -> anyhow::Result<()>
+    where
+        T: Send + Sync + 'static,
+    {
+        let (rendered, child_budget) = Box::pin(render_component(
+            component, app, ctx, data, serialized_data, definition_id, key,
+        )).await?;
+        for part in rendered {
+            let child = match part.component {
+                CreateComponent::ActionRow(row) => CreateContainerComponent::ActionRow(row),
+                CreateComponent::Section(section) => CreateContainerComponent::Section(section),
+                CreateComponent::TextDisplay(text) => CreateContainerComponent::TextDisplay(text),
+                CreateComponent::MediaGallery(gallery) => CreateContainerComponent::MediaGallery(gallery),
+                CreateComponent::File(file) => CreateContainerComponent::File(file),
+                CreateComponent::Separator(separator) => CreateContainerComponent::Separator(separator),
+                CreateComponent::Container(_) => anyhow::bail!(
+                    "Discord does not allow a Container inside another Container"
+                ),
+                CreateComponent::Label(_) => anyhow::bail!(
+                    "Labels cannot be rendered inside a message Container"
+                ),
+            };
+            children.push(child);
+        }
+        budget.total_components = budget.total_components.saturating_add(child_budget.total_components);
+        budget.text_display_chars = budget.text_display_chars.saturating_add(child_budget.text_display_chars);
+        budget.direct_container_children = budget.direct_container_children.saturating_add(rendered_len(&child_budget));
+        Ok(())
+    }
+
+    for item in &container.children {
+        match item {
+            ContainerItem::Component(component) => {
+                append_component(
+                    component, frame_identity, &mut children, &mut budget,
+                    app, ctx, data, serialized_data, definition_id,
+                ).await?;
+            }
+            ContainerItem::Frame(frame) => {
+                let elements = (frame.resolver)(ctx.clone(), data.clone()).await
+                    .with_context(|| format!("Resolving Frame '{}' inside Container", frame.id))?;
+                for element in elements {
+                    let key = element.key.as_deref().map(|key| format!("{}:{key}", frame.id));
+                    let needs_key = matches!(
+                        &element.component,
+                        C::Button(_) | C::ButtonRow(_) | C::Select(_)
+                    );
+                    anyhow::ensure!(
+                        !needs_key || key.is_some(),
+                        "Interactive element in Container Frame '{}' requires a stable developer key",
+                        frame.id
+                    );
+                    append_component(
+                        &element.component, key.as_deref(), &mut children, &mut budget,
+                        app, ctx, data, serialized_data, definition_id,
+                    ).await.with_context(|| format!(
+                        "Rendering element in Container Frame '{}'", frame.id
+                    ))?;
+                }
+            }
+        }
+    }
+
+    anyhow::ensure!(
+        children.len() <= super::limits::CONTAINER_MAX_DIRECT_CHILDREN,
+        "Rendered Container has {} direct children; maximum is {}",
+        children.len(),
+        super::limits::CONTAINER_MAX_DIRECT_CHILDREN
+    );
+
+    let mut rendered = CreateContainer::new(children);
+    if let Some(accent) = &container.accent_color {
+        let accent = super::value::resolve(accent, ctx.clone(), data.clone())
+            .await.context("Resolving Container accent color")?;
+        rendered = rendered.accent_color(serenity::model::prelude::Colour::new(accent));
+    }
+    rendered = rendered.spoiler(container.spoiler);
+
+    budget.total_components = budget.total_components.saturating_add(1);
+    budget.direct_container_children = children_len_for_budget(&rendered);
+    Ok((rendered.into_owned(), budget))
+}
+
+fn rendered_len(_budget: &ComponentBudget) -> usize { 1 }
+fn children_len_for_budget(_container: &CreateContainer<'_>) -> usize { 0 }
+
 async fn render_component<T>(
     component: &Component<T>,
     app: &App,
@@ -446,8 +560,42 @@ where
                 },
             ))
         },
-        C::Container(_) => anyhow::bail!("Container rendering is not implemented yet"),
-        C::Separator(_) => anyhow::bail!("Separator rendering is not implemented yet"),
+        C::Container(container) => {
+            let (rendered, budget) = render_container(
+                container, app, ctx, data, serialized_data, definition_id, frame_identity,
+            ).await.context("Rendering Container")?;
+            Ok((
+                vec![RenderedComponent {
+                    component: CreateComponent::Container(rendered),
+                }],
+                budget,
+            ))
+        }
+        C::Separator(separator) => {
+            let spacing = super::value::resolve(
+                &separator.spacing, ctx.clone(), data.clone()
+            ).await.context("Resolving Separator spacing")?;
+            let divider = super::value::resolve(
+                &separator.divider, ctx.clone(), data.clone()
+            ).await.context("Resolving Separator divider")?;
+            let spacing = match spacing {
+                super::component::SeparatorSpacing::Small =>
+                    serenity::model::prelude::SeparatorSpacingSize::Small,
+                super::component::SeparatorSpacing::Large =>
+                    serenity::model::prelude::SeparatorSpacingSize::Large,
+            };
+            let rendered = CreateSeparator::new().spacing(spacing).divider(divider);
+            Ok((
+                vec![RenderedComponent {
+                    component: CreateComponent::Separator(rendered),
+                }],
+                ComponentBudget {
+                    total_components: 1,
+                    text_display_chars: 0,
+                    direct_container_children: 0,
+                },
+            ))
+        },
         C::MediaGallery(_) => anyhow::bail!("Media Gallery rendering is not implemented yet"),
         C::File(_) => anyhow::bail!("File component rendering is not implemented yet"),
         C::Select(_) => anyhow::bail!("Selection menu rendering is not implemented yet"),
