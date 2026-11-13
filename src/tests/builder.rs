@@ -31,7 +31,7 @@ fn page_data_type_is_shared_by_static_and_dynamic_components() {
         }));
     assert_eq!(page.items.len(), 2);
     assert!(matches!(&page.items[1], PageItem::Component(Component::Text(text))
-        if matches!(text.content, crate::page::Value::Dynamic(_))));
+        if matches!(&text.content, crate::page::Value::Dynamic(_))));
 }
 
 #[test]
