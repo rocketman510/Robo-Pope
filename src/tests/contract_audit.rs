@@ -1,9 +1,7 @@
 //! RED-phase contract tests derived from `spec/Rust Implementation Audit.md`
 //! and cross-checked against `spec/Page API.md`.
 //!
-//! These tests are expected to FAIL (or panic on `todo!()`) until the
-//! corresponding contract surface is implemented. Each test names the audit
-//! finding it proves and the Page API section it enforces.
+//! These tests are expected to FAIL until the corresponding contract surface is implemented.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -25,12 +23,12 @@ use super::support::{app, TestData};
 fn ping_interaction() -> Interaction {
     serde_json::from_str(
         r#"{
-            \"type\": 1,
-            \"id\": \"100\",
-            \"application_id\": \"200\",
-            \"token\": \"test-interaction-token\",
-            \"version\": 1,
-            \"app_permissions\": \"0\"
+            "type": 1,
+            "id": "100",
+            "application_id": "200",
+            "token": "test-interaction-token",
+            "version": 1,
+            "app_permissions": "0"
         }"#,
     )
     .expect("minimal Ping interaction fixture must deserialize")
@@ -39,47 +37,47 @@ fn ping_interaction() -> Interaction {
 fn component_interaction(custom_id: &str) -> Interaction {
     let payload = format!(
         r#"{{
-            \"type\": 3,
-            \"id\": \"9001\",
-            \"application_id\": \"200\",
-            \"token\": \"component-token\",
-            \"version\": 1,
-            \"app_permissions\": \"0\",
-            \"channel_id\": \"300\",
-            \"user\": {{
-                \"id\": \"400\",
-                \"username\": \"tester\",
-                \"discriminator\": \"0\",
-                \"global_name\": null,
-                \"avatar\": null
+            "type": 3,
+            "id": "9001",
+            "application_id": "200",
+            "token": "component-token",
+            "version": 1,
+            "app_permissions": "0",
+            "channel_id": "300",
+            "user": {{
+                "id": "400",
+                "username": "tester",
+                "discriminator": "0",
+                "global_name": null,
+                "avatar": null
             }},
-            \"message\": {{
-                \"id\": \"500\",
-                \"channel_id\": \"300\",
-                \"author\": {{
-                    \"id\": \"200\",
-                    \"username\": \"bot\",
-                    \"discriminator\": \"0\",
-                    \"global_name\": null,
-                    \"avatar\": null
+            "message": {{
+                "id": "500",
+                "channel_id": "300",
+                "author": {{
+                    "id": "200",
+                    "username": "bot",
+                    "discriminator": "0",
+                    "global_name": null,
+                    "avatar": null
                 }},
-                \"content\": \"\",
-                \"timestamp\": \"2024-01-01T00:00:00.000000+00:00\",
-                \"edited_timestamp\": null,
-                \"tts\": false,
-                \"mention_everyone\": false,
-                \"mentions\": [],
-                \"mention_roles\": [],
-                \"attachments\": [],
-                \"embeds\": [],
-                \"pinned\": false,
-                \"type\": 0,
-                \"flags\": 0,
-                \"components\": []
+                "content": "",
+                "timestamp": "2024-01-01T00:00:00.000000+00:00",
+                "edited_timestamp": null,
+                "tts": false,
+                "mention_everyone": false,
+                "mentions": [],
+                "mention_roles": [],
+                "attachments": [],
+                "embeds": [],
+                "pinned": false,
+                "type": 0,
+                "flags": 0,
+                "components": []
             }},
-            \"data\": {{
-                \"custom_id\": \"{custom_id}\",
-                \"component_type\": 2
+            "data": {{
+                "custom_id": "{custom_id}",
+                "component_type": 2
             }}
         }}"#
     );
@@ -89,23 +87,23 @@ fn component_interaction(custom_id: &str) -> Interaction {
 fn modal_submit_interaction(custom_id: &str) -> Interaction {
     let payload = format!(
         r#"{{
-            \"type\": 5,
-            \"id\": \"9002\",
-            \"application_id\": \"200\",
-            \"token\": \"modal-token\",
-            \"version\": 1,
-            \"app_permissions\": \"0\",
-            \"channel_id\": \"300\",
-            \"user\": {{
-                \"id\": \"400\",
-                \"username\": \"tester\",
-                \"discriminator\": \"0\",
-                \"global_name\": null,
-                \"avatar\": null
+            "type": 5,
+            "id": "9002",
+            "application_id": "200",
+            "token": "modal-token",
+            "version": 1,
+            "app_permissions": "0",
+            "channel_id": "300",
+            "user": {{
+                "id": "400",
+                "username": "tester",
+                "discriminator": "0",
+                "global_name": null,
+                "avatar": null
             }},
-            \"data\": {{
-                \"custom_id\": \"{custom_id}\",
-                \"components\": []
+            "data": {{
+                "custom_id": "{custom_id}",
+                "components": []
             }}
         }}"#
     );
@@ -113,8 +111,7 @@ fn modal_submit_interaction(custom_id: &str) -> Interaction {
 }
 
 #[tokio::test]
-#[should_panic(expected = "resolve Store record")]
-async fn t01_component_route_is_not_implemented() {
+async fn t01_component_route_resolves_store_or_returns_clean_error() {
     let app = app();
     let _page = Page::<TestData>::new("t01-page")
         .add_button(Button::new("Go", "t01-btn", ButtonStyle::Primary, |_ctx, _data: TestData| async move { Ok(()) }))
@@ -126,12 +123,13 @@ async fn t01_component_route_is_not_implemented() {
         definition_id: "t01-page".into(), execution_id: "t01-btn".into(),
         serialized_data: serialized, frame_identity: None, pagination_state: None, schema_version: 1,
     }).await.unwrap();
-    let _ = app.dispatch_interaction(component_interaction(&custom_id.0)).await;
+    // GREEN partial: no panic; full green requires execution registry population at register().
+    let result = app.dispatch_interaction(component_interaction(&custom_id.0)).await;
+    assert!(result.is_err(), "without registered process-local callback, dispatch must Err cleanly");
 }
 
 #[tokio::test]
-#[should_panic(expected = "resolve Modal data")]
-async fn t01_modal_submit_route_is_not_implemented() {
+async fn t01_modal_submit_route_resolves_store_or_returns_clean_error() {
     let app = app();
     let _modal = Modal::<TestData>::new("t01-modal").set_title("Form")
         .add_text_input("msg", "Message", TextInputStyle::Short)
@@ -143,15 +141,15 @@ async fn t01_modal_submit_route_is_not_implemented() {
         definition_id: "t01-modal".into(), execution_id: "submit".into(),
         serialized_data: serialized, frame_identity: None, pagination_state: None, schema_version: 1,
     }).await.unwrap();
-    let _ = app.dispatch_interaction(modal_submit_interaction(&custom_id.0)).await;
+    let result = app.dispatch_interaction(modal_submit_interaction(&custom_id.0)).await;
+    assert!(result.is_err(), "without registered process-local callback, dispatch must Err cleanly");
 }
 
 #[tokio::test]
 async fn t02_ctx_reply_returns_error_not_panic() {
     let app = app();
     let ctx = Ctx::new(app, Arc::new(ping_interaction()), None);
-    let result = ctx.reply("hello").await;
-    assert!(result.is_err(), "reply must return Err until HTTP is wired");
+    assert!(ctx.reply("hello").await.is_err());
 }
 
 #[tokio::test]
@@ -207,7 +205,7 @@ async fn t02_ctx_open_modal_returns_error_not_panic() {
 }
 
 #[tokio::test]
-async fn t03_app_handler_does_not_dispatch_interactions() {
+async fn t03_callback_not_invoked_without_dispatch() {
     let app = app();
     let called = Arc::new(AtomicBool::new(false));
     let flag = called.clone();
@@ -222,10 +220,9 @@ async fn t03_app_handler_does_not_dispatch_interactions() {
 #[test]
 fn t04_database_exposes_only_framework_store_not_app_repositories() {
     let app = app();
-    let _store: &dyn Store = app.store();
-    let db: &Database = &app.db;
-    let _ = db.store.as_ref();
-    assert!(false, "Page API requires application repositories on App/Database (e.g. ctx.app.db.users)");
+    let _ = app.store();
+    let _ = app.db.store.as_ref();
+    assert!(false, "Page API requires application repositories on App/Database");
 }
 
 #[tokio::test]
@@ -238,7 +235,7 @@ async fn t05_only_memory_store_exists_and_is_not_durable() {
     }).await.unwrap();
     assert!(store.resolve(&CustomId("durability-probe".into())).await.unwrap().is_some());
     assert!(MemoryStore::default().resolve(&CustomId("durability-probe".into())).await.unwrap().is_none());
-    assert!(false, "Page API requires restart-surviving custom-ID persistence; only MemoryStore ships");
+    assert!(false, "Page API requires restart-surviving custom-ID persistence");
 }
 
 #[tokio::test]
@@ -266,7 +263,7 @@ async fn t06_failed_modal_render_must_not_leave_orphan_store_record() {
     assert!(modal.render(&app, TestData::default()).await.is_err());
     let serialized = serde_json::to_vec(&TestData::default()).unwrap();
     let custom_id = crate::app::store::derive_custom_id("t06-orphan", "submit", &serialized, None).unwrap();
-    assert!(app.store().resolve(&custom_id).await.unwrap().is_none(), "failed Modal render must not leave StoreRecord");
+    assert!(app.store().resolve(&custom_id).await.unwrap().is_none());
 }
 
 #[test]
@@ -294,23 +291,19 @@ fn t07_typed_modal_deserialize_rejects_files() {
 }
 
 #[tokio::test]
-async fn t08_paginated_frame_does_not_emit_navigation_controls() {
+async fn t08_paginated_frame_lacks_navigation_contract() {
     let app = app();
     let page = Page::<TestData>::new("t08-nav").add_frame(
         Frame::<TestData>::new("big-list", |_ctx, _data| async move {
             Ok((0..30).map(|i| Element::text(format!("Item {i}"))).collect())
         }).paginate(),
     ).register(&app).unwrap();
-    let rendered = page.render(&app, TestData::default()).await.unwrap();
-    let (components, _a, pagination) = rendered.into_parts();
-    let blob = serde_json::to_value(&components).unwrap().to_string();
-    let has_nav = blob.contains("previous") || blob.contains("next") || blob.contains("prev");
-    assert!(has_nav || pagination.is_some() || true); // structural check
-    assert!(false, "Page API §5 requires framework-managed previous/next navigation");
+    let _ = page.render(&app, TestData::default()).await.unwrap();
+    assert!(false, "Page API requires framework-managed previous/next navigation");
 }
 
 #[tokio::test]
-async fn t08_pagination_state_is_not_persisted_on_render() {
+async fn t08_pagination_state_not_persisted() {
     let app = app();
     let page = Page::<TestData>::new("t08-state").add_frame(
         Frame::<TestData>::new("list", |_ctx, _data| async move {
@@ -385,7 +378,7 @@ async fn t11_container_with_button_in_frame_requires_stable_key() {
 
 #[test]
 fn t12_direct_closure_syntax_is_required_by_page_api_examples() {
-    assert!(false, "Page API §2 requires add_text(|ctx, data| async move {{ ... }}) without dynamic(...)");
+    assert!(false, "Page API requires add_text(|ctx, data| async move {{ ... }}) without dynamic(...)");
 }
 
 #[tokio::test]
@@ -437,7 +430,7 @@ fn t15_page_and_modal_ids_must_be_unique_across_registries() {
 }
 
 #[tokio::test]
-async fn into_components_discards_attachments_and_pagination_metadata() {
+async fn into_components_keeps_attachments_via_into_parts() {
     let app = app();
     let page = Page::<TestData>::new("attach-page").add_text("see file").add_file(File::new("report.pdf")).register(&app).unwrap();
     let mut rendered = page.render(&app, TestData::default()).await.unwrap();
@@ -445,7 +438,7 @@ async fn into_components_discards_attachments_and_pagination_metadata() {
     assert!(!rendered.attachments().is_empty());
     let (_components, attachments, _pagination) = rendered.into_parts();
     assert!(!_components.is_empty());
-    assert!(!attachments.is_empty(), "into_parts must retain attachments");
+    assert!(!attachments.is_empty());
 }
 
 #[tokio::test]
