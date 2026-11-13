@@ -75,31 +75,51 @@ impl Ctx {
     }
     /// Sends the initial response to this interaction, not a follow-up message.
     pub fn reply(&self, content: impl Into<String>) -> BoxFuture<'_, anyhow::Result<()>> {
-        todo!("send initial interaction response")
+        let content = content.into();
+        Box::pin(async move {
+            let _ = content;
+            anyhow::bail!("Ctx::reply is not yet wired to Discord HTTP responses")
+        })
     }
     /// Defers the initial response so the callback can finish processing first.
     pub fn defer(&self) -> BoxFuture<'_, anyhow::Result<()>> {
-        todo!("defer initial response")
+        Box::pin(async move {
+            anyhow::bail!("Ctx::defer is not yet wired to Discord HTTP responses")
+        })
     }
     /// Edits the message that contains the interactive component.
     pub fn edit_message(&self, message: RenderedMessage) -> BoxFuture<'_, anyhow::Result<()>> {
-        todo!("edit component message")
+        let _ = message;
+        Box::pin(async move {
+            anyhow::bail!("Ctx::edit_message is not yet wired to Discord HTTP responses")
+        })
     }
     /// Edits the original response associated with this interaction.
     pub fn edit_original_response(&self, message: RenderedMessage) -> BoxFuture<'_, anyhow::Result<()>> {
-        todo!("edit original response")
+        let _ = message;
+        Box::pin(async move {
+            anyhow::bail!("Ctx::edit_original_response is not yet wired to Discord HTTP responses")
+        })
     }
     /// Sends a follow-up response after the initial response has been handled.
     pub fn followup(&self, message: RenderedMessage) -> BoxFuture<'_, anyhow::Result<()>> {
-        todo!("send follow-up response")
+        let _ = message;
+        Box::pin(async move {
+            anyhow::bail!("Ctx::followup is not yet wired to Discord HTTP responses")
+        })
     }
     /// Deletes the response associated with this interaction.
     pub fn delete_response(&self) -> BoxFuture<'_, anyhow::Result<()>> {
-        todo!("delete interaction response")
+        Box::pin(async move {
+            anyhow::bail!("Ctx::delete_response is not yet wired to Discord HTTP responses")
+        })
     }
     /// Opens a Modal as the initial response to this interaction.
     pub fn open_modal(&self, modal: ModalRender) -> BoxFuture<'_, anyhow::Result<()>> {
-        todo!("open Modal as initial interaction response")
+        let _ = modal;
+        Box::pin(async move {
+            anyhow::bail!("Ctx::open_modal is not yet wired to Discord HTTP responses")
+        })
     }
     /// Borrows the typed selection payload, if this interaction carried one.
     pub fn selected(&self) -> Option<&Selection> { self.selection.as_ref() }
