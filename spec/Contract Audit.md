@@ -172,6 +172,7 @@ The following tests have now been committed and registered in `src/tests/mod.rs`
 - `page_registration_rejects_duplicate_frame_ids`
 - `rendered_message_parts_conversion_preserves_attachments_and_pagination`
 - `context_construction_retains_app_http_and_absent_ping_metadata`
+- `context_retains_the_typed_selection_payload`
 - `router_returns_an_error_for_an_unsupported_interaction_kind`
 
 These tests are intentionally ahead of the unfinished renderer, Modal renderer, context, router, and registration validation paths. The output-parts conversion test exercises the completed `RenderedMessage::into_parts` API. The rest are expected to expose missing behavior once confirmed by an actual test run.
