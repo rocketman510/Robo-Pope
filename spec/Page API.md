@@ -672,6 +672,8 @@ let modal = Modal::<EditUserData>::new("EditUser")
 
 The Modal's generic data works like a Page's data. It is serialized when the Modal is opened and reconstructed when the form is submitted.
 
+Modal rendering is transactional with respect to framework persistence. The framework resolves all dynamic input properties, validates the complete Modal payload, and builds the rendered Modal before inserting its submit-execution record into the Store. If resolution, validation, or payload construction fails, no submit record is persisted. A successful render persists the record before the Modal is sent as an interaction response.
+
 The submitted form values are separate. They come from Discord and are provided to the submission callback through a `ModalSubmission` object.
 
 ### Opening a Modal
@@ -854,6 +856,10 @@ The registries must be able to hold Pages and Modals with different generic data
 The public API should preserve the concrete generic types when defining and using them. Type erasure is an internal registry implementation detail.
 
 A registered Page is immutable. The App owns its registered definition and uses it to resolve executions.
+
+Registration indexes every interactive execution callback in the App's process-local execution registry under its definition ID and execution ID. A successful registration guarantees that each declared callback can be resolved by routing. This includes Buttons, Select callbacks, and the Modal submit callback (whose execution ID is `submit`). Duplicate execution IDs within one definition are errors. Callback closures are never serialized; the registry is rebuilt when the application starts and re-registers its definitions.
+
+The Serenity gateway handler forwards every incoming `InteractionCreate` event to `App::dispatch_interaction`. The App router resolves the persisted custom-ID record, retrieves the registered definition and its process-local callback, reconstructs the typed data, and invokes that callback. Dispatch errors must be returned to the handler rather than silently treated as successful dispatch.
 
 Rendering a Page requires the App:
 
