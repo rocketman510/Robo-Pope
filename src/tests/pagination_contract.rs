@@ -1,8 +1,57 @@
 use std::sync::{Arc, atomic::{AtomicUsize, Ordering}};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::{TcpListener, TcpStream};
+use crate::app::{App, Database};
+use crate::app::store::{MemoryStore, Store};
 use crate::app::RenderCtx;
 use crate::app::store::derive_custom_id;
 use crate::page::{Container, Element, Frame, Page};
 use super::support::{app, component_interaction, TestData};
+
+async fn app_with_discord_response() -> (App, tokio::task::JoinHandle<String>) {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap().to_string();
+    let server = tokio::spawn(async move {
+        let (mut stream, _) = listener.accept().await.unwrap();
+        let mut bytes = Vec::new();
+        let mut header_end = None;
+        let mut content_length = 0usize;
+        loop {
+            let mut buffer = [0_u8; 2048];
+            let read = stream.read(&mut buffer).await.unwrap();
+            if read == 0 { break; }
+            bytes.extend_from_slice(&buffer[..read]);
+            if header_end.is_none() {
+                if let Some(index) = bytes.windows(4).position(|window| window == b"\r\n\r\n") {
+                    let end = index + 4;
+                    let headers = String::from_utf8_lossy(&bytes[..end]);
+                    content_length = headers.lines().find_map(|line| {
+                        let (name, value) = line.split_once(':')?;
+                        name.eq_ignore_ascii_case("content-length")
+                            .then(|| value.trim().parse::<usize>().ok()).flatten()
+                    }).unwrap_or(0);
+                    header_end = Some(end);
+                }
+            }
+            if let Some(end) = header_end {
+                if bytes.len() >= end + content_length { break; }
+            }
+        }
+        let request = String::from_utf8_lossy(&bytes).into_owned();
+        stream.write_all(b"HTTP/1.1 204 No Content\r\ncontent-length: 0\r\nconnection: close\r\n\r\n")
+            .await.unwrap();
+        request
+    });
+    let http = Arc::new(
+        serenity::http::HttpBuilder::without_token()
+            .application_id(serenity::all::ApplicationId::new(200))
+            .proxy(format!("http://{address}"))
+            .ratelimiter_disabled(true)
+            .build()
+    );
+    let store: Arc<dyn Store> = Arc::new(MemoryStore::default());
+    (App::new(http, Database::new(()), store), server)
+}
 
 fn find_button<'a>(value: &'a serde_json::Value, label: &str) -> Option<&'a serde_json::Value> {
     match value {
@@ -95,7 +144,7 @@ async fn pagination_navigation_records_persist_frame_identity_and_current_positi
 #[tokio::test]
 async fn next_and_previous_navigation_update_state_and_reject_out_of_range_clicks() {
     // FIRST: navigation advances one position, rejects stale clicks, and never escapes bounds.
-    let app = app();
+    let (app, server) = app_with_discord_response().await;
     let data = TestData::default();
     let serialized = serde_json::to_vec(&data).unwrap();
     let page = Page::<TestData>::new("pagination-boundaries")
@@ -112,6 +161,15 @@ async fn next_and_previous_navigation_update_state_and_reject_out_of_range_click
     assert!(app.dispatch_interaction(component_interaction(&next.0)).await.is_err());
     let final_state = app.store().resolve(&next).await.unwrap().unwrap();
     assert_eq!(final_state.pagination_state.as_ref().unwrap()["page_index"], 1);
+    let request = server.await.unwrap();
+    assert!(request.lines().next().unwrap().contains(
+        "POST /api/v10/interactions/9001/component-token/callback"
+    ));
+    let body = request.split_once("
+
+").unwrap().1;
+    let payload: serde_json::Value = serde_json::from_str(body).unwrap();
+    assert_eq!(payload["type"], 7, "pagination must update the original component message");
 }
 
 #[tokio::test]
