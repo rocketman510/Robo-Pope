@@ -299,6 +299,25 @@ where
                             .await?;
                         anyhow::ensure!(updated, "This pagination control is stale or has already been used");
 
+                        // Invalidate controls belonging to every other page. The
+                        // clicked record remains as the FIRST-observable state record;
+                        // the target page's controls are recreated during rendering.
+                        for page_index in 0..request.page_count {
+                            let identity = pagination_identity(&frame_id, page_index);
+                            for name in ["previous", "next"] {
+                                let execution_id = pagination_execution_id(&frame_id, name);
+                                let candidate = derive_custom_id(
+                                    &definition.id,
+                                    &execution_id,
+                                    &serde_json::to_vec(&data)?,
+                                    Some(&identity),
+                                )?;
+                                if candidate != request.custom_id {
+                                    ctx.app.store().remove(&candidate).await?;
+                                }
+                            }
+                        }
+
                         let page = RegisteredPage { definition };
                         let rendered = page.render_pages(&ctx.app, data).await?;
                         let message = rendered.pages.into_iter()
