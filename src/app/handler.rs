@@ -2,7 +2,7 @@
 use serenity::{all::{Context, EventHandler, FullEvent}, async_trait};
 use crate::app::App;
 
-/// Serenity gateway adapter that forwards interaction events to the App.
+/// Serenity gateway adapter that forwards gateway events to the App.
 pub struct AppHandler {
     /// The single App instance that owns framework state.
     pub app: App,
@@ -13,10 +13,18 @@ impl AppHandler {
 }
 #[async_trait]
 impl EventHandler for AppHandler {
-    /// Forwards interaction-creation events; unrelated gateway events are ignored.
+    /// Reports a successful Gateway connection. Interaction routing is not
+    /// invoked here yet because the router and Page renderer are still pending.
     async fn dispatch(&self, _ctx: &Context, event: &FullEvent) {
-        if let FullEvent::InteractionCreate { interaction, .. } = event {
-            todo!("dispatch InteractionCreate through App and log contextual anyhow errors")
+        match event {
+            FullEvent::Ready { data_about_bot, .. } => {
+                println!("{} is connected. Demo definitions are registered.", data_about_bot.user.name);
+                println!("Registered Pages: {}", self.app.pages.len());
+            }
+            FullEvent::InteractionCreate { .. } => {
+                println!("Received an interaction. Framework interaction routing is not implemented yet.");
+            }
+            _ => {}
         }
     }
 }
