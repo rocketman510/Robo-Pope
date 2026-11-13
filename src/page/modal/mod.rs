@@ -152,7 +152,7 @@ impl<T> Modal<T> {
 {
         self.submit = Some(Execution::with_input(
             "submit",
-            move |ctx, data, submission| async move {
+            move |ctx, data, submission: ModalSubmission| async move {
                 let form = submission.deserialize::<S>()?;
                 callback(ctx, data, form).await
             },

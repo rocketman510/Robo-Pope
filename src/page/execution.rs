@@ -26,7 +26,7 @@ impl<T> Execution<T> {
         {
         Self {
             id: id.into(),
-            callback: Arc::new(move |ctx, data| Box::pin(callback(ctx, data))),
+            callback: Arc::new(move |ctx, data, _input| Box::pin(callback(ctx, data))),
         }
     }
 }
