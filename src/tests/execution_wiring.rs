@@ -98,7 +98,7 @@ fn page_and_modal_definitions_share_one_global_id_namespace_in_both_orders() {
     assert!(Modal::<TestData>::new("shared-definition-id").set_title("Modal")
         .on_submit(|_ctx, _data, _submission: ModalSubmission| async move { Ok(()) })
         .register(&app).is_err());
-    let other = app();
+    let other = super::support::app();
     Modal::<TestData>::new("shared-definition-id").set_title("Modal")
         .on_submit(|_ctx, _data, _submission: ModalSubmission| async move { Ok(()) })
         .register(&other).unwrap();

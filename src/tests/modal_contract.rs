@@ -217,6 +217,6 @@ async fn modal_select_option_description_is_checked_against_discord_limit() {
         .add_select("choice", "Choice", [ModalOption::new("A", "a").set_description("x".repeat(101))])
         .on_submit(|_ctx, _data, _submission: ModalSubmission| async move { Ok(()) })
         .register(&app).unwrap();
-    let error = modal.render(&app, TestData::default()).await.unwrap_err();
+    let error = modal.render(&app, TestData::default()).await.err().expect("description validation must fail");
     assert!(format!("{error:#}").contains("100"));
 }

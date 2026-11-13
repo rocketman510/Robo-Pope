@@ -26,6 +26,9 @@ where
 }
 
 pub trait IntoValue<V, T> { fn into_value(self) -> Value<V, T>; }
+impl<V, T> IntoValue<V, T> for Dynamic<V, T> {
+    fn into_value(self) -> Value<V, T> { Value::Dynamic(self) }
+}
 impl<V, T, F, Fut> IntoValue<V, T> for F
 where
     F: Fn(RenderCtx, Arc<T>) -> Fut + Send + Sync + 'static,
@@ -59,6 +62,9 @@ impl<V: Clone, T> Clone for Slot<V, T> {
     }
 }
 pub trait IntoSlot<V, T> { fn into_slot(self) -> Slot<V, T>; }
+impl<V, T> IntoSlot<V, T> for Dynamic<V, T> {
+    fn into_slot(self) -> Slot<V, T> { Slot::Value(Value::Dynamic(self)) }
+}
 impl<V, T, F, Fut> IntoSlot<V, T> for F
 where
     F: Fn(RenderCtx, Arc<T>) -> Fut + Send + Sync + 'static,

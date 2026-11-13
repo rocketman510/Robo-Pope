@@ -11,7 +11,7 @@ async fn disabled_string_select_option_is_rejected_instead_of_silently_ignored()
             [SelectOption::new("Enabled", "enabled"), SelectOption::new("Disabled", "disabled").set_disabled(true)],
             |_ctx, _data: TestData, _values: Vec<String>| async move { Ok(()) },
         )).register(&app).unwrap();
-    let error = page.render(&app, TestData::default()).await.unwrap_err();
+    let error = page.render(&app, TestData::default()).await.err().expect("unsupported option state must fail");
     assert!(format!("{error:#}").contains("do not support per-option disabled"));
 }
 
