@@ -10,3 +10,4 @@ mod store;
 mod support;
 mod value;
 mod validation;
+mod rendering;
