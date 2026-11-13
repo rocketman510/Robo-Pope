@@ -80,7 +80,7 @@ Required behavior:
 - Rendered output must retain all parts needed by the caller. A convenience conversion that consumes a `RenderedMessage` must not silently discard attachments or pagination state.
 - A render failure identifies the Page and relevant component/Frame/execution and preserves its original cause.
 
-Current branch status: output structs and accessors exist. Both Page rendering methods are TODOs. `RenderedMessage::into_components` consumes the message but drops attachment and pagination metadata; callers needing the complete payload must have an ownership-preserving parts conversion.
+Current branch status: output structs and accessors exist. Both Page rendering methods are TODOs. `RenderedMessage::into_parts` now preserves the component tree, outgoing attachments, and pagination metadata. The component-only `into_components` convenience method explicitly discards the other two parts.
 
 ## 6. Frames and pagination
 
