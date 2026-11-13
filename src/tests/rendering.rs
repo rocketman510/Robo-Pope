@@ -202,3 +202,29 @@ fn page_registration_rejects_duplicate_frame_ids() {
 
     assert!(page.register(&app).is_err());
 }
+#[test]
+fn rendered_message_parts_conversion_preserves_attachments_and_pagination() {
+    use crate::page::frame::pagination::PaginationState;
+    use crate::page::{OutgoingAttachment, RenderedMessage};
+
+    let message = RenderedMessage {
+        components: Vec::new(),
+        attachments: vec![OutgoingAttachment {
+            filename: "report.pdf".into(),
+            bytes: Arc::new(vec![1, 2, 3]),
+        }],
+        pagination: Some(PaginationState {
+            frame_id: "users".into(),
+            page_index: 1,
+            page_count: 3,
+        }),
+    };
+
+    let (components, attachments, pagination) = message.into_parts();
+
+    assert!(components.is_empty());
+    assert_eq!(attachments.len(), 1);
+    assert_eq!(attachments[0].filename, "report.pdf");
+    assert_eq!(attachments[0].bytes.as_slice(), &[1, 2, 3]);
+    assert_eq!(pagination.unwrap().page_index, 1);
+}
