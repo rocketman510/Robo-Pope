@@ -19,7 +19,8 @@ impl EventHandler for AppHandler {
         match event {
             FullEvent::Ready { data_about_bot, .. } => {
                 println!("{} is connected. Demo definitions are registered.", data_about_bot.user.name);
-                println!("Registered Pages: {}", self.app.pages.len());
+                println!("Demo Page registered: {}", self.app.pages.contains("framework-demo"));
+                println!("Demo Modal registered: {}", self.app.modals.contains("framework-demo-modal"));
             }
             FullEvent::InteractionCreate { .. } => {
                 println!("Received an interaction. Framework interaction routing is not implemented yet.");
