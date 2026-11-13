@@ -16,12 +16,18 @@ use crate::app::executions::{ExecutionKey, InteractionPayload};
 use crate::app::store::CustomId;
 use crate::app::{App, Ctx};
 use crate::page::{ModalSubmission, Selection};
+use crate::page::frame::pagination::{PaginationRequest, PaginationState};
 fn routed_execution_id(frame_identity: Option<&str>, execution_id: &str) -> String {
+    let identity = frame_identity.unwrap_or_default();
+    let frame_id = identity.rsplit_once(":page:")
+        .and_then(|(frame, index)| index.parse::<usize>().ok().map(|_| frame))
+        .unwrap_or(identity);
     match frame_identity {
-        Some(identity) => format!("{identity}::{execution_id}"),
+        Some(_) => format!("{frame_id}::{execution_id}"),
         None => execution_id.to_owned(),
     }
 }
+
 
 
 #[derive(Clone, Default)]
@@ -77,9 +83,40 @@ impl InteractionRouter {
             .map_err(|e| anyhow::anyhow!("Deserializing stored Page data: {e}"))?;
 
         let selection = extract_selection(&component.data.kind);
-        let payload = match &selection {
-            Some(s) => InteractionPayload::Selection(s.clone()),
-            None => InteractionPayload::None,
+        let payload = if record.execution_id.starts_with("__frame:") {
+            let state_value = record.pagination_state.clone()
+                .ok_or_else(|| anyhow::anyhow!("Pagination record is missing its state"))?;
+            let state: PaginationState = serde_json::from_value(state_value.clone())?;
+            let identity = record.frame_identity.as_deref()
+                .ok_or_else(|| anyhow::anyhow!("Pagination record is missing its Frame identity"))?;
+            let (frame_id, source_page_index) = match identity.rsplit_once(":page:") {
+                Some((frame_id, index)) => (frame_id.to_owned(), index.parse::<usize>()?),
+                None => (identity.to_owned(), 0),
+            };
+            anyhow::ensure!(state.frame_id == frame_id, "Pagination record Frame identity does not match its state");
+            anyhow::ensure!(state.page_index == source_page_index, "This pagination control is stale");
+            let prefix = format!("__frame:{frame_id}:");
+            let direction = record.execution_id.strip_prefix(&prefix)
+                .ok_or_else(|| anyhow::anyhow!("Malformed framework pagination execution ID"))?;
+            let target_page_index = match direction {
+                "previous" if source_page_index > 0 => source_page_index - 1,
+                "next" if source_page_index + 1 < state.page_count => source_page_index + 1,
+                "previous" | "next" => anyhow::bail!("Pagination control is outside the Frame's page range"),
+                _ => anyhow::bail!("Unknown framework pagination direction '{direction}'"),
+            };
+            InteractionPayload::Pagination(PaginationRequest {
+                custom_id: custom_id.clone(),
+                expected_state: state_value,
+                frame_id,
+                source_page_index,
+                target_page_index,
+                page_count: state.page_count,
+            })
+        } else {
+            match &selection {
+                Some(s) => InteractionPayload::Selection(s.clone()),
+                None => InteractionPayload::None,
+            }
         };
 
         let ctx = Ctx::new(app.clone(), Arc::new(interaction), selection);

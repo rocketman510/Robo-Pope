@@ -278,21 +278,6 @@ where
                             .await?;
                         anyhow::ensure!(updated, "This pagination control is stale or has already been used");
 
-                        let serialized_data = serde_json::to_vec(&data)?;
-                        for page_index in 0..request.page_count {
-                            let identity = pagination_identity(&frame_id, page_index);
-                            for name in ["previous", "next"] {
-                                let exec_id = pagination_execution_id(&frame_id, name);
-                                let id = derive_custom_id(
-                                    &definition.id,
-                                    &exec_id,
-                                    &serialized_data,
-                                    Some(&identity),
-                                )?;
-                                ctx.app.store().remove(&id).await?;
-                            }
-                        }
-
                         let page = RegisteredPage { definition };
                         let rendered = page.render_pages(&ctx.app, data).await?;
                         let message = rendered.pages.into_iter()
@@ -1314,19 +1299,21 @@ where
                         &serialized_data,
                         Some(&identity),
                     )?;
-                    app.store().insert(StoreRecord {
-                        custom_id: custom_id.0.clone(),
-                        definition_kind: DefinitionKind::Page,
-                        definition_id: self.id().to_owned(),
-                        execution_id,
-                        serialized_data: serialized_data.clone(),
-                        frame_identity: Some(identity.clone()),
-                        pagination_state: Some(serde_json::to_value(&pagination)?),
-                        schema_version: 1,
-                    }).await.with_context(|| format!(
-                        "Persisting {label} navigation for Frame '{}'",
-                        frame.id
-                    ))?;
+                    if app.store().resolve(&custom_id).await?.is_none() {
+                        app.store().insert(StoreRecord {
+                            custom_id: custom_id.0.clone(),
+                            definition_kind: DefinitionKind::Page,
+                            definition_id: self.id().to_owned(),
+                            execution_id,
+                            serialized_data: serialized_data.clone(),
+                            frame_identity: Some(identity.clone()),
+                            pagination_state: Some(serde_json::to_value(&pagination)?),
+                            schema_version: 1,
+                        }).await.with_context(|| format!(
+                            "Persisting {label} navigation for Frame '{}'",
+                            frame.id
+                        ))?;
+                    }
                     nav_buttons.push(
                         CreateButton::new(custom_id.0)
                             .label(label)
