@@ -1,6 +1,7 @@
 mod app;
 mod builder;
 mod components;
+mod contract_audit;
 mod ctx_http;
 mod database_contract;
 mod execution;
