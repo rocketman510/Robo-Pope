@@ -14,7 +14,7 @@ use serenity::{
 };
 
 use robo_pope::{
-    app::{store::{MemoryStore, Store}, App, Database},
+    app::{store::{FileStore, Store}, App, Database},
     page::{
         dynamic, Button, ButtonStyle, Container, Element, Frame, LinkButton,
         MediaGallery, Modal, Page, Section, SelectOption, Separator, StringSelect,
@@ -215,9 +215,9 @@ async fn main() -> anyhow::Result<()> {
         .context("Could not load a valid DISCORD_TOKEN from .env")?;
 
     let http = Arc::new(Http::new(token.clone()));
-    // This runnable showcase intentionally uses process-local storage. Production bots must provide a durable Store.
+    // Persist interaction references so custom IDs remain routable after a restart.
     let database = Database::new(());
-    let store: Arc<dyn Store> = Arc::new(MemoryStore::default());
+    let store: Arc<dyn Store> = Arc::new(FileStore::open(".robo-pope/store.json")?);
     let app = App::new(http, database, store);
 
     register_demo_page(&app)?;

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use crate::app::{App, Database};
-use crate::app::store::{MemoryStore, Store, StoreDurability};
+use crate::app::store::{FileStore, MemoryStore, Store, StoreDurability};
 use super::support::app;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -41,6 +41,14 @@ fn cloned_app_preserves_the_same_host_database_value() {
 #[test]
 fn production_store_must_advertise_restart_durability() {
     // FIRST: production records must survive process recreation; MemoryStore is not enough.
-    let store = MemoryStore::default();
+    let path = std::env::temp_dir().join(format!(
+        "robo-pope-store-{}-{}.json",
+        std::process::id(),
+        std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos(),
+    ));
+    let store = FileStore::open(&path).unwrap();
     assert_eq!(store.durability(), StoreDurability::Durable);
+    drop(store);
+    assert_eq!(MemoryStore::default().durability(), StoreDurability::ProcessLocal);
+    let _ = std::fs::remove_file(path);
 }
