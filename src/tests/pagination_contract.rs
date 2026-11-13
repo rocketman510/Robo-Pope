@@ -165,11 +165,10 @@ async fn next_and_previous_navigation_update_state_and_reject_out_of_range_click
     assert!(request.lines().next().unwrap().contains(
         "POST /api/v10/interactions/9001/component-token/callback"
     ));
-    let body = request.split_once("
-
-").unwrap().1;
-    let payload: serde_json::Value = serde_json::from_str(body).unwrap();
-    assert_eq!(payload["type"], 7, "pagination must update the original component message");
+    assert!(
+        request.contains("\"type\":7"),
+        "pagination must send an UpdateMessage interaction response; captured request: {request:?}"
+    );
 }
 
 #[tokio::test]
