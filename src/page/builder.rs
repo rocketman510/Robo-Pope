@@ -575,7 +575,7 @@ async fn render_container<T>(
     frame_identity: Option<&str>,
 ) -> anyhow::Result<(CreateContainer<'static>, ComponentBudget)>
 where
-    T: Send + Sync + 'static,
+    T: DeserializeOwned + Send + Sync + 'static,
 {
     use super::component::{Component as C, ContainerItem};
 
@@ -948,6 +948,11 @@ where
     Ok((rendered, budget))
 }
 
+struct RenderedFrameElement {
+    components: Vec<RenderedComponent>,
+    budget: ComponentBudget,
+}
+
 async fn render_frame_elements<T>(
     elements: &[super::frame::Element<T>],
     app: &App,
@@ -956,12 +961,11 @@ async fn render_frame_elements<T>(
     serialized_data: &[u8],
     definition_id: &str,
     frame_id: &str,
-) -> anyhow::Result<(Vec<RenderedComponent>, ComponentBudget)>
+) -> anyhow::Result<Vec<RenderedFrameElement>>
 where
-    T: Send + Sync + 'static,
+    T: DeserializeOwned + Send + Sync + 'static,
 {
-    let mut rendered = Vec::new();
-    let mut budget = ComponentBudget::default();
+    let mut rendered = Vec::with_capacity(elements.len());
     for element in elements {
         let frame_identity = element.key.as_deref()
             .map(|key| append_frame_identity(None, frame_id, key));
@@ -972,13 +976,54 @@ where
         );
         let frame_identity = frame_identity.as_deref();
         register_component_executions(&element.component, app, definition_id, frame_identity)?;
-        let (mut parts, element_budget) = render_component(
+        let (components, budget) = render_component(
             &element.component, app, ctx, data, serialized_data, definition_id, frame_identity,
         ).await?;
-        rendered.append(&mut parts);
-        budget = add_budgets(budget, element_budget);
+        rendered.push(RenderedFrameElement { components, budget });
     }
-    Ok((rendered, budget))
+    Ok(rendered)
+}
+
+fn message_budget_fits(budget: ComponentBudget) -> bool {
+    budget.total_components <= super::limits::MESSAGE_MAX_COMPONENTS
+        && budget.text_display_chars <= super::limits::MESSAGE_MAX_TEXT_DISPLAY_CHARS
+        && budget.direct_container_children <= super::limits::CONTAINER_MAX_DIRECT_CHILDREN
+}
+
+fn plan_rendered_frame(
+    elements: Vec<RenderedFrameElement>,
+    reserved: ComponentBudget,
+) -> anyhow::Result<(Vec<(Vec<RenderedComponent>, ComponentBudget)>, usize)> {
+    anyhow::ensure!(
+        message_budget_fits(reserved),
+        "Static content exceeds the Discord message budget"
+    );
+    let mut pages = Vec::new();
+    let mut current_components = Vec::new();
+    let mut current_budget = reserved;
+    let mut current_count = 0usize;
+
+    for element in elements {
+        anyhow::ensure!(
+            message_budget_fits(add_budgets(reserved, element.budget)),
+            "A single resolved Frame element cannot fit within the remaining Discord message budget"
+        );
+        let combined = add_budgets(current_budget, element.budget);
+        if !message_budget_fits(combined) && current_count > 0 {
+            pages.push((std::mem::take(&mut current_components), current_budget));
+            current_budget = reserved;
+            current_count = 0;
+        }
+        current_budget = add_budgets(current_budget, element.budget);
+        current_components.extend(element.components);
+        current_count += 1;
+    }
+
+    if current_count > 0 || pages.is_empty() {
+        pages.push((current_components, current_budget));
+    }
+    let page_count = pages.len();
+    Ok((pages, page_count))
 }
 
 impl<T> RegisteredPage<T>
@@ -1071,10 +1116,19 @@ where
         let reserved = add_budgets(prefix_budget, suffix_budget);
         let should_paginate = self.definition.paginate || frame.paginate;
 
+        let rendered_elements = render_frame_elements(
+            &elements, app, &ctx, &data, &serialized_data, self.id(), &frame.id,
+        ).await.with_context(|| format!(
+            "Rendering resolved Frame '{}' in Page '{}'", frame.id, self.id()
+        ))?;
+
         if !should_paginate {
-            let (frame_components, frame_budget) = render_frame_elements(
-                &elements, app, &ctx, &data, &serialized_data, self.id(), &frame.id,
-            ).await?;
+            let mut frame_components = Vec::new();
+            let mut frame_budget = ComponentBudget::default();
+            for element in rendered_elements {
+                frame_components.extend(element.components);
+                frame_budget = add_budgets(frame_budget, element.budget);
+            }
             let budget = add_budgets(reserved, frame_budget);
             validate_message_budget(budget)
                 .with_context(|| format!("Validating Page '{}' with Frame '{}'", self.id(), frame.id))?;
@@ -1087,36 +1141,29 @@ where
             });
         }
 
-        let plan = super::frame::pagination::plan(
-            frame.id.clone(),
-            elements,
+        let (planned_pages, page_count) = plan_rendered_frame(
+            rendered_elements,
             reserved,
-            super::frame::pagination::ComponentBudget::default(),
         ).with_context(|| format!("Paginating Frame '{}' in Page '{}'", frame.id, self.id()))?;
 
-        let mut pages = Vec::with_capacity(plan.pages.len());
-        for (page_index, elements) in plan.pages.into_iter().enumerate() {
-            let (frame_components, frame_budget) = render_frame_elements(
-                &elements, app, &ctx, &data, &serialized_data, self.id(), &frame.id,
-            ).await.with_context(|| format!(
-                "Rendering Frame '{}' page {} in Page '{}'",
-                frame.id, page_index, self.id()
-            ))?;
-            validate_message_budget(add_budgets(reserved, frame_budget))
+        let mut pages = Vec::with_capacity(page_count);
+        for (page_index, (frame_components, budget)) in planned_pages.into_iter().enumerate() {
+            validate_message_budget(budget)
                 .with_context(|| format!(
                     "Validating Frame '{}' page {} in Page '{}'",
                     frame.id, page_index, self.id()
                 ))?;
-
             let mut components = prefix_components.clone();
             components.extend(frame_components);
             components.extend(suffix_components.clone());
-            let mut pagination = plan.state.clone();
-            pagination.page_index = page_index;
             pages.push(RenderedMessage {
                 components,
                 attachments: Vec::new(),
-                pagination: Some(pagination),
+                pagination: Some(super::frame::pagination::PaginationState {
+                    frame_id: frame.id.clone(),
+                    page_index,
+                    page_count,
+                }),
             });
         }
 
