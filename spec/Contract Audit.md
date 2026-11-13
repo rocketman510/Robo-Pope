@@ -158,4 +158,22 @@ The following contract tests are still required:
 | Gateway | InteractionCreate is forwarded to `App::dispatch_interaction`; routing errors are surfaced rather than logged as a successful dispatch. |
 | Validation | Whole-message nested component counts and aggregate text; dynamic properties; Frames inside Containers; every published Discord limit and boundary. |
 
+### Tests added in the current red-phase batch
+
+The following tests have now been committed and registered in `src/tests/mod.rs`:
+
+- `page_render_resolves_dynamic_values_with_page_data_and_app_context`
+- `page_render_preserves_dynamic_callback_errors_and_adds_page_context`
+- `page_render_validates_the_combined_text_display_budget_after_resolution`
+- `page_render_persists_button_execution_identity_and_page_data`
+- `render_pages_keeps_static_content_and_splits_frame_elements_in_order`
+- `modal_render_persists_modal_data_and_returns_a_modal_response`
+- `page_registration_rejects_duplicate_execution_ids`
+- `page_registration_rejects_duplicate_frame_ids`
+- `rendered_message_parts_conversion_preserves_attachments_and_pagination`
+- `context_construction_retains_app_http_and_absent_ping_metadata`
+- `router_returns_an_error_for_an_unsupported_interaction_kind`
+
+These tests are intentionally ahead of the unfinished renderer, Modal renderer, context, router, and registration validation paths. The output-parts conversion test exercises the completed `RenderedMessage::into_parts` API. The rest are expected to expose missing behavior once confirmed by an actual test run.
+
 Do not begin the green phase merely because these tests compile. The red phase is complete only after the test command has been run against this branch and failures are confirmed to be behavioral contract failures rather than compile failures.
