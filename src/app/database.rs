@@ -1,19 +1,18 @@
-//! Persistence handle owned by the monolithic App.
+//! Type-erased host application database, independent from framework persistence.
+use std::any::Any;
 use std::sync::Arc;
-use super::store::Store;
 
-/// Framework persistence used to map Discord custom IDs to execution records.
-///
-/// The App-level contract is to own the host application's database and
-/// repositories as well. This skeleton currently models only its own Store
-/// handle here; repository access in the Page API examples remains an API gap.
-pub struct Database {
-    /// Durable storage for custom-ID to execution-reference records.
-    pub store: Arc<dyn Store>,
-}
+/// Type-erased handle to the host application's concrete database and repositories.
+#[derive(Clone)]
+pub struct Database { value: Arc<dyn Any + Send + Sync> }
 impl Database {
-    /// Creates the framework persistence handle around the supplied Store.
-    pub fn new(store: Arc<dyn Store>) -> Self {
-        Self { store }
+    /// Stores any host database aggregate that is safe to share across async tasks.
+    pub fn new<T: Any + Send + Sync>(value: T) -> Self { Self { value: Arc::new(value) } }
+
+    /// Returns the host database as its original concrete type, or an error on mismatch.
+    pub fn get<T: Any + Send + Sync>(&self) -> anyhow::Result<&T> {
+        self.value.downcast_ref::<T>().ok_or_else(|| {
+            anyhow::anyhow!("The App database does not contain the requested type")
+        })
     }
 }

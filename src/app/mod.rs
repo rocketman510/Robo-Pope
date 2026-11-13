@@ -29,8 +29,10 @@ pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 /// live here. Pages and components carry only their own serialized data type;
 /// callbacks reach all application state through Ctx or RenderCtx.
 pub struct App {
-    /// Shared App-owned database aggregate and framework persistence Store.
+    /// Shared host application's database aggregate.
     pub db: Arc<Database>,
+    /// Framework persistence for custom-ID execution and pagination records.
+    pub(crate) store: Arc<dyn Store>,
     /// Heterogeneous registry of immutable registered Page definitions.
     pub pages: PageRegistry,
     /// Heterogeneous registry of immutable registered Modal definitions.
@@ -44,6 +46,7 @@ impl Clone for App {
     fn clone(&self) -> Self {
         Self {
             db: self.db.clone(),
+            store: self.store.clone(),
             pages: self.pages.clone(),
             modals: self.modals.clone(),
             http: self.http.clone(),
@@ -54,9 +57,10 @@ impl Clone for App {
 }
 impl App {
     /// Creates an App with empty definition registries and shared infrastructure.
-    pub fn new(http: Arc<Http>, db: Database) -> Self {
+    pub fn new(http: Arc<Http>, db: Database, store: Arc<dyn Store>) -> Self {
         Self {
             db: Arc::new(db),
+            store,
             pages: PageRegistry::default(),
             modals: ModalRegistry::default(),
             http,
@@ -76,5 +80,5 @@ impl App {
         RenderCtx::new(self.clone(), definition_id.into())
     }
     /// Borrows the Store used for persisted interaction execution records.
-    pub fn store(&self) -> &dyn Store { self.db.store.as_ref() }
+    pub fn store(&self) -> &dyn Store { self.store.as_ref() }
 }
