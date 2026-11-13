@@ -4,6 +4,7 @@ use serenity::builder::CreateComponent;
 use super::frame::pagination::PaginationState;
 
 /// One Serenity component produced by the render layer.
+#[derive(Clone)]
 pub struct RenderedComponent {
     pub(crate) component:CreateComponent<'static>,
 }
