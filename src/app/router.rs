@@ -11,7 +11,11 @@ pub struct InteractionRouter;
 impl InteractionRouter {
     /// Dispatches a supported interaction kind to its specialized route.
     pub async fn dispatch(&self, app: &App, interaction: Interaction) -> anyhow::Result<()> {
-        todo!("identify interaction kind and delegate to its route")
+        match interaction {
+            Interaction::Component(_) => self.dispatch_component(app, interaction).await,
+            Interaction::Modal(_) => self.dispatch_modal_submit(app, interaction).await,
+            _ => anyhow::bail!("Unsupported Discord interaction kind for UI routing"),
+        }
     }
     /// Resolves and invokes a registered component execution from its custom ID.
     pub async fn dispatch_component(&self, app: &App, interaction: Interaction) -> anyhow::Result<()> {
