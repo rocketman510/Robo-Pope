@@ -4,8 +4,10 @@ use std::collections::HashSet;
 use anyhow::Context as _;
 use serenity::builder::{
     CreateActionRow, CreateButton, CreateComponent, CreateContainer,
-    CreateContainerComponent, CreateSection, CreateSectionAccessory,
-    CreateSectionComponent, CreateSeparator, CreateTextDisplay,
+    CreateContainerComponent, CreateFile, CreateMediaGallery,
+    CreateMediaGalleryItem, CreateSection, CreateSectionAccessory,
+    CreateSectionComponent, CreateSelectMenu, CreateSelectMenuKind,
+    CreateSelectMenuOption, CreateSeparator, CreateTextDisplay,
     CreateThumbnail, CreateUnfurledMediaItem,
 };
 use serenity::all::ButtonStyle as SerenityButtonStyle;
@@ -257,6 +259,31 @@ async fn persist_button_execution<T>(
     Ok(custom_id.0)
 }
 
+async fn persist_select_execution(
+    app: &App,
+    execution_id: &str,
+    definition_id: &str,
+    serialized_data: &[u8],
+    frame_identity: Option<&str>,
+) -> anyhow::Result<String> {
+    let custom_id = derive_custom_id(
+        definition_id, execution_id, serialized_data, frame_identity,
+    )?;
+    app.store().insert(StoreRecord {
+        custom_id: custom_id.0.clone(),
+        definition_kind: DefinitionKind::Page,
+        definition_id: definition_id.to_owned(),
+        execution_id: execution_id.to_owned(),
+        serialized_data: serialized_data.to_vec(),
+        frame_identity: frame_identity.map(str::to_owned),
+        pagination_state: None,
+        schema_version: 1,
+    }).await.with_context(|| format!(
+        "Persisting selection execution '{execution_id}' for Page '{definition_id}'"
+    ))?;
+    Ok(custom_id.0)
+}
+
 async fn render_button<T>(
     app: &App,
     button: &Button<T>,
@@ -291,6 +318,171 @@ where
         .style(serenity_style)
         .disabled(disabled)
         .into_owned())
+}
+
+async fn render_select_menu<T>(
+    menu: &SelectMenu<T>,
+    app: &App,
+    ctx: &RenderCtx,
+    data: &Arc<T>,
+    serialized_data: &[u8],
+    definition_id: &str,
+    frame_identity: Option<&str>,
+) -> anyhow::Result<CreateSelectMenu<'static>>
+where
+    T: Send + Sync + 'static,
+{
+    use super::select::SelectMenu as M;
+
+    let (execution_id, placeholder, disabled, min_values, max_values, kind) = match menu {
+        M::String(menu) => {
+            let mut options = Vec::with_capacity(menu.options.len());
+            for option in &menu.options {
+                let label = super::value::resolve(&option.label, ctx.clone(), data.clone())
+                    .await.context("Resolving String Select option label")?;
+                let disabled = super::value::resolve(
+                    &option.disabled, ctx.clone(), data.clone()
+                ).await.context("Resolving String Select option disabled state")?;
+                anyhow::ensure!(
+                    !disabled,
+                    "Discord String Select options do not support per-option disabled state"
+                );
+                let mut rendered = CreateSelectMenuOption::new(label, option.value.clone());
+                if let Some(description) = &option.description {
+                    let description = super::value::resolve(
+                        description, ctx.clone(), data.clone()
+                    ).await.context("Resolving String Select option description")?;
+                    rendered = rendered.description(description);
+                }
+                options.push(rendered);
+            }
+            (
+                menu.id.as_str(),
+                match &menu.placeholder {
+                    Some(value) => Some(super::value::resolve(value, ctx.clone(), data.clone())
+                        .await.context("Resolving String Select placeholder")?),
+                    None => None,
+                },
+                super::value::resolve(&menu.disabled, ctx.clone(), data.clone())
+                    .await.context("Resolving String Select disabled state")?,
+                menu.min_values,
+                menu.max_values,
+                CreateSelectMenuKind::String { options: options.into() },
+            )
+        }
+        M::User(menu) => (
+            menu.id.as_str(),
+            match &menu.placeholder {
+                Some(value) => Some(super::value::resolve(value, ctx.clone(), data.clone())
+                    .await.context("Resolving User Select placeholder")?),
+                None => None,
+            },
+            super::value::resolve(&menu.disabled, ctx.clone(), data.clone())
+                .await.context("Resolving User Select disabled state")?,
+            menu.min_values,
+            menu.max_values,
+            CreateSelectMenuKind::User { default_users: None },
+        ),
+        M::Role(menu) => (
+            menu.id.as_str(),
+            match &menu.placeholder {
+                Some(value) => Some(super::value::resolve(value, ctx.clone(), data.clone())
+                    .await.context("Resolving Role Select placeholder")?),
+                None => None,
+            },
+            super::value::resolve(&menu.disabled, ctx.clone(), data.clone())
+                .await.context("Resolving Role Select disabled state")?,
+            menu.min_values,
+            menu.max_values,
+            CreateSelectMenuKind::Role { default_roles: None },
+        ),
+        M::Mentionable(menu) => (
+            menu.id.as_str(),
+            match &menu.placeholder {
+                Some(value) => Some(super::value::resolve(value, ctx.clone(), data.clone())
+                    .await.context("Resolving Mentionable Select placeholder")?),
+                None => None,
+            },
+            super::value::resolve(&menu.disabled, ctx.clone(), data.clone())
+                .await.context("Resolving Mentionable Select disabled state")?,
+            menu.min_values,
+            menu.max_values,
+            CreateSelectMenuKind::Mentionable {
+                default_users: None,
+                default_roles: None,
+            },
+        ),
+        M::Channel(menu) => (
+            menu.id.as_str(),
+            match &menu.placeholder {
+                Some(value) => Some(super::value::resolve(value, ctx.clone(), data.clone())
+                    .await.context("Resolving Channel Select placeholder")?),
+                None => None,
+            },
+            super::value::resolve(&menu.disabled, ctx.clone(), data.clone())
+                .await.context("Resolving Channel Select disabled state")?,
+            menu.min_values,
+            menu.max_values,
+            CreateSelectMenuKind::Channel {
+                channel_types: if menu.channel_types.is_empty() {
+                    None
+                } else {
+                    Some(menu.channel_types.clone().into())
+                },
+                default_channels: None,
+            },
+        ),
+    };
+
+    let custom_id = persist_select_execution(
+        app, execution_id, definition_id, serialized_data, frame_identity,
+    ).await?;
+    let mut rendered = CreateSelectMenu::new(custom_id, kind).disabled(disabled);
+    if let Some(placeholder) = placeholder {
+        rendered = rendered.placeholder(placeholder);
+    }
+    if let Some(min_values) = min_values {
+        rendered = rendered.min_values(min_values);
+    }
+    if let Some(max_values) = max_values {
+        rendered = rendered.max_values(max_values);
+    }
+    Ok(rendered.into_owned())
+}
+
+async fn render_media_gallery<T>(
+    gallery: &super::component::MediaGallery<T>,
+    ctx: &RenderCtx,
+    data: &Arc<T>,
+) -> anyhow::Result<CreateMediaGallery<'static>>
+where
+    T: Send + Sync + 'static,
+{
+    anyhow::ensure!(
+        gallery.items.len() <= super::limits::MEDIA_GALLERY_MAX_ITEMS,
+        "Media Gallery has {} items; maximum is {}",
+        gallery.items.len(),
+        super::limits::MEDIA_GALLERY_MAX_ITEMS
+    );
+    let mut items = Vec::with_capacity(gallery.items.len());
+    for item in &gallery.items {
+        let url = super::value::resolve(&item.url, ctx.clone(), data.clone())
+            .await.context("Resolving Media Gallery URL")?;
+        let description = match &item.description {
+            Some(value) => Some(super::value::resolve(value, ctx.clone(), data.clone())
+                .await.context("Resolving Media Gallery description")?),
+            None => None,
+        };
+        let spoiler = super::value::resolve(&item.spoiler, ctx.clone(), data.clone())
+            .await.context("Resolving Media Gallery spoiler state")?;
+        let mut rendered = CreateMediaGalleryItem::new(CreateUnfurledMediaItem::new(url));
+        if let Some(description) = description {
+            rendered = rendered.description(description);
+        }
+        rendered = rendered.spoiler(spoiler);
+        items.push(rendered);
+    }
+    Ok(CreateMediaGallery::new(items).into_owned())
 }
 
 async fn render_container<T>(
@@ -600,9 +792,56 @@ where
                 },
             ))
         },
-        C::MediaGallery(_) => anyhow::bail!("Media Gallery rendering is not implemented yet"),
-        C::File(_) => anyhow::bail!("File component rendering is not implemented yet"),
-        C::Select(_) => anyhow::bail!("Selection menu rendering is not implemented yet"),
+        C::MediaGallery(gallery) => {
+            let rendered = render_media_gallery(gallery, ctx, data)
+                .await.context("Rendering Media Gallery")?;
+            Ok((
+                vec![RenderedComponent {
+                    component: CreateComponent::MediaGallery(rendered),
+                }],
+                ComponentBudget {
+                    total_components: 1,
+                    text_display_chars: 0,
+                    direct_container_children: 0,
+                },
+            ))
+        }
+        C::File(file) => {
+            anyhow::ensure!(
+                !file.filename.trim().is_empty() && !file.filename.contains('/') && !file.filename.contains('\\\\'),
+                "File component requires a non-empty filename without path separators"
+            );
+            let rendered = CreateFile::new(CreateUnfurledMediaItem::new(
+                format!("attachment://{}", file.filename)
+            )).into_owned();
+            Ok((
+                vec![RenderedComponent {
+                    component: CreateComponent::File(rendered),
+                }],
+                ComponentBudget {
+                    total_components: 1,
+                    text_display_chars: 0,
+                    direct_container_children: 0,
+                },
+            ))
+        }
+        C::Select(menu) => {
+            let rendered = render_select_menu(
+                menu, app, ctx, data, serialized_data, definition_id, frame_identity,
+            ).await.context("Rendering Selection menu")?;
+            Ok((
+                vec![RenderedComponent {
+                    component: CreateComponent::ActionRow(
+                        CreateActionRow::select_menu(rendered).into()
+                    ),
+                }],
+                ComponentBudget {
+                    total_components: 2,
+                    text_display_chars: 0,
+                    direct_container_children: 0,
+                },
+            ))
+        },
     }
 }
 
