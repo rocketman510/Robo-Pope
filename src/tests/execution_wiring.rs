@@ -45,25 +45,39 @@ async fn component_dispatch_restores_page_data_and_invokes_the_registered_callba
     assert!(called.load(Ordering::SeqCst));
 }
 
+fn registered_modal(app: &crate::app::App) -> crate::page::RegisteredModal<TestData> {
+    Modal::<TestData>::new("execution-modal").set_title("Submit")
+        .add_text_input("name", "Name", TextInputStyle::Short)
+        .on_submit(|_ctx, _data, _submission: ModalSubmission| async move { Ok(()) })
+        .register(app).unwrap()
+}
+
+#[test]
+fn modal_registration_indexes_its_submit_callback() {
+    // FIRST: Modal registration inserts its submit closure into ExecutionRegistry.
+    let app = app();
+    let _modal = registered_modal(&app);
+    assert!(app.executions.contains(&ExecutionKey {
+        definition_id: "execution-modal".into(), execution_id: "submit".into(),
+    }));
+}
+
 #[tokio::test]
-async fn modal_registration_indexes_and_dispatches_its_submit_callback() {
-    // FIRST: Modal submit callbacks are process-local executions just like buttons.
+async fn modal_submit_dispatch_invokes_the_registered_callback() {
+    // FIRST: a submitted Modal custom ID resolves and invokes the typed submit callback.
     let app = app();
     let called = Arc::new(AtomicBool::new(false));
-    let callback_flag = called.clone();
-    let modal = Modal::<TestData>::new("execution-modal").set_title("Submit")
+    let flag = called.clone();
+    let modal = Modal::<TestData>::new("modal-dispatch").set_title("Submit")
         .add_text_input("name", "Name", TextInputStyle::Short)
         .on_submit(move |_ctx, data, _submission: ModalSubmission| {
-            let flag = callback_flag.clone();
+            let flag = flag.clone();
             async move {
                 assert_eq!(data.count, 7);
                 flag.store(true, Ordering::SeqCst);
                 Ok(())
             }
         }).register(&app).unwrap();
-    assert!(app.executions.contains(&ExecutionKey {
-        definition_id: "execution-modal".into(), execution_id: "submit".into(),
-    }));
     let rendered = modal.render(&app, TestData::default()).await.unwrap();
     app.dispatch_interaction(modal_submit_interaction(&rendered.custom_id)).await.unwrap();
     assert!(called.load(Ordering::SeqCst));
@@ -91,18 +105,23 @@ async fn gateway_handler_forwards_interaction_create_to_app_dispatch() {
 }
 
 #[test]
-fn page_and_modal_definitions_share_one_global_id_namespace_in_both_orders() {
-    // FIRST: a definition ID cannot be ambiguous regardless of registration order.
+fn page_registration_rejects_id_already_owned_by_modal() {
+    // FIRST: Page and Modal definitions share one application-wide ID namespace.
     let app = app();
-    Page::<TestData>::new("shared-definition-id").add_text("Page").register(&app).unwrap();
-    assert!(Modal::<TestData>::new("shared-definition-id").set_title("Modal")
+    Modal::<TestData>::new("shared-page-first").set_title("Modal")
+        .on_submit(|_ctx, _data, _submission: ModalSubmission| async move { Ok(()) })
+        .register(&app).unwrap();
+    assert!(Page::<TestData>::new("shared-page-first").add_text("Page").register(&app).is_err());
+}
+
+#[test]
+fn modal_registration_rejects_id_already_owned_by_page() {
+    // FIRST: uniqueness works in the reverse registration order as well.
+    let app = app();
+    Page::<TestData>::new("shared-modal-first").add_text("Page").register(&app).unwrap();
+    assert!(Modal::<TestData>::new("shared-modal-first").set_title("Modal")
         .on_submit(|_ctx, _data, _submission: ModalSubmission| async move { Ok(()) })
         .register(&app).is_err());
-    let other = super::support::app();
-    Modal::<TestData>::new("shared-definition-id").set_title("Modal")
-        .on_submit(|_ctx, _data, _submission: ModalSubmission| async move { Ok(()) })
-        .register(&other).unwrap();
-    assert!(Page::<TestData>::new("shared-definition-id").add_text("Page").register(&other).is_err());
 }
 
 #[test]
