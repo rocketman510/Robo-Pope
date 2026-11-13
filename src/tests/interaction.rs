@@ -41,3 +41,16 @@ async fn router_returns_an_error_for_an_unsupported_interaction_kind() {
 
     assert!(result.is_err());
 }
+#[test]
+fn context_retains_the_typed_selection_payload() {
+    use crate::page::Selection;
+
+    let app = app();
+    let selection = Selection::Strings(vec!["member".into(), "admin".into()]);
+    let ctx = Ctx::new(app, Arc::new(ping_interaction()), Some(selection));
+
+    assert!(matches!(
+        ctx.selected(),
+        Some(Selection::Strings(values)) if values == &["member".to_string(), "admin".to_string()]
+    ));
+}
