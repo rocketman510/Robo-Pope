@@ -1,5 +1,6 @@
 //! Page<T> builder and immutable RegisteredPage<T> typestate.
 use std::sync::Arc;
+use std::collections::HashSet;
 use serde::{Serialize, de::DeserializeOwned};
 use crate::app::App;
 use super::component::*;
@@ -31,6 +32,78 @@ pub enum PageItem<T> {
 /// Registered, immutable Page handle. Rendering is only available after registration.
 pub struct RegisteredPage<T> {
     pub(crate) definition: Arc<PageDefinition<T>>,
+}
+
+
+fn validate_execution_id(id: &str, ids: &mut HashSet<String>) -> anyhow::Result<()> {
+    anyhow::ensure!(!id.trim().is_empty(), "Execution ID must not be empty");
+    anyhow::ensure!(ids.insert(id.to_owned()), "Duplicate execution ID: {id}");
+    Ok(())
+}
+
+fn validate_frame_id(id: &str, ids: &mut HashSet<String>) -> anyhow::Result<()> {
+    anyhow::ensure!(!id.trim().is_empty(), "Frame ID must not be empty");
+    anyhow::ensure!(ids.insert(id.to_owned()), "Duplicate Frame ID: {id}");
+    Ok(())
+}
+
+fn validate_component_ids<T>(
+    component: &Component<T>,
+    execution_ids: &mut HashSet<String>,
+    frame_ids: &mut HashSet<String>,
+) -> anyhow::Result<()> {
+    use super::component::{ContainerItem, SectionAccessory};
+    use super::select::SelectMenu;
+
+    match component {
+        Component::Button(button) => {
+            validate_execution_id(&button.id, execution_ids)?;
+        }
+        Component::ButtonRow(row) => {
+            for button in [
+                row.slots.0.as_ref(),
+                row.slots.1.as_ref(),
+                row.slots.2.as_ref(),
+                row.slots.3.as_ref(),
+                row.slots.4.as_ref(),
+            ].into_iter().flatten() {
+                validate_execution_id(&button.id, execution_ids)?;
+            }
+        }
+        Component::Section(section) => {
+            if let Some(SectionAccessory::Button(button)) = &section.accessory {
+                validate_execution_id(&button.id, execution_ids)?;
+            }
+        }
+        Component::Select(menu) => {
+            let id = match menu {
+                SelectMenu::String(menu) => &menu.id,
+                SelectMenu::User(menu) => &menu.id,
+                SelectMenu::Role(menu) => &menu.id,
+                SelectMenu::Mentionable(menu) => &menu.id,
+                SelectMenu::Channel(menu) => &menu.id,
+            };
+            validate_execution_id(id, execution_ids)?;
+        }
+        Component::Container(container) => {
+            for child in &container.children {
+                match child {
+                    ContainerItem::Component(component) => {
+                        validate_component_ids(component, execution_ids, frame_ids)?;
+                    }
+                    ContainerItem::Frame(frame) => {
+                        validate_frame_id(&frame.id, frame_ids)?;
+                    }
+                }
+            }
+        }
+        Component::Text(_)
+        | Component::Separator(_)
+        | Component::MediaGallery(_)
+        | Component::File(_)
+        | Component::LinkButton(_) => {}
+    }
+    Ok(())
 }
 
 impl<T> Page<T> {
@@ -96,9 +169,17 @@ impl<T> Page<T> {
         T: Serialize + DeserializeOwned + Send + Sync + 'static
 {
         anyhow::ensure!(!self.id.trim().is_empty(), "Page ID must not be empty");
+        let mut execution_ids = HashSet::new();
+        let mut frame_ids = HashSet::new();
         for item in &self.items {
-            if let PageItem::Component(component) = item {
-                super::render::validate_component(component)?;
+            match item {
+                PageItem::Component(component) => {
+                    super::render::validate_component(component)?;
+                    validate_component_ids(component, &mut execution_ids, &mut frame_ids)?;
+                }
+                PageItem::Frame(frame) => {
+                    validate_frame_id(&frame.id, &mut frame_ids)?;
+                }
             }
         }
         let definition = Arc::new(PageDefinition {
