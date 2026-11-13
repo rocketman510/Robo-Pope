@@ -140,7 +140,7 @@ fn modal_string_and_checkbox_values_deserialize_to_their_declared_types() {
     struct Form { choices: Vec<String>, urgent: bool }
     let mut submission = ModalSubmission::default();
     submission.values.insert("choices".into(), SubmittedValue::Strings(vec!["one".into(), "two".into()]));
-    submission.values.insert("urgent".into(), SubmittedValue::Checkbox(true));
+    submission.values.insert("urgent".into(), SubmittedValue::Boolean(true));
     let form: Form = submission.deserialize().unwrap();
     assert_eq!(form.choices, vec!["one", "two"]);
     assert!(form.urgent);
