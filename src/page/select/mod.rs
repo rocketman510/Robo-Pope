@@ -5,6 +5,8 @@ pub mod string;
 pub use entity::{ChannelSelect, EntitySelect, MentionableSelect, RoleSelect, UserSelect};
 pub use string::{SelectOption, StringSelect};
 
+/// Unified menu type accepted by Page and Container builders.
+/// Each variant retains its own typed selection callback.
 pub enum SelectMenu<T> {
     String(StringSelect<T>),
     User(UserSelect<T>),

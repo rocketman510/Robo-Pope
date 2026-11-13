@@ -8,66 +8,89 @@ use super::render::{RenderedMessage, RenderedPage};
 use super::select::SelectMenu;
 use super::value::IntoValue;
 
+/// Mutable builder for a reusable message definition.
+///
+/// `T` is the Page's shared data type. It is serialized for each rendered
+/// instance and reconstructed before an interaction callback runs.
 pub struct Page<T> {
     pub(crate) id: String,
     pub(crate) items: Vec<PageItem<T>>,
     pub(crate) paginate: bool,
 }
+/// Immutable definition retained by the App after Page registration.
 pub struct PageDefinition<T> {
     pub(crate) id: String,
     pub(crate) items: Vec<PageItem<T>>,
     pub(crate) paginate: bool,
 }
+/// One ordered top-level entry in a Page: a fixed component or dynamic Frame.
 pub enum PageItem<T> {
     Component(Component<T>),
     Frame(Frame<T>),
 }
+/// Registered, immutable Page handle. Rendering is only available after registration.
 pub struct RegisteredPage<T> {
     pub(crate) definition: Arc<PageDefinition<T>>,
 }
 
 impl<T> Page<T> {
+    /// Starts a Page definition with a globally unique application-wide ID.
     pub fn new(id: impl Into<String>) -> Self {
         Self { id:id.into(), items:Vec::new(), paginate:false }
     }
+    /// Returns the developer-defined Page ID.
     pub fn id(&self) -> &str { &self.id }
+    /// Appends a Text Display. Its content may be static or resolved at render time.
     pub fn add_text<V: IntoValue<String, T>>(mut self, value: V) -> Self {
         self.items.push(PageItem::Component(Component::Text(Text::new(value))));
         self
     }
+    /// Appends a Section with one to three Text Display slots and one optional accessory.
     pub fn add_section(mut self, value: Section<T>) -> Self {
         self.items.push(PageItem::Component(Component::Section(value))); self
     }
+    /// Appends a Container while preserving the order of its children.
     pub fn add_container(mut self, value: Container<T>) -> Self {
         self.items.push(PageItem::Component(Component::Container(value))); self
     }
+    /// Appends a Separator with dynamic spacing and divider properties.
     pub fn add_separator(mut self, value: Separator<T>) -> Self {
         self.items.push(PageItem::Component(Component::Separator(value))); self
     }
+    /// Appends an interactive Button with an explicit execution callback.
     pub fn add_button(mut self, value: Button<T>) -> Self {
         self.items.push(PageItem::Component(Component::Button(value))); self
     }
+    /// Appends a URL button. Link buttons do not create interaction executions.
     pub fn add_link_button(mut self, value: LinkButton<T>) -> Self {
         self.items.push(PageItem::Component(Component::LinkButton(value))); self
     }
+    /// Appends an Action Row with up to five fixed Button slots.
     pub fn add_button_row(mut self, slots: ButtonSlots<T>) -> Self {
         self.items.push(PageItem::Component(Component::ButtonRow(ButtonRow::new(slots))));
         self
     }
+    /// Appends one String, User, Role, Mentionable, or Channel Select menu.
     pub fn add_selection_menu<M: Into<SelectMenu<T>>>(mut self, value: M) -> Self {
         self.items.push(PageItem::Component(Component::Select(value.into()))); self
     }
+    /// Appends a Media Gallery containing at most ten media items.
     pub fn add_gallery(mut self, value: MediaGallery<T>) -> Self {
         self.items.push(PageItem::Component(Component::MediaGallery(value))); self
     }
+    /// Appends a reference to an attachment included in the outgoing message.
     pub fn add_file(mut self, value: File) -> Self {
         self.items.push(PageItem::Component(Component::File(value))); self
     }
+    /// Appends a dynamic region whose elements are resolved when the Page renders.
     pub fn add_frame(mut self, value: Frame<T>) -> Self {
         self.items.push(PageItem::Frame(value)); self
     }
+    /// Enables framework-managed pagination for dynamic Frame content.
     pub fn paginate(mut self) -> Self { self.paginate = true; self }
 
+    /// Validates and registers this definition. Registration consumes the builder;
+    /// a duplicate Page ID is an error.
     pub fn register(self, app: &App) -> anyhow::Result<RegisteredPage<T>>
     where
         T: Serialize + DeserializeOwned + Send + Sync + 'static
@@ -80,14 +103,18 @@ impl<T> RegisteredPage<T>
 where
     T: Serialize + DeserializeOwned + Send + Sync + 'static
 {
+    /// Returns the registered Page ID.
     pub fn id(&self) -> &str { &self.definition.id }
 
+    /// Resolves dynamic properties and Frames for one Page instance, persists
+    /// execution references, checks Discord limits, and returns one message.
     pub async fn render(&self, app: &App, data: T)
         -> anyhow::Result<RenderedMessage>
     {
         todo!("resolve values and Frames, validate, paginate, persist executions, build message")
     }
 
+    /// Renders the Page's complete Frame pagination and reports its current position.
     pub async fn render_pages(&self, app: &App, data: T)
         -> anyhow::Result<RenderedPage>
     {

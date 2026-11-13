@@ -1,75 +1,81 @@
-//! Static and asynchronous dynamic values share one property API.
-use std::future::Future;
 use std::sync::Arc;
-use crate::app::{BoxFuture,RenderCtx};
+use crate::app::RenderCtx;
+use crate::page::{dynamic, resolve, IntoSlot, IntoValue, Slot, Value, ButtonStyle, SeparatorSpacing};
+use super::support::{app, TestData};
 
-/// Explicit adapter for an asynchronous property callback. It avoids
-/// overlapping blanket trait implementations for arbitrary closures.
-pub struct Dynamic<F>(pub F);
-pub fn dynamic<F>(callback:F)->Dynamic<F> { Dynamic(callback) }
-
-pub enum Value<V,T> {
-    Static(V),
-    Dynamic(Arc<dyn Fn(RenderCtx,Arc<T>)
-        ->BoxFuture<'static,anyhow::Result<V>>+Send+Sync>),
-}
-pub trait IntoValue<V,T> { fn into_value(self)->Value<V,T>; }
-
-impl<T> IntoValue<String,T> for String {
-    fn into_value(self)->Value<String,T> { Value::Static(self) }
-}
-impl<T> IntoValue<String,T> for &'static str {
-    fn into_value(self)->Value<String,T> { Value::Static(self.to_owned()) }
-}
-impl<T> IntoValue<bool,T> for bool {
-    fn into_value(self)->Value<bool,T> { Value::Static(self) }
-}
-impl<T> IntoValue<u32,T> for u32 {
-    fn into_value(self)->Value<u32,T> { Value::Static(self) }
-}
-impl<T> IntoValue<super::component::ButtonStyle,T> for super::component::ButtonStyle {
-    fn into_value(self)->Value<super::component::ButtonStyle,T> { Value::Static(self) }
-}
-impl<T> IntoValue<super::component::SeparatorSpacing,T> for super::component::SeparatorSpacing {
-    fn into_value(self)->Value<super::component::SeparatorSpacing,T> { Value::Static(self) }
-}
-impl<V,T,F,Fut> IntoValue<V,T> for Dynamic<F>
-where
-    F:Fn(RenderCtx,Arc<T>)->Fut+Send+Sync+'static,
-    Fut:Future<Output=anyhow::Result<V>>+Send+'static,
-    V:Send+Sync+'static,T:Send+Sync+'static,{
-    fn into_value(self)->Value<V,T> {
-        Value::Dynamic(Arc::new(move |ctx,data|Box::pin((self.0)(ctx,data))))
-    }
+#[test]
+fn static_values_convert_without_a_special_constructor() {
+    // First-principles check: the ordinary Rust value is the public input.
+    let value: Value<String, TestData> = "hello".into_value();
+    assert!(matches!(value, Value::Static(text) if text == "hello"));
 }
 
-pub enum Slot<V,T> { Empty, Value(Value<V,T>) }
-pub trait IntoSlot<V,T> { fn into_slot(self)->Slot<V,T>; }
-
-impl<V,T> IntoSlot<V,T> for Option<Value<V,T>> {
-    fn into_slot(self)->Slot<V,T> {
-        match self { Some(value)=>Slot::Value(value),None=>Slot::Empty }
-    }
-}
-impl<T> IntoSlot<String,T> for String {
-    fn into_slot(self)->Slot<String,T> { Slot::Value(Value::Static(self)) }
-}
-impl<T> IntoSlot<String,T> for &'static str {
-    fn into_slot(self)->Slot<String,T> { Slot::Value(Value::Static(self.to_owned())) }
-}
-impl<V,T,F> IntoSlot<V,T> for Dynamic<F>
-where Dynamic<F>:IntoValue<V,T>
-{
-    fn into_slot(self)->Slot<V,T> { Slot::Value(self.into_value()) }
+#[test]
+fn supported_primitive_and_enum_values_convert_to_static_values() {
+    // First-principles check: properties accept their natural Rust value, not a
+    // manually constructed Value::Static wrapper.
+    let enabled: Value<bool, TestData> = true.into_value();
+    let color: Value<u32, TestData> = 0x336699.into_value();
+    let style: Value<ButtonStyle, TestData> = ButtonStyle::Primary.into_value();
+    let spacing: Value<SeparatorSpacing, TestData> = SeparatorSpacing::Large.into_value();
+    assert!(matches!(enabled, Value::Static(true)));
+    assert!(matches!(color, Value::Static(0x336699)));
+    assert!(matches!(style, Value::Static(ButtonStyle::Primary)));
+    assert!(matches!(spacing, Value::Static(SeparatorSpacing::Large)));
 }
 
-pub async fn resolve<V,T>(
-    value:&Value<V,T>,ctx:RenderCtx,data:Arc<T>
-)->anyhow::Result<V>
-where V:Clone
-{
-    match value {
-        Value::Static(value)=>Ok(value.clone()),
-        Value::Dynamic(callback)=>callback(ctx,data).await,
-    }
+#[tokio::test]
+async fn dynamic_values_resolve_with_page_data_and_render_context() {
+    // First-principles check: dynamic properties receive the shared Page data and
+    // App-linked context at render time.
+    let app = app();
+    let value: Value<String, TestData> = dynamic(
+        |ctx: RenderCtx, data: Arc<TestData>| async move {
+            assert_eq!(ctx.definition_id.as_ref(), "value-test");
+            let _db = ctx.app.db.clone();
+            Ok(format!("{}:{}", data.label, data.count))
+        },
+    ).into_value();
+
+    let result = resolve(&value, app.render_context("value-test"), Arc::new(TestData::default()))
+        .await
+        .unwrap();
+    assert_eq!(result, "sample:7");
+}
+
+#[tokio::test]
+async fn dynamic_value_errors_are_returned_without_being_replaced() {
+    // First-principles check: callers receive the original failure, not a
+    // fabricated value or an error whose source has been discarded.
+    let app = app();
+    let value: Value<String, TestData> = dynamic(
+        |_ctx: RenderCtx, _data: Arc<TestData>| async move {
+            Err(anyhow::anyhow!("dynamic lookup failed"))
+        },
+    ).into_value();
+
+    let error = resolve(&value, app.render_context("error-test"), Arc::new(TestData::default()))
+        .await
+        .unwrap_err();
+    assert_eq!(error.to_string(), "dynamic lookup failed");
+}
+
+#[test]
+fn optional_slot_converts_none_to_an_empty_slot() {
+    // First-principles check: an unused fixed Section slot can be written as
+    // ordinary None instead of exposing internal Slot or Value constructors.
+    let slot: Slot<String, TestData> = None.into_slot();
+    assert!(matches!(slot, Slot::Empty));
+}
+
+#[test]
+fn optional_slot_converts_static_and_dynamic_values() {
+    // First-principles check: fixed slots accept the same static/dynamic choices
+    // as ordinary component properties.
+    let static_slot: Slot<String, TestData> = "Title".into_slot();
+    let dynamic_slot: Slot<String, TestData> = dynamic(
+        |_ctx: RenderCtx, data: Arc<TestData>| async move { Ok(data.label.clone()) },
+    ).into_slot();
+    assert!(matches!(static_slot, Slot::Value(Value::Static(_))));
+    assert!(matches!(dynamic_slot, Slot::Value(Value::Dynamic(_))));
 }

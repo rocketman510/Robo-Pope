@@ -65,7 +65,7 @@ pub struct UserLevelInfo {
     user_id: String,
 }
 
-let page = Page::<UserLevelInfo>::new("UserLevel")
+let page = Page::<UserLevelInfo, MyDatabase>::new("UserLevel")
     .add_text(|ctx, data| async move {
         let user = ctx.app.db.users.query(data.user_id).await?;
         Ok(format!("Level: {}", user.level))
@@ -461,7 +461,7 @@ Unlike a dynamic property, which resolves one component value, a Frame resolves 
 This allows a Page to have a fixed structure while still displaying a dynamically generated list of components.
 
 ```rust
-Page::<UserListData>::new("UserList")
+Page::<UserListData, MyDatabase>::new("UserList")
     .add_text("# Users")
     .add_frame(|ctx, data| async move {
         let users = ctx.app.db.users.query_all().await?;
@@ -512,7 +512,7 @@ A Frame can contain more components than Discord permits in a single message.
 Rather than requiring developers to manually split their data into pages, the framework should automatically paginate the Frame's contents.
 
 ```rust
-Page::<UserListData>::new("UserList")
+Page::<UserListData, MyDatabase>::new("UserList")
     .add_text("# Users")
     .add_frame(|ctx, data| async move {
         let users = ctx.app.db.users.query_all().await?;
@@ -565,7 +565,7 @@ The Frame does not own the entire Page.
 Static elements before and after the Frame are part of the Page's fixed structure.
 
 ```rust
-Page::<UserListData>::new("UserList")
+Page::<UserListData, MyDatabase>::new("UserList")
     .add_text("# User Directory")
     .add_separator()
     .add_frame(dynamic_users)
@@ -624,7 +624,7 @@ pub struct EditUserData {
     user_id: String,
 }
 
-let modal = Modal::<EditUserData>::new("EditUser")
+let modal = Modal::<EditUserData, MyDatabase>::new("EditUser")
     .set_title("Edit User")
     .add_text_input(
         "username",
@@ -809,7 +809,7 @@ The context is temporary. It belongs to the current interaction and is never sto
 The App owns the registered Pages and Modals, the database, and the interaction router.
 
 ```rust
-struct App {
+struct App<E = ()> {
     db: Database,
     pages: PageRegistry,
     modals: ModalRegistry,
@@ -1014,7 +1014,7 @@ This order establishes the core execution and rendering model before adding the 
 The end result should make building a Discord interface mostly ordinary composition:
 
 ```rust
-let page = Page::<UserListData>::new("UserList")
+let page = Page::<UserListData, MyDatabase>::new("UserList")
     .add_container(
         Container::new()
             .add_text("# User Directory")

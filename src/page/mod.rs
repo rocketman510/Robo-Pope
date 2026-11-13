@@ -1,4 +1,7 @@
 //! Declarative Pages, Components V2, Frames, and Modals.
+//!
+//! `T` is the only Page/Modal data generic. Dynamic callbacks and interaction
+//! executions access application-wide state through App-linked contexts.
 pub mod builder;
 pub mod component;
 pub mod execution;

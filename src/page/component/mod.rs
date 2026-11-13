@@ -23,6 +23,8 @@ pub use text::Text;
 pub use thumbnail::Thumbnail;
 
 use crate::page::select::SelectMenu;
+/// Internal heterogeneous component tree shared by Page and Frame definitions.
+/// Thumbnail is deliberately excluded because it can only appear as a Section accessory.
 pub enum Component<T> {
     Text(Text<T>),
     Section(Section<T>),
