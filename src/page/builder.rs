@@ -124,7 +124,7 @@ fn register_component_executions<T>(
     frame_identity: Option<&str>,
 ) -> anyhow::Result<()>
 where
-    T: Serialize + DeserializeOwned + Send + Sync + 'static,
+    T: DeserializeOwned + Send + Sync + 'static,
 {
     use super::component::{ContainerItem, SectionAccessory};
     match component {
@@ -594,7 +594,7 @@ where
         definition_id: &str,
     ) -> anyhow::Result<()>
     where
-        T: Send + Sync + 'static,
+        T: DeserializeOwned + Send + Sync + 'static,
     {
         let (rendered, child_budget) = Box::pin(render_component(
             component, app, ctx, data, serialized_data, definition_id, key,
@@ -691,7 +691,7 @@ async fn render_component<T>(
     frame_identity: Option<&str>,
 ) -> anyhow::Result<(Vec<RenderedComponent>, ComponentBudget)>
 where
-    T: Send + Sync + 'static,
+    T: DeserializeOwned + Send + Sync + 'static,
 {
     use super::component::Component as C;
 
@@ -934,7 +934,7 @@ async fn render_component_list<T>(
     frame_identity: Option<&str>,
 ) -> anyhow::Result<(Vec<RenderedComponent>, ComponentBudget)>
 where
-    T: Send + Sync + 'static,
+    T: DeserializeOwned + Send + Sync + 'static,
 {
     let mut rendered = Vec::new();
     let mut budget = ComponentBudget::default();

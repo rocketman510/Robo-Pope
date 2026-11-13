@@ -374,7 +374,7 @@ where
         let data = Arc::new(data);
         let mut components = Vec::with_capacity(self.definition.inputs.len());
 
-        for input in &self.definition.inputs {
+        for (input_index, input) in self.definition.inputs.iter().enumerate() {
             let (id, label_value) = match input {
                 I::Text(v) => (&v.id, &v.label),
                 I::StringSelect(v) | I::UserSelect(v) | I::RoleSelect(v)
@@ -437,7 +437,7 @@ where
                         }
                         options.push(rendered_option);
                     }
-                    let kind = match input {
+                    let kind = match &self.definition.inputs[input_index] {
                         I::StringSelect(_) => CreateSelectMenuKind::String { options: options.into() },
                         I::UserSelect(_) => CreateSelectMenuKind::User { default_users: None },
                         I::RoleSelect(_) => CreateSelectMenuKind::Role { default_roles: None },

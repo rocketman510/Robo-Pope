@@ -212,7 +212,7 @@ fn extract_modal_submission(
             }
             LabelComponent::FileUpload(upload) => {
                 let id = upload.custom_id.to_string();
-                let mut attachments = Vec::with_capacity(upload.values.len());
+                let mut attachments = Vec::with_capacity(upload.values.len() as usize);
                 for attachment_id in &upload.values {
                     let attachment = modal.data.resolved.attachments.get(attachment_id)
                         .cloned()
