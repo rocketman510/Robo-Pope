@@ -29,7 +29,7 @@ pub fn app() -> App {
         db: Arc::new(Database::new(store)),
         pages: PageRegistry::default(),
         modals: ModalRegistry::default(),
-        http: Arc::new(serenity::http::HttpBuilder::new("Bot red-phase-test").build()),
+        http: Arc::new(serenity::http::HttpBuilder::without_token().build()),
         router: InteractionRouter::default(),
     }
 }

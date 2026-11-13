@@ -31,7 +31,7 @@ fn app_constructor_initializes_empty_registries_and_keeps_database() {
     // bypassing its responsibility with a hand-built App.
     let store: Arc<dyn Store> = Arc::new(MemoryStore::default());
     let db = Database::new(store);
-    let app = App::new(Arc::new(serenity::http::HttpBuilder::new("Bot red-phase-test").build()), db);
+    let app = App::new(Arc::new(serenity::http::HttpBuilder::without_token().build()), db);
     assert!(!app.pages.contains("missing-page"));
     assert!(!app.modals.contains("missing-modal"));
 }
