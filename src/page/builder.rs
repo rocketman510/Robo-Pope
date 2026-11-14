@@ -114,6 +114,30 @@ fn validate_component_ids<T, D>(
     Ok(())
 }
 
+fn static_component_count<T, D>(component: &Component<T, D>) -> usize {
+    use super::component::{Component as C, ContainerItem};
+    use super::value::Slot;
+
+    match component {
+        C::Button(_) | C::LinkButton(_) | C::Select(_) => 2,
+        C::ButtonRow(row) => 1 + row.populated(),
+        C::Section(section) => {
+            let text_count = [&section.text.0, &section.text.1, &section.text.2]
+                .iter()
+                .filter(|slot| matches!(slot, Slot::Value(_)))
+                .count();
+            1 + text_count + if section.accessory.is_some() { 1 } else { 0 }
+        }
+        C::Container(container) => {
+            1 + container.children.iter().map(|child| match child {
+                ContainerItem::Component(component) => static_component_count(component),
+                ContainerItem::Frame(_) => 0,
+            }).sum::<usize>()
+        }
+        C::Text(_) | C::Separator(_) | C::MediaGallery(_) | C::File(_) => 1,
+    }
+}
+
 fn register_component_executions<T, D>(
     component: &Component<T, D>,
     app: &App<D>,
@@ -398,6 +422,17 @@ impl<T, D> Page<T, D> {
         T: Serialize + DeserializeOwned + Send + Sync + 'static
     {
         anyhow::ensure!(!self.id.trim().is_empty(), "Page ID must not be empty");
+        let static_count = self.items.iter().map(|item| match item {
+            PageItem::Component(component) => static_component_count(component),
+            PageItem::Frame(_) => 0,
+        }).sum::<usize>();
+        anyhow::ensure!(
+            static_count <= super::limits::MESSAGE_MAX_COMPONENTS,
+            "Page '{}' contains {} static message components; maximum is {}",
+            self.id,
+            static_count,
+            super::limits::MESSAGE_MAX_COMPONENTS
+        );
         let mut execution_ids = HashSet::new();
         let mut frame_ids = HashSet::new();
         for item in &self.items {
@@ -609,6 +644,16 @@ where
             for option in &menu.options {
                 let label = super::value::resolve(&option.label, ctx.clone(), data.clone())
                     .await.context("Resolving String Select option label")?;
+                anyhow::ensure!(
+                    label.chars().count() <= super::limits::SELECT_OPTION_MAX_CHARS,
+                    "String Select option label exceeds {} characters",
+                    super::limits::SELECT_OPTION_MAX_CHARS
+                );
+                anyhow::ensure!(
+                    option.value.chars().count() <= super::limits::SELECT_OPTION_MAX_CHARS,
+                    "String Select option value exceeds {} characters",
+                    super::limits::SELECT_OPTION_MAX_CHARS
+                );
                 let disabled = super::value::resolve(
                     &option.disabled, ctx.clone(), data.clone()
                 ).await.context("Resolving String Select option disabled state")?;
@@ -621,6 +666,11 @@ where
                     let description = super::value::resolve(
                         description, ctx.clone(), data.clone()
                     ).await.context("Resolving String Select option description")?;
+                    anyhow::ensure!(
+                        description.chars().count() <= super::limits::SELECT_OPTION_MAX_CHARS,
+                        "String Select option description exceeds {} characters",
+                        super::limits::SELECT_OPTION_MAX_CHARS
+                    );
                     rendered = rendered.description(description);
                 }
                 if let Some(emoji) = &option.emoji {
@@ -708,6 +758,14 @@ where
             },
         ),
     };
+
+    if let Some(placeholder) = &placeholder {
+        anyhow::ensure!(
+            placeholder.chars().count() <= super::limits::SELECT_PLACEHOLDER_MAX_CHARS,
+            "Selection menu placeholder exceeds {} characters",
+            super::limits::SELECT_PLACEHOLDER_MAX_CHARS
+        );
+    }
 
     let custom_id = persist_select_execution(
         app, execution_id, definition_id, serialized_data, frame_identity,

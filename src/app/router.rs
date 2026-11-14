@@ -80,7 +80,7 @@ impl InteractionRouter {
         })?;
 
         let data: JsonValue = serde_json::from_slice(&record.serialized_data)
-            .map_err(|e| anyhow::anyhow!("Deserializing stored Page data: {e}"))?;
+            .map_err(|e| anyhow::anyhow!("Failed to deserialize stored Page data: {e}"))?;
 
         let selection = extract_selection(&component.data.kind, &component.data.resolved)?;
         let payload = if record.execution_id.starts_with("__frame:") {
@@ -157,7 +157,7 @@ impl InteractionRouter {
         })?;
 
         let data: JsonValue = serde_json::from_slice(&record.serialized_data)
-            .map_err(|e| anyhow::anyhow!("Deserializing stored Modal data: {e}"))?;
+            .map_err(|e| anyhow::anyhow!("Failed to deserialize stored Modal data: {e}"))?;
 
         let submission = extract_modal_submission(modal)?;
         let payload = InteractionPayload::Modal(submission);

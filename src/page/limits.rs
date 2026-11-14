@@ -30,8 +30,14 @@ pub const MODAL_MAX_TOP_LEVEL_COMPONENTS: usize = 5;
 pub const MODAL_LABEL_MAX_CHARS: usize = 45;
 /// Maximum Modal input Label description length.
 pub const MODAL_LABEL_DESCRIPTION_MAX_CHARS: usize = 100;
+/// Maximum Text Input placeholder length.
+pub const MODAL_TEXT_INPUT_PLACEHOLDER_MAX_CHARS: usize = 100;
 /// Maximum Text Input length.
 pub const MODAL_TEXT_INPUT_MAX_CHARS: usize = 4_000;
+/// Maximum select menu placeholder length.
+pub const SELECT_PLACEHOLDER_MAX_CHARS: usize = 150;
+/// Maximum String Select option label, value, or description length.
+pub const SELECT_OPTION_MAX_CHARS: usize = 100;
 /// Maximum options in a Modal Select.
 pub const MODAL_SELECT_MAX_OPTIONS: usize = 25;
 

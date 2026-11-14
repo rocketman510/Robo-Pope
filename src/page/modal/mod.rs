@@ -291,6 +291,16 @@ impl<T, D> Modal<T, D> {
         for input in &self.inputs {
             let (id, label) = match input {
                 ModalInput::Text(v) => {
+                    if let Some(Value::Static(placeholder)) = &v.placeholder {
+                        anyhow::ensure!(
+                            placeholder.chars().count()
+                                <= crate::page::limits::MODAL_TEXT_INPUT_PLACEHOLDER_MAX_CHARS,
+                            "Modal '{}' Text Input '{}' placeholder exceeds {} characters",
+                            self.id,
+                            v.id,
+                            crate::page::limits::MODAL_TEXT_INPUT_PLACEHOLDER_MAX_CHARS
+                        );
+                    }
                     if let Some(max) = v.max_length {
                         anyhow::ensure!(
                             max as usize <= crate::page::limits::MODAL_TEXT_INPUT_MAX_CHARS,
@@ -411,9 +421,9 @@ where
                             self.definition.id, input.id
                         ))?;
                         anyhow::ensure!(
-                            placeholder.chars().count() <= crate::page::limits::MODAL_LABEL_MAX_CHARS,
+                            placeholder.chars().count() <= crate::page::limits::MODAL_TEXT_INPUT_PLACEHOLDER_MAX_CHARS,
                             "Modal '{}' Text Input '{}' placeholder exceeds {} characters",
-                            self.definition.id, input.id, crate::page::limits::MODAL_LABEL_MAX_CHARS
+                            self.definition.id, input.id, crate::page::limits::MODAL_TEXT_INPUT_PLACEHOLDER_MAX_CHARS
                         );
                         builder = builder.placeholder(placeholder);
                     }
