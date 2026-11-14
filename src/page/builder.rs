@@ -381,6 +381,7 @@ impl<T, D> Page<T, D> {
         F: Fn(RenderCtx<D>, Arc<T>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = anyhow::Result<Vec<super::frame::Element<T, D>>>> + Send + 'static,
         T: Send + Sync + 'static,
+        D: Clone + Send + Sync + 'static,
     {
         let frame_id = format!("frame-{}", self.items.len());
         self.items.push(PageItem::Frame(Frame::new(frame_id, resolver)));
@@ -527,6 +528,7 @@ async fn render_link_button<T, D>(
 ) -> anyhow::Result<CreateButton<'static>>
 where
     T: Send + Sync + 'static,
+    D: Clone + Send + Sync + 'static,
 {
     let label = super::value::resolve(&button.label, ctx.clone(), data.clone())
         .await.context("Resolving Link Button label")?;
@@ -555,6 +557,7 @@ async fn render_button<T, D>(
 ) -> anyhow::Result<CreateButton<'static>>
 where
     T: Send + Sync + 'static,
+    D: Clone + Send + Sync + 'static,
 {
     let label = super::value::resolve(&button.label, ctx.clone(), data.clone())
         .await.with_context(|| format!("Resolving label for Button '{}'", button.id))?;
@@ -596,6 +599,7 @@ async fn render_select_menu<T, D>(
 ) -> anyhow::Result<CreateSelectMenu<'static>>
 where
     T: Send + Sync + 'static,
+    D: Clone + Send + Sync + 'static,
 {
     use super::select::SelectMenu as M;
 
@@ -728,6 +732,7 @@ async fn render_media_gallery<T, D>(
 ) -> anyhow::Result<CreateMediaGallery<'static>>
 where
     T: Send + Sync + 'static,
+    D: Clone + Send + Sync + 'static,
 {
     anyhow::ensure!(
         !gallery.items.is_empty(),
@@ -778,6 +783,7 @@ async fn render_container<T, D>(
 ) -> anyhow::Result<(CreateContainer<'static>, ComponentBudget)>
 where
     T: DeserializeOwned + Send + Sync + 'static,
+    D: Clone + Send + Sync + 'static,
 {
     use super::component::{Component as C, ContainerItem};
 
@@ -785,7 +791,7 @@ where
     let mut budget = ComponentBudget::default();
 
     async fn append_component<T, D>(
-        component: &C<T>,
+        component: &C<T, D>,
         key: Option<&str>,
         children: &mut Vec<CreateContainerComponent<'static>>,
         budget: &mut ComponentBudget,
@@ -797,6 +803,7 @@ where
     ) -> anyhow::Result<()>
     where
         T: DeserializeOwned + Send + Sync + 'static,
+        D: Clone + Send + Sync + 'static,
     {
         let (rendered, child_budget) = Box::pin(render_component(
             component, app, ctx, data, serialized_data, definition_id, key,
@@ -895,6 +902,7 @@ async fn render_component<T, D>(
 ) -> anyhow::Result<(Vec<RenderedComponent>, ComponentBudget)>
 where
     T: DeserializeOwned + Send + Sync + 'static,
+    D: Clone + Send + Sync + 'static,
 {
     use super::component::Component as C;
 
@@ -1148,6 +1156,7 @@ async fn render_component_list<T, D>(
 ) -> anyhow::Result<(Vec<RenderedComponent>, ComponentBudget)>
 where
     T: DeserializeOwned + Send + Sync + 'static,
+    D: Clone + Send + Sync + 'static,
 {
     let mut rendered = Vec::new();
     let mut budget = ComponentBudget::default();
@@ -1190,6 +1199,7 @@ async fn render_frame_elements<T, D>(
 ) -> anyhow::Result<Vec<RenderedFrameElement>>
 where
     T: DeserializeOwned + Send + Sync + 'static,
+    D: Clone + Send + Sync + 'static,
 {
     validate_frame_elements(elements, frame_id)?;
     let mut rendered = Vec::with_capacity(elements.len());
@@ -1315,6 +1325,7 @@ async fn render_page_items<T, D>(
 ) -> anyhow::Result<(Vec<RenderedComponent>, ComponentBudget)>
 where
     T: DeserializeOwned + Send + Sync + 'static,
+    D: Clone + Send + Sync + 'static,
 {
     let mut rendered = Vec::new();
     let mut budget = ComponentBudget::default();
@@ -1349,7 +1360,7 @@ where
 }
 
 async fn render_container_items<T, D>(
-    items: &[super::component::ContainerItem<T>],
+    items: &[super::component::ContainerItem<T, D>],
     app: &App<D>,
     ctx: &RenderCtx<D>,
     data: &Arc<T>,
@@ -1358,6 +1369,7 @@ async fn render_container_items<T, D>(
 ) -> anyhow::Result<(Vec<RenderedComponent>, ComponentBudget)>
 where
     T: DeserializeOwned + Send + Sync + 'static,
+    D: Clone + Send + Sync + 'static,
 {
     use super::component::ContainerItem;
     let mut rendered = Vec::new();
@@ -1475,6 +1487,7 @@ async fn render_paginated_container<T, D>(
 ) -> anyhow::Result<RenderedPage>
 where
     T: DeserializeOwned + Send + Sync + 'static,
+    D: Clone + Send + Sync + 'static,
 {
     use super::component::ContainerItem;
 
