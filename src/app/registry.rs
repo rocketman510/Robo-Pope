@@ -14,7 +14,7 @@ pub struct PageRegistry<D = Arc<()>> {
     marker: std::marker::PhantomData<fn() -> D>,
 }
 impl<D> Clone for PageRegistry<D> {
-    fn clone(&self) -> Self { Self { entries: self.entries.clone() } }
+    fn clone(&self) -> Self { Self { entries: self.entries.clone(), marker: std::marker::PhantomData } }
 }
 impl<D> Default for PageRegistry<D> {
     fn default() -> Self {
@@ -60,7 +60,7 @@ pub struct ModalRegistry<D = Arc<()>> {
     marker: std::marker::PhantomData<fn() -> D>,
 }
 impl<D> Clone for ModalRegistry<D> {
-    fn clone(&self) -> Self { Self { entries: self.entries.clone() } }
+    fn clone(&self) -> Self { Self { entries: self.entries.clone(), marker: std::marker::PhantomData } }
 }
 impl<D> Default for ModalRegistry<D> {
     fn default() -> Self {
