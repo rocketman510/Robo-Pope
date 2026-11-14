@@ -1,7 +1,7 @@
 //! Declarative Pages, Components V2, Frames, and Modals.
 //!
-//! `T` is the only Page/Modal data generic. Dynamic callbacks and interaction
-//! executions access application-wide state through App-linked contexts.
+//! `T` is the serialized Page/Modal data type and `D` is the concrete host
+//! database type carried by App-scoped builders and every callback context.
 pub mod builder;
 pub mod component;
 pub mod execution;
@@ -21,4 +21,4 @@ pub use frame::{Element,Frame,FrameIdentity};
 pub use modal::{Modal,ModalInput,ModalOption,ModalRender,ModalSubmission,RegisteredModal,SubmittedValue,TextInputStyle};
 pub use render::{OutgoingAttachment,RenderedComponent,RenderedMessage,RenderedPage};
 pub use select::{ChannelSelect,MentionableSelect,RoleSelect,SelectMenu,SelectOption,StringSelect,UserSelect};
-pub use value::{dynamic,resolve,Dynamic,IntoSlot,IntoValue,Slot,Value};
+pub use value::{dynamic, dynamic_for, resolve, Dynamic, IntoSlot, IntoValue, Slot, Value};
