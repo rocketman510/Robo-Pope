@@ -286,3 +286,42 @@ fn static_string_select_option_description_over_100_characters_is_rejected_at_re
 
     assert!(page.register(&app).is_err());
 }
+
+
+#[tokio::test]
+async fn channel_select_callback_receives_the_resolved_channel_entity() {
+    // Page API §6: Channel Select callbacks receive both the channel ID and
+    // the resolved entity supplied in Discord's interaction payload.
+    use crate::app::store::derive_custom_id;
+    use crate::page::{ChannelSelect, SelectedChannel};
+    use super::support::channel_select_interaction;
+
+    let app = app();
+    let page = Page::<TestData>::new("channel-select-resolved")
+        .add_selection_menu(ChannelSelect::new(
+            "choose-channel",
+            |_ctx, _data: TestData, selected: Vec<SelectedChannel>| async move {
+                assert_eq!(selected.len(), 1);
+                assert_eq!(selected[0].id.get(), 300);
+                assert!(
+                    selected[0].resolved.is_some(),
+                    "router must preserve the resolved channel object from the interaction",
+                );
+                Ok(())
+            },
+        ))
+        .register(&app)
+        .unwrap();
+
+    let data = TestData::default();
+    let custom_id = derive_custom_id(
+        "channel-select-resolved",
+        "choose-channel",
+        &serde_json::to_vec(&data).unwrap(),
+    ).unwrap();
+
+    page.render(&app, data).await.unwrap();
+    app.dispatch_interaction(channel_select_interaction(&custom_id.0))
+        .await
+        .unwrap();
+}
