@@ -28,7 +28,7 @@ async fn component_dispatch_restores_page_data_and_invokes_the_registered_callba
     let flag = called.clone();
     let data = TestData { label: "restored".into(), count: 42 };
     let serialized = serde_json::to_vec(&data).unwrap();
-    let custom_id = derive_custom_id("execution-dispatch", "go", &serialized, None).unwrap();
+    let custom_id = derive_custom_id("execution-dispatch", "go", &serialized).unwrap();
     let page = Page::<TestData>::new("execution-dispatch")
         .add_button_row((Button::new("Go", "go", ButtonStyle::Primary,
             Some("➡️".into()), false, move |_ctx, received: TestData| {
@@ -88,7 +88,7 @@ async fn gateway_handler_forwards_interaction_create_to_app_dispatch() {
     let flag = called.clone();
     let data = TestData::default();
     let serialized = serde_json::to_vec(&data).unwrap();
-    let custom_id = derive_custom_id("handler-dispatch", "click", &serialized, None).unwrap();
+    let custom_id = derive_custom_id("handler-dispatch", "click", &serialized).unwrap();
     let page = Page::<TestData>::new("handler-dispatch")
         .add_button_row((Button::new("Click", "click", ButtonStyle::Secondary,
             None, false, move |_ctx, _data: TestData| {
