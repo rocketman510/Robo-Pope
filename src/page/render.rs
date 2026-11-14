@@ -78,13 +78,13 @@ impl RenderedMessage {
 
 /// Validates a resolved component tree against the Discord component and text budgets.
 /// Validation occurs after dynamic properties and Frame contents have been expanded.
-pub(crate) fn validate_component<T>(
-    _component:&super::component::Component<T>
+pub(crate) fn validate_component<T, D>(
+    _component:&super::component::Component<T, D>
 )->anyhow::Result<()> {
     use super::component::{Component, ContainerItem, SectionAccessory};
     use super::value::{Slot, Value};
 
-    fn text_chars<T>(value: &super::value::Value<String, T>) -> usize {
+    fn text_chars<T, D>(value: &super::value::Value<String, T, D>) -> usize {
         match value {
             Value::Static(text) => text.chars().count(),
             Value::Dynamic(_) => 0, // The resolved value is checked during rendering.
