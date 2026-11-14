@@ -9,15 +9,15 @@ pub enum ButtonSlot<T, D = std::sync::Arc<()>> {
     Empty,
 }
 
-impl<T> From<Button<T, D>> for ButtonSlot<T, D> {
+impl<T, D> From<Button<T, D>> for ButtonSlot<T, D> {
     fn from(value: Button<T, D>) -> Self { Self::Button(value) }
 }
 
-impl<T> From<LinkButton<T, D>> for ButtonSlot<T, D> {
+impl<T, D> From<LinkButton<T, D>> for ButtonSlot<T, D> {
     fn from(value: LinkButton<T, D>) -> Self { Self::LinkButton(value) }
 }
 
-impl<T> From<Option<Button<T, D>>> for ButtonSlot<T, D> {
+impl<T, D> From<Option<Button<T, D>>> for ButtonSlot<T, D> {
     fn from(value: Option<Button<T, D>>) -> Self {
         value.map(Self::Button).unwrap_or(Self::Empty)
     }
@@ -25,17 +25,17 @@ impl<T> From<Option<Button<T, D>>> for ButtonSlot<T, D> {
 
 /// Exactly five positions, each accepting a Button, LinkButton, or None.
 pub type ButtonSlots<T, D = std::sync::Arc<()>> = (
-    ButtonSlot<T>,
-    ButtonSlot<T>,
-    ButtonSlot<T>,
-    ButtonSlot<T>,
-    ButtonSlot<T>,
+    ButtonSlot<T, D>,
+    ButtonSlot<T, D>,
+    ButtonSlot<T, D>,
+    ButtonSlot<T, D>,
+    ButtonSlot<T, D>,
 );
 
 /// A Button Action Row. At least one and at most five slots must be populated.
 pub struct ButtonRow<T, D = std::sync::Arc<()>> {
     /// The five possible Button positions in their rendered order.
-    pub slots: ButtonSlots<T>,
+    pub slots: ButtonSlots<T, D>,
 }
 
 impl<T, D> ButtonRow<T, D> {
