@@ -30,7 +30,7 @@ use robo_pope::{
 };
 use serde::{Deserialize, Serialize};
 use serenity::{
-    all::{ApplicationId, Http, Interaction},
+    all::{ApplicationId, Interaction},
     http::HttpBuilder,
 };
 use tokio::{
