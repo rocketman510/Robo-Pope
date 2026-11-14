@@ -1,21 +1,14 @@
-# Compile fixes applied on rewrite/rust-red-tests
+# Test compile notes
 
-## Already on branch
+The RED suite is organized around `spec/Page API.md`. It intentionally describes the target public API, which may differ from the unfinished implementation on this branch.
 
-`src/app/router.rs` uses `custom_id.to_string()` for Serenity `FixedString`.
+Compile the test crate before evaluating runtime RED failures. A compiler error is not an acceptable RED result. In particular, keep fixtures and imports synchronized with the public Page API contracts for:
 
-## If contract_audit.rs still fails to compile after pull
+- Generic `App<D>` and direct host database access.
+- Four-field routing records and SQLite Store persistence.
+- Complete Button and LinkButton property configuration.
+- Five-slot Button rows with direct values and `None`.
+- Dynamic Frame callbacks without implicit pagination.
+- Modal Label-wrapped inputs and typed submission values.
 
-The interaction fixtures must use normal JSON quotes inside `r#"..."#`, not `\"`.
-
-Also avoid `{result:?}` on `RenderedMessage` (no `Debug`) and avoid `.clone()` on it (no `Clone` on the outer message in some builds — use `into_parts()` once).
-
-T-02 tests should expect `Err` from Ctx methods, not `should_panic` on `todo!()`.
-
-Pull latest and if `contract_audit.rs` still has `\"type\"` in fixtures, replace with `"type"` (run):
-
-```bash
-sed -i 's/\\"/"/g' src/tests/contract_audit.rs
-```
-
-Then `cargo test` should **compile**. Many contract tests will still **fail** (RED) until GREEN finishes.
+The suite has not been marked GREEN by this note. Run the full test suite after the implementation has been updated to the current contract.
