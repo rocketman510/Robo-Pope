@@ -406,6 +406,32 @@ fn modal_rejects_a_static_text_input_placeholder_over_one_hundred_characters_at_
 }
 
 #[tokio::test]
+async fn modal_text_input_placeholder_accepts_the_full_one_hundred_character_limit() {
+    // FIRST: a 100-character Text Input placeholder is valid. This distinguishes
+    // Discord's placeholder limit from the shorter Label text limit.
+    let app = app();
+    let modal = Modal::<TestData>::new("modal-max-placeholder")
+        .set_title("Placeholder")
+        .add_input(ModalInput::Text(TextInput {
+            id: "field".into(),
+            label: Value::Static("Field".into()),
+            style: TextInputStyle::Short,
+            required: true,
+            placeholder: Some(Value::Static("x".repeat(100))),
+            min_length: None,
+            max_length: None,
+        }))
+        .on_submit(|_ctx, _data, _submission: ModalSubmission| async move { Ok(()) })
+        .register(&app)
+        .unwrap();
+
+    let rendered = modal.render(&app, TestData::default()).await.unwrap();
+    let payload = serde_json::to_value(&rendered.components).unwrap();
+    let input = &payload[0]["component"];
+    assert_eq!(input["placeholder"].as_str().unwrap().chars().count(), 100);
+}
+
+#[tokio::test]
 async fn modal_rejects_a_dynamic_text_input_placeholder_over_one_hundred_characters_after_resolution() {
     // FIRST: dynamically resolved placeholders are checked before the Modal
     // response is constructed, using the same 100-character limit.
