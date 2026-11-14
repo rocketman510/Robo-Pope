@@ -90,7 +90,7 @@ impl<D> ExecutionRegistry<D> {
 }
 
 /// Builds a Ctx for a routed interaction.
-pub fn make_ctx<D: Send + Sync + 'static>(
+pub fn make_ctx<D: Clone + Send + Sync + 'static>(
     app: &App<D>,
     interaction: Interaction,
     selection: Option<Selection>,
