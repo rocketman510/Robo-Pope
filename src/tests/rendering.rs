@@ -117,7 +117,10 @@ async fn page_render_persists_button_execution_identity_and_page_data() {
         .register(&app)
         .unwrap();
 
-    let _rendered = page.render(&app, data).await.unwrap();
+    let rendered = page.render(&app, data).await.unwrap();
+    assert!(expected_id.0.len() <= 100, "generated custom_id must fit Discord's limit");
+    let payload = serde_json::to_value(rendered.into_components()).unwrap().to_string();
+    assert!(payload.contains(&expected_id.0), "rendered Button must contain its stored custom_id");
     let record = app.store()
         .resolve(&expected_id)
         .await
