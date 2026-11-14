@@ -190,7 +190,7 @@ async fn all_entity_select_kinds_render_their_discord_component_types() {
 }
 
 #[tokio::test]
-async fn legacy_page_user_select_coverage_is_part_of_the_selection_contract() {
+async fn page_user_select_renders_with_placeholder() {
     // FIRST: a Page-level User Select is a supported message component.
     use crate::page::UserSelect;
     let app = app();
