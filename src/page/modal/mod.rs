@@ -361,7 +361,7 @@ where
     /// invalid resolved component cannot leave an orphaned custom-ID record.
     pub async fn render(&self, app: &App<D>, data: T) -> Result<ModalRender>
     where
-        D: Clone + std::any::Any + Send + Sync + 'static,
+        D: Clone + Send + Sync + 'static,
     {
         use self::input::ModalInput as I;
 
