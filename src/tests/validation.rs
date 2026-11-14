@@ -1,6 +1,6 @@
 use crate::page::component::Component;
 use crate::page::render::validate_component;
-use crate::page::{Container, MediaGallery, MediaItem, Page, Section, Text, Thumbnail};
+use crate::page::{Button, ButtonStyle, Container, LinkButton, MediaGallery, MediaItem, Page, Section, Text, Thumbnail};
 use super::support::app;
 
 #[test]
@@ -151,4 +151,86 @@ fn validator_rejects_a_media_gallery_description_over_1024_characters() {
             .set_description("x".repeat(1_025)),
     );
     assert!(validate_component(&Component::MediaGallery(gallery)).is_err());
+}
+
+
+#[test]
+fn registration_rejects_a_static_button_label_over_eighty_characters() {
+    // Page API §13: Discord Button labels are limited to 80 characters.
+    // Page API §12: a static violation is rejected during registration.
+    let app = app();
+    let page = Page::<()>::new("static-button-label-too-long").add_button(
+        Button::new(
+            "x".repeat(81),
+            "open",
+            ButtonStyle::Primary,
+            None,
+            false,
+            |_ctx, _data: ()| async move { Ok(()) },
+        ),
+    );
+
+    assert!(page.register(&app).is_err());
+}
+
+#[tokio::test]
+async fn rendering_rejects_a_dynamic_button_label_over_eighty_characters() {
+    // Page API §§2, 12, and 13: validate a dynamic property after resolution.
+    let app = app();
+    let page = Page::<()>::new("dynamic-button-label-too-long")
+        .add_button(Button::new(
+            |_ctx: crate::app::RenderCtx<std::sync::Arc<()>>, _data: std::sync::Arc<()>| async move {
+                Ok("x".repeat(81))
+            },
+            "open",
+            ButtonStyle::Primary,
+            None,
+            false,
+            |_ctx, _data: ()| async move { Ok(()) },
+        ))
+        .register(&app)
+        .unwrap();
+
+    assert!(page.render(&app, ()).await.is_err());
+}
+
+#[test]
+fn registration_rejects_a_static_link_button_label_over_eighty_characters() {
+    // Page API §13 applies the Button label limit to Link Buttons as well.
+    let app = app();
+    let page = Page::<()>::new("static-link-label-too-long").add_link_button(
+        LinkButton::new("x".repeat(81), "https://example.test/", None, false),
+    );
+
+    assert!(page.register(&app).is_err());
+}
+
+#[test]
+fn registration_rejects_a_static_link_button_url_over_five_hundred_twelve_characters() {
+    // Page API §§12-13: the static Link Button URL limit is known at registration.
+    let app = app();
+    let url = format!("https://example.test/{}", "x".repeat(500));
+    let page = Page::<()>::new("static-link-url-too-long")
+        .add_link_button(LinkButton::new("Docs", url, None, false));
+
+    assert!(page.register(&app).is_err());
+}
+
+#[tokio::test]
+async fn rendering_rejects_a_dynamic_link_button_url_over_five_hundred_twelve_characters() {
+    // Page API §§2, 12, and 13: a dynamic Link Button URL is checked after resolution.
+    let app = app();
+    let page = Page::<()>::new("dynamic-link-url-too-long")
+        .add_link_button(LinkButton::new(
+            "Docs",
+            |_ctx: crate::app::RenderCtx<std::sync::Arc<()>>, _data: std::sync::Arc<()>| async move {
+                Ok(format!("https://example.test/{}", "x".repeat(500)))
+            },
+            None,
+            false,
+        ))
+        .register(&app)
+        .unwrap();
+
+    assert!(page.render(&app, ()).await.is_err());
 }
