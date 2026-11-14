@@ -1,5 +1,6 @@
 //! Heterogeneous registries; concrete T is retained by typed query handles.
 use std::any::Any;
+use std::sync::Arc;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use crate::page::{PageDefinition, RegisteredPage};
@@ -9,20 +10,21 @@ use crate::page::modal::{ModalDefinition, RegisteredModal};
 ///
 /// The registry erases types internally; callers recover the concrete type
 /// through query::<T>. Registering an existing ID is an error, not replacement.
-pub struct PageRegistry {
+pub struct PageRegistry<D = Arc<()>> {
     entries: Arc<RwLock<HashMap<String, Arc<dyn Any + Send + Sync>>>>,
+    marker: std::marker::PhantomData<fn() -> D>,
 }
-impl Clone for PageRegistry {
+impl<D> Clone for PageRegistry<D> {
     fn clone(&self) -> Self { Self { entries: self.entries.clone() } }
 }
-impl Default for PageRegistry {
+impl<D> Default for PageRegistry<D> {
     fn default() -> Self {
-        Self { entries: Arc::new(RwLock::new(HashMap::new())) }
+        Self { entries: Arc::new(RwLock::new(HashMap::new())), marker: std::marker::PhantomData }
     }
 }
-impl PageRegistry {
+impl<D: Send + Sync + 'static> PageRegistry<D> {
     /// Inserts an immutable Page definition, rejecting an already-registered ID.
-    pub fn insert<T: Send + Sync + 'static>(&self, definition: Arc<PageDefinition<T>>) -> anyhow::Result<()> {
+    pub fn insert<T: Send + Sync + 'static>(&self, definition: Arc<PageDefinition<T, D>>) -> anyhow::Result<()> {
         let id = definition.id.clone();
         let mut entries = self.entries.write()
             .map_err(|_| anyhow::anyhow!("Page registry lock was poisoned"))?;
@@ -32,13 +34,13 @@ impl PageRegistry {
     }
     /// Retrieves a Page by ID and verifies that its stored data type is T.
     /// Returns an error for an unknown ID or a type mismatch.
-    pub fn query<T: Send + Sync + 'static>(&self, id: &str) -> anyhow::Result<RegisteredPage<T>> {
+    pub fn query<T: Send + Sync + 'static>(&self, id: &str) -> anyhow::Result<RegisteredPage<T, D>> {
         let entries = self.entries.read()
             .map_err(|_| anyhow::anyhow!("Page registry lock was poisoned"))?;
         let definition = entries.get(id)
             .cloned()
             .ok_or_else(|| anyhow::anyhow!("No Page is registered with ID: {id}"))?;
-        let definition = Arc::downcast::<PageDefinition<T>>(definition)
+        let definition = Arc::downcast::<PageDefinition<T, D>>(definition)
             .map_err(|_| anyhow::anyhow!("Page '{id}' was registered with a different data type"))?;
         Ok(RegisteredPage { definition })
     }
@@ -54,20 +56,21 @@ impl PageRegistry {
 ///
 /// Duplicate IDs are rejected. Typed queries fail rather than returning a
 /// Modal definition whose data type differs from the requested type.
-pub struct ModalRegistry {
+pub struct ModalRegistry<D = Arc<()>> {
     entries: Arc<RwLock<HashMap<String, Arc<dyn Any + Send + Sync>>>>,
+    marker: std::marker::PhantomData<fn() -> D>,
 }
-impl Clone for ModalRegistry {
+impl<D> Clone for ModalRegistry<D> {
     fn clone(&self) -> Self { Self { entries: self.entries.clone() } }
 }
-impl Default for ModalRegistry {
+impl<D> Default for ModalRegistry<D> {
     fn default() -> Self {
-        Self { entries: Arc::new(RwLock::new(HashMap::new())) }
+        Self { entries: Arc::new(RwLock::new(HashMap::new())), marker: std::marker::PhantomData }
     }
 }
-impl ModalRegistry {
+impl<D: Send + Sync + 'static> ModalRegistry<D> {
     /// Inserts an immutable Modal definition, rejecting an already-registered ID.
-    pub fn insert<T: Send + Sync + 'static>(&self, definition: Arc<ModalDefinition<T>>) -> anyhow::Result<()> {
+    pub fn insert<T: Send + Sync + 'static>(&self, definition: Arc<ModalDefinition<T, D>>) -> anyhow::Result<()> {
         let id = definition.id.clone();
         let mut entries = self.entries.write()
             .map_err(|_| anyhow::anyhow!("Modal registry lock was poisoned"))?;
@@ -77,13 +80,13 @@ impl ModalRegistry {
     }
     /// Retrieves a Modal by ID and verifies that its stored data type is T.
     /// Returns an error for an unknown ID or a type mismatch.
-    pub fn query<T: Send + Sync + 'static>(&self, id: &str) -> anyhow::Result<RegisteredModal<T>> {
+    pub fn query<T: Send + Sync + 'static>(&self, id: &str) -> anyhow::Result<RegisteredModal<T, D>> {
         let entries = self.entries.read()
             .map_err(|_| anyhow::anyhow!("Modal registry lock was poisoned"))?;
         let definition = entries.get(id)
             .cloned()
             .ok_or_else(|| anyhow::anyhow!("No Modal is registered with ID: {id}"))?;
-        let definition = Arc::downcast::<ModalDefinition<T>>(definition)
+        let definition = Arc::downcast::<ModalDefinition<T, D>>(definition)
             .map_err(|_| anyhow::anyhow!("Modal '{id}' was registered with a different data type"))?;
         Ok(RegisteredModal { definition })
     }
