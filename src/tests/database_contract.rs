@@ -60,10 +60,9 @@ async fn dynamic_property_and_execution_callbacks_read_named_host_database_field
     // FIRST: App<D> keeps its concrete host database type all the way into both
     // render-time and interaction-time callbacks.
     use std::sync::atomic::{AtomicBool, Ordering};
-    use crate::app::RenderCtx;
     use crate::app::store::derive_custom_id;
     use crate::page::{Button, ButtonStyle, Page};
-    use crate::tests::support::{component_interaction, TestData};
+    use super::support::{component_interaction, TestData};
 
     let database = Arc::new(HostDatabase {
         messages: Arc::from("message repository"),
