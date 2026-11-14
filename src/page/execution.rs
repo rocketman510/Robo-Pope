@@ -159,5 +159,5 @@ pub enum SelectedMentionable { User(SelectedUser), Role(SelectedRole) }
 #[derive(Debug, Clone)]
 pub struct SelectedChannel {
     pub id: serenity::all::ChannelId,
-    pub resolved: Option<Arc<serenity::all::PartialChannel>>,
+    pub resolved: Option<Arc<serenity::all::GenericInteractionChannel>>,
 }
