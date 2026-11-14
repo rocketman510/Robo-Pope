@@ -11,7 +11,7 @@ use std::sync::{Arc, RwLock};
 use serde_json::Value as JsonValue;
 use serenity::all::Interaction;
 
-use crate::app::{App, BoxFuture, Ctx, Database};
+use crate::app::{App, BoxFuture, Ctx};
 use crate::page::{ModalSubmission, Selection};
 use crate::page::frame::pagination::PaginationRequest;
 
@@ -31,20 +31,20 @@ pub enum InteractionPayload {
     Pagination(PaginationRequest),
 }
 
-pub(crate) type ErasedCallback = Arc<
-    dyn Fn(Ctx<Database>, JsonValue, InteractionPayload) -> BoxFuture<'static, anyhow::Result<()>>
+pub(crate) type ErasedCallback<D = Arc<()>> = Arc<
+    dyn Fn(Ctx<D>, JsonValue, InteractionPayload) -> BoxFuture<'static, anyhow::Result<()>>
         + Send
         + Sync,
 >;
 
 /// Process-local map from (definition_id, execution_id) to a type-erased callback.
 #[derive(Clone, Default)]
-pub struct ExecutionRegistry {
-    entries: Arc<RwLock<HashMap<ExecutionKey, ErasedCallback>>>,
+pub struct ExecutionRegistry<D = Arc<()>> {
+    entries: Arc<RwLock<HashMap<ExecutionKey, ErasedCallback<D>>>>,
 }
 
-impl ExecutionRegistry {
-    pub fn insert(&self, key: ExecutionKey, callback: ErasedCallback) -> anyhow::Result<()> {
+impl<D> ExecutionRegistry<D> {
+    pub fn insert(&self, key: ExecutionKey, callback: ErasedCallback<D>) -> anyhow::Result<()> {
         let mut entries = self
             .entries
             .write()
@@ -74,7 +74,7 @@ impl ExecutionRegistry {
         }
     }
 
-    pub fn get(&self, key: &ExecutionKey) -> Option<ErasedCallback> {
+    pub fn get(&self, key: &ExecutionKey) -> Option<ErasedCallback<D>> {
         self.entries
             .read()
             .ok()
@@ -90,10 +90,10 @@ impl ExecutionRegistry {
 }
 
 /// Builds a Ctx for a routed interaction.
-pub fn make_ctx(
-    app: &App<Database>,
+pub fn make_ctx<D: Send + Sync + 'static>(
+    app: &App<D>,
     interaction: Interaction,
     selection: Option<Selection>,
-) -> Ctx<Database> {
+) -> Ctx<D> {
     Ctx::new(app.clone(), Arc::new(interaction), selection)
 }
