@@ -53,3 +53,32 @@ pub fn modal_submit_interaction(custom_id: &str) -> serenity::all::Interaction {
     }}"#);
     serde_json::from_str(&payload).expect("Modal submit fixture must deserialize")
 }
+
+
+pub fn channel_select_interaction(custom_id: &str) -> serenity::all::Interaction {
+    let mut interaction = component_interaction(custom_id);
+    if let serenity::all::Interaction::Component(component) = &mut interaction {
+        component.data.kind = serde_json::from_value(serde_json::json!({
+            "component_type": 8,
+            "values": ["300"]
+        })).expect("Channel Select kind must deserialize");
+
+        component.data.resolved = serde_json::from_value(serde_json::json!({
+            "channels": {
+                "300": {
+                    "id": "300",
+                    "type": 0,
+                    "guild_id": "100",
+                    "name": "resolved-channel",
+                    "position": 0,
+                    "topic": null,
+                    "nsfw": false,
+                    "parent_id": null
+                }
+            }
+        })).expect("resolved channel fixture must deserialize");
+    } else {
+        panic!("the shared component fixture must be a Component interaction");
+    }
+    interaction
+}
