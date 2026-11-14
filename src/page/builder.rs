@@ -237,6 +237,7 @@ fn register_pagination_callbacks<T, D>(
 ) -> anyhow::Result<()>
 where
     T: Serialize + DeserializeOwned + Send + Sync + 'static,
+    D: Clone + Send + Sync + 'static,
 {
     for frame_id in frame_ids {
         for direction in ["previous", "next"] {
@@ -377,7 +378,6 @@ impl<T, D> Page<T, D> {
     /// Appends a dynamic region whose elements are resolved when the Page renders.
     pub fn add_frame<F, Fut>(mut self, resolver: F) -> Self
     where
-        D: Send + Sync + 'static,
         F: Fn(RenderCtx<D>, Arc<T>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = anyhow::Result<Vec<super::frame::Element<T, D>>>> + Send + 'static,
         T: Send + Sync + 'static,
