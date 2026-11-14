@@ -1,15 +1,15 @@
-//! Container with ordered children, optional dynamic accent, spoiler, and Frames.
+//! Container with ordered component children, optional dynamic accent, and spoiler.
 use crate::page::select::SelectMenu;
 use crate::page::value::{IntoValue, Value};
 use super::{Button, ButtonRow, ButtonSlot, Component, File, LinkButton, MediaGallery,
     Section, Separator, Text};
 
-/// An ordered Container child, either a component or a dynamically expanded Frame.
+/// A component child in a Container.
 pub enum ContainerItem<T, D = std::sync::Arc<()>> {
     Component(Component<T, D>),
 }
 
-/// Discord Container. Children remain in insertion order, including Frame entries.
+/// Discord Container. Children remain in insertion order.
 pub struct Container<T, D = std::sync::Arc<()>> {
     /// Optional accent color resolved when the Page renders.
     pub accent_color: Option<Value<u32, T, D>>,
@@ -98,5 +98,4 @@ impl<T, D> Container<T, D> {
         self.children.push(ContainerItem::Component(Component::File(value)));
         self
     }
-
 }
