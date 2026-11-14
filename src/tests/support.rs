@@ -53,4 +53,3 @@ pub fn modal_submit_interaction(custom_id: &str) -> serenity::all::Interaction {
     }}"#);
     serde_json::from_str(&payload).expect("Modal submit fixture must deserialize")
 }
-
