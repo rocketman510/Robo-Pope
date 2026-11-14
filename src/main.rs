@@ -14,10 +14,10 @@ use serenity::{
 };
 
 use robo_pope::{
-    app::{store::{FileStore, Store}, App, Database},
+    app::{store::{FileStore, Store}, App, Database, RenderCtx},
     page::{
-        dynamic, Button, ButtonStyle, Container, Element, LinkButton,
-        MediaGallery, Modal, Page, Section, SelectOption, Separator, StringSelect,
+        Button, ButtonStyle, Container, Element, LinkButton,
+        MediaGallery, Section, SelectOption, Separator, StringSelect,
         TextInputStyle, Thumbnail,
     },
 };
@@ -34,11 +34,11 @@ struct DemoForm {
 }
 
 fn register_demo_page(app: &App<Database>) -> anyhow::Result<()> {
-    let page = Page::<DemoData>::new("framework-demo")
+    let page = app.page::<DemoData>("framework-demo")
         .add_text("# Robo-Pope framework showcase")
-        .add_text(dynamic::<String, DemoData, _, _>(|_ctx, data| async move {
+        .add_text(|_ctx: RenderCtx<Database>, data: Arc<DemoData>| async move {
             Ok(format!("Welcome, {}. Visits: {}", data.username, data.visits))
-        }))
+        })
         .add_section(
             Section::new()
                 .set_text(
@@ -115,7 +115,7 @@ fn register_demo_page(app: &App<Database>) -> anyhow::Result<()> {
 }
 
 fn register_demo_modal(app: &App<Database>) -> anyhow::Result<()> {
-    let modal = Modal::<DemoData>::new("framework-demo-modal")
+    let modal = app.modal::<DemoData>("framework-demo-modal")
         .set_title("Framework Demo Form")
         .add_text_input("message", "Your message", TextInputStyle::Short)
         .on_submit_typed(
