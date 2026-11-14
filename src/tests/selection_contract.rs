@@ -68,7 +68,7 @@ async fn string_select_renders_placeholder_min_max_and_dynamic_option_properties
                 "select-bounds",
                 [
                     SelectOption::new(
-                        |_ctx: crate::app::RenderCtx<Arc<()>>, data: Arc<TestData>| async move {
+                        |_ctx: crate::app::RenderCtx<std::sync::Arc<()>>, data: std::sync::Arc<TestData>| async move {
                             Ok(format!("{} role", data.label))
                         },
                         "member",
