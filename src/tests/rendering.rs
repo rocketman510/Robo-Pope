@@ -6,10 +6,49 @@ use std::sync::{
 use crate::{
     app::store::{CustomId, derive_custom_id},
     page::{
-        Button, ButtonStyle, Container, Element, File, LinkButton, Modal, Page, Separator, TextInputStyle,
+        Button, ButtonStyle, Container, Element, File, LinkButton, Modal, Page, Section,
+        SelectOption, Separator, StringSelect, TextInputStyle,
     },
 };
 use super::support::{app, TestData};
+
+fn find_component_type(
+    value: &serde_json::Value,
+    expected: u64,
+) -> Option<&serde_json::Value> {
+    match value {
+        serde_json::Value::Object(object) => {
+            if object.get("type").and_then(serde_json::Value::as_u64) == Some(expected) {
+                Some(value)
+            } else {
+                object.values().find_map(|child| find_component_type(child, expected))
+            }
+        }
+        serde_json::Value::Array(items) => {
+            items.iter().find_map(|child| find_component_type(child, expected))
+        }
+        _ => None,
+    }
+}
+
+fn collect_custom_ids(value: &serde_json::Value, ids: &mut Vec<String>) {
+    match value {
+        serde_json::Value::Object(object) => {
+            if let Some(id) = object.get("custom_id").and_then(serde_json::Value::as_str) {
+                ids.push(id.to_owned());
+            }
+            for child in object.values() {
+                collect_custom_ids(child, ids);
+            }
+        }
+        serde_json::Value::Array(items) => {
+            for child in items {
+                collect_custom_ids(child, ids);
+            }
+        }
+        _ => {}
+    }
+}
 
 #[tokio::test]
 async fn page_render_renders_container_children_in_order() {
@@ -54,6 +93,21 @@ async fn file_component_renders_the_complete_attachment_uri() {
     let rendered = page.render(&app, TestData::default()).await.unwrap();
     let json = serde_json::to_value(rendered.into_components()).unwrap().to_string();
     assert!(json.contains("attachment://report.pdf"));
+}
+
+#[tokio::test]
+async fn file_spoiler_setting_is_rendered() {
+    // FIRST: File exposes and serializes its documented spoiler setting.
+    let app = app();
+    let page = Page::<TestData>::new("file-spoiler")
+        .add_file(File::new("attachment://spoiler.pdf").set_spoiler(true))
+        .register(&app)
+        .unwrap();
+
+    let rendered = page.render(&app, TestData::default()).await.unwrap();
+    let components = serde_json::to_value(rendered.into_components()).unwrap();
+    let file = find_component_type(&components, 13).expect("File component must be rendered");
+    assert_eq!(file["spoiler"], true);
 }
 
 #[tokio::test]
@@ -146,6 +200,61 @@ async fn page_render_persists_button_execution_identity_and_page_data() {
     assert_eq!(record.definition_id, "render-persist");
     assert_eq!(record.execution_id, "open-profile");
     assert_eq!(record.serialized_data, serialized_data);
+}
+
+#[tokio::test]
+async fn every_rendered_interactive_component_has_a_custom_id_within_discord_limit() {
+    // FIRST: Button rows, Section Button accessories, and Select menus all
+    // serialize a custom_id no longer than Discord's 100-character maximum.
+    let app = app();
+    let page = Page::<TestData>::new("rendered-custom-id-limits")
+        .add_button_row((
+            Button::new(
+                "Row action",
+                "row-action",
+                ButtonStyle::Primary,
+                None,
+                false,
+                |_ctx, _data: TestData| async move { Ok(()) },
+            ),
+            None,
+            None,
+            None,
+            None,
+        ))
+        .add_section(
+            Section::new()
+                .set_text("Section action", None, None)
+                .set_accessory(Button::new(
+                    "Section action",
+                    "section-action",
+                    ButtonStyle::Secondary,
+                    None,
+                    false,
+                    |_ctx, _data: TestData| async move { Ok(()) },
+                )),
+        )
+        .add_selection_menu(StringSelect::new(
+            "Choose",
+            "select-action",
+            [SelectOption::new("One", "one")],
+            |_ctx, _data: TestData, _values: Vec<String>| async move { Ok(()) },
+        ))
+        .register(&app)
+        .unwrap();
+
+    let rendered = page.render(&app, TestData::default()).await.unwrap();
+    let components = serde_json::to_value(rendered.into_components()).unwrap();
+    let mut custom_ids = Vec::new();
+    collect_custom_ids(&components, &mut custom_ids);
+
+    assert_eq!(custom_ids.len(), 3, "each interactive component must have one routing ID");
+    for custom_id in custom_ids {
+        assert!(
+            custom_id.chars().count() <= 100,
+            "rendered custom_id exceeds Discord's 100-character limit: {custom_id}"
+        );
+    }
 }
 
 #[tokio::test]
@@ -283,6 +392,10 @@ async fn modal_render_persists_modal_data_and_returns_a_modal_response() {
     let rendered = modal.render(&app, data).await.unwrap();
 
     assert_eq!(rendered.custom_id, expected_id.0);
+    assert!(
+        rendered.custom_id.chars().count() <= 100,
+        "rendered Modal custom_id must fit Discord's limit"
+    );
     let record = app.store()
         .resolve(&CustomId(rendered.custom_id.clone()))
         .await

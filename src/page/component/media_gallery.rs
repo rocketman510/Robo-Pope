@@ -33,6 +33,14 @@ pub struct MediaGallery<T> {
 impl<T> MediaGallery<T> {
     /// Starts an empty Media Gallery.
     pub fn new()->Self { Self { items:Vec::new() } }
+    /// Replaces the gallery's current collection of media items.
+    pub fn set_media(
+        mut self,
+        items: impl IntoIterator<Item = MediaItem<T>>,
+    ) -> Self {
+        self.items = items.into_iter().collect();
+        self
+    }
     /// Appends a media item using the supplied URL.
     pub fn add_media<V:IntoValue<String,T>>(mut self,url:V)->Self {
         self.items.push(MediaItem::new(url)); self

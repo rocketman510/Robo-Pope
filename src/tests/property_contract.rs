@@ -174,3 +174,43 @@ async fn string_select_placeholder_option_label_and_description_resolve_dynamica
     assert!(json.contains("\"min_values\":1"));
     assert!(json.contains("\"max_values\":1"));
 }
+
+#[tokio::test]
+async fn dynamic_thumbnail_description_over_1024_characters_is_rejected() {
+    // FIRST: dynamic Thumbnail descriptions are checked after they resolve.
+    let app = app();
+    let page = Page::<TestData>::new("dynamic-thumbnail-description-limit")
+        .add_section(
+            Section::new()
+                .set_text("Preview", None, None)
+                .set_accessory(
+                    Thumbnail::new("https://example.test/thumbnail.png")
+                        .set_description(|_ctx, _data| async move {
+                            Ok("x".repeat(1_025))
+                        }),
+                ),
+        )
+        .register(&app)
+        .unwrap();
+
+    assert!(page.render(&app, TestData::default()).await.is_err());
+}
+
+#[tokio::test]
+async fn dynamic_media_gallery_description_over_1024_characters_is_rejected() {
+    // FIRST: dynamic Media Gallery descriptions are checked after they resolve.
+    let app = app();
+    let page = Page::<TestData>::new("dynamic-gallery-description-limit")
+        .add_gallery(
+            MediaGallery::new().add_item(
+                MediaItem::new("https://example.test/gallery.png")
+                    .set_description(|_ctx, _data| async move {
+                        Ok("x".repeat(1_025))
+                    }),
+            ),
+        )
+        .register(&app)
+        .unwrap();
+
+    assert!(page.render(&app, TestData::default()).await.is_err());
+}

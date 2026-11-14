@@ -1043,12 +1043,20 @@ where
             ))
         }
         C::File(file) => {
+            let filename = file
+                .attachment_uri
+                .strip_prefix("attachment://")
+                .ok_or_else(|| anyhow::anyhow!(
+                    "File component requires a complete attachment:// URI"
+                ))?;
             anyhow::ensure!(
-                !file.filename.trim().is_empty() && !file.filename.contains('/') && !file.filename.contains('\\'),
-                "File component requires a non-empty filename without path separators"
+                !filename.trim().is_empty()
+                    && !filename.contains('/')
+                    && !filename.contains('\\'),
+                "File component requires an attachment URI with a filename and no path separators"
             );
             let rendered = CreateFile::new(CreateUnfurledMediaItem::new(
-                format!("attachment://{}", file.filename)
+                file.attachment_uri.clone()
             )).into_owned();
             Ok((
                 vec![RenderedComponent {

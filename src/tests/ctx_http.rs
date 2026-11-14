@@ -4,8 +4,8 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::time::timeout;
 use crate::app::{App, Ctx};
-use crate::app::store::{MemoryStore, Store};
-use crate::page::{Modal, ModalSubmission, Page, TextInputStyle};
+use crate::app::store::{derive_custom_id, MemoryStore, Store};
+use crate::page::{Button, ButtonStyle, Modal, ModalSubmission, Page, TextInputStyle};
 use super::support::{component_interaction, TestData};
 
 const MESSAGE_JSON: &str = r#"{"id":"500","channel_id":"300","author":{"id":"200","username":"bot","discriminator":"0","global_name":null,"avatar":null},"content":"","timestamp":"2024-01-01T00:00:00.000000+00:00","edited_timestamp":null,"tts":false,"mention_everyone":false,"mentions":[],"mention_roles":[],"attachments":[],"embeds":[],"pinned":false,"type":0,"flags":0,"components":[]}"#;
@@ -172,6 +172,72 @@ async fn open_modal_sends_a_modal_interaction_response() {
     context(&app).open_modal(rendered).await.unwrap();
     let requests = server.await.unwrap();
     assert_callback_type(&requests[0], 9);
+}
+
+#[tokio::test]
+async fn button_callback_queries_renders_and_opens_a_registered_modal() {
+    // FIRST: exercise the documented interaction path as one end-to-end flow:
+    // Button callback -> App Modal query -> Modal render -> initial open_modal response.
+    let (app, server) = setup(1, None).await;
+
+    Modal::<TestData>::new("ctx-modal-flow")
+        .set_title("Edit from callback")
+        .add_text_input("field", "Field", TextInputStyle::Short)
+        .on_submit(|_ctx, _data, _submission: ModalSubmission| async move { Ok(()) })
+        .register(&app)
+        .unwrap();
+
+    let data = TestData::default();
+    let expected_id = derive_custom_id(
+        "ctx-modal-flow-page",
+        "open-modal",
+        &serde_json::to_vec(&data).unwrap(),
+    )
+    .unwrap();
+
+    let page = Page::<TestData>::new("ctx-modal-flow-page")
+        .add_button_row((
+            Button::new(
+                "Open modal",
+                "open-modal",
+                ButtonStyle::Primary,
+                None,
+                false,
+                |ctx, data: TestData| async move {
+                    let modal = ctx
+                        .app
+                        .modals
+                        .query::<TestData>("ctx-modal-flow")?
+                        .render(&ctx.app, data)
+                        .await?;
+                    ctx.open_modal(modal).await?;
+                    Ok(())
+                },
+            ),
+            None,
+            None,
+            None,
+            None,
+        ))
+        .register(&app)
+        .unwrap();
+
+    page.render(&app, data).await.unwrap();
+    app.dispatch_interaction(component_interaction(&expected_id.0))
+        .await
+        .unwrap();
+
+    let requests = server.await.unwrap();
+    assert_callback_type(&requests[0], 9);
+
+    let body = requests[0].split_once("\r\n\r\n").unwrap().1;
+    let payload: serde_json::Value = serde_json::from_str(body).unwrap();
+    assert_eq!(payload["data"]["title"], "Edit from callback");
+    assert_eq!(payload["data"]["components"].as_array().unwrap().len(), 1);
+    assert!(
+        payload["data"]["custom_id"].as_str().unwrap().chars().count() <= 100,
+        "the rendered Modal custom_id must fit Discord's limit"
+    );
 }
 
 #[tokio::test]

@@ -1,6 +1,6 @@
 use crate::page::component::Component;
 use crate::page::render::validate_component;
-use crate::page::{Container, MediaGallery, Page, Section, Text};
+use crate::page::{Container, MediaGallery, MediaItem, Page, Section, Text, Thumbnail};
 use super::support::app;
 
 #[test]
@@ -99,5 +99,56 @@ fn validator_rejects_a_media_gallery_with_more_than_ten_items() {
     let gallery = (0..11).fold(MediaGallery::<()>::new(), |gallery, index| {
         gallery.add_media(format!("https://example.test/{index}.png"))
     });
+    assert!(validate_component(&Component::MediaGallery(gallery)).is_err());
+}
+
+#[test]
+fn validator_rejects_an_empty_media_gallery() {
+    // FIRST: Discord Media Galleries must contain at least one media item.
+    let gallery = MediaGallery::<()>::new();
+    assert!(validate_component(&Component::MediaGallery(gallery)).is_err());
+}
+
+#[test]
+fn validator_accepts_a_thumbnail_description_at_1024_characters() {
+    // FIRST: a Thumbnail description at the documented boundary is valid.
+    let section = Section::<()>::new()
+        .set_text("Thumbnail", None, None)
+        .set_accessory(
+            Thumbnail::new("https://example.test/thumbnail.png")
+                .set_description("x".repeat(1_024)),
+        );
+    assert!(validate_component(&Component::Section(section)).is_ok());
+}
+
+#[test]
+fn validator_rejects_a_thumbnail_description_over_1024_characters() {
+    // FIRST: a Thumbnail description cannot exceed 1024 characters.
+    let section = Section::<()>::new()
+        .set_text("Thumbnail", None, None)
+        .set_accessory(
+            Thumbnail::new("https://example.test/thumbnail.png")
+                .set_description("x".repeat(1_025)),
+        );
+    assert!(validate_component(&Component::Section(section)).is_err());
+}
+
+#[test]
+fn validator_accepts_a_media_gallery_description_at_1024_characters() {
+    // FIRST: a Media Gallery item description at the documented boundary is valid.
+    let gallery = MediaGallery::<()>::new().add_item(
+        MediaItem::new("https://example.test/gallery.png")
+            .set_description("x".repeat(1_024)),
+    );
+    assert!(validate_component(&Component::MediaGallery(gallery)).is_ok());
+}
+
+#[test]
+fn validator_rejects_a_media_gallery_description_over_1024_characters() {
+    // FIRST: a Media Gallery item description cannot exceed 1024 characters.
+    let gallery = MediaGallery::<()>::new().add_item(
+        MediaItem::new("https://example.test/gallery.png")
+            .set_description("x".repeat(1_025)),
+    );
     assert!(validate_component(&Component::MediaGallery(gallery)).is_err());
 }

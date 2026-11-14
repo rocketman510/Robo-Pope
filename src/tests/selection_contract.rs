@@ -1,6 +1,19 @@
 use crate::page::{Page, SelectOption, StringSelect};
 use super::support::{app, TestData};
 
+fn contains_component_type(value: &serde_json::Value, expected: u64) -> bool {
+    match value {
+        serde_json::Value::Object(object) => {
+            object.get("type").and_then(serde_json::Value::as_u64) == Some(expected)
+                || object.values().any(|child| contains_component_type(child, expected))
+        }
+        serde_json::Value::Array(items) => {
+            items.iter().any(|child| contains_component_type(child, expected))
+        }
+        _ => false,
+    }
+}
+
 #[tokio::test]
 async fn disabled_string_select_option_is_rejected_instead_of_silently_ignored() {
     // FIRST: Discord has no per-option disabled field for String Select.
@@ -205,7 +218,10 @@ async fn page_user_select_renders_with_placeholder() {
         .register(&app)
         .unwrap();
     let rendered = page.render(&app, TestData::default()).await.unwrap();
-    let json = serde_json::to_value(rendered.into_components()).unwrap().to_string();
-    assert!(json.contains("Pick a user"));
-    assert!(json.contains("\\"type\\":5"));
+    let components = serde_json::to_value(rendered.into_components()).unwrap();
+    assert!(components.to_string().contains("Pick a user"));
+    assert!(
+        contains_component_type(&components, 5),
+        "rendered User Select must use Discord component type 5"
+    );
 }
