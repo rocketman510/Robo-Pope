@@ -110,6 +110,10 @@ pub(crate) fn validate_component<T, D>(
                 populated <= super::limits::SECTION_MAX_TEXT_DISPLAYS,
                 "Section contains too many Text Displays"
             );
+            anyhow::ensure!(
+                section.accessory.is_some(),
+                "Section requires a Button or Thumbnail accessory"
+            );
             let chars = slots.iter().map(|slot| match slot {
                 Slot::Empty => 0,
                 Slot::Value(value) => text_chars(value),

@@ -1100,7 +1100,7 @@ where
                     component: CreateComponent::Section(rendered),
                 }],
                 ComponentBudget {
-                    total_components: 1 + text_component_count,
+                    total_components: 2 + text_component_count,
                     text_display_chars: text_chars,
                     direct_container_children: 0,
                 },
