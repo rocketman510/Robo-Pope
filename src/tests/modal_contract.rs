@@ -356,6 +356,83 @@ fn modal_rejects_duplicate_input_ids() {
 }
 
 #[test]
+fn modal_rejects_a_static_input_label_over_forty_five_characters_at_registration() {
+    // FIRST: the static Label text limit is known when the Modal is registered.
+    let app = app();
+    let modal = Modal::<TestData>::new("modal-long-input-label")
+        .set_title("Label")
+        .add_text_input("field", "x".repeat(46), TextInputStyle::Short)
+        .on_submit(|_ctx, _data, _submission: ModalSubmission| async move { Ok(()) });
+    assert!(modal.register(&app).is_err());
+}
+
+#[tokio::test]
+async fn modal_rejects_a_dynamic_input_label_over_forty_five_characters_after_resolution() {
+    // FIRST: a dynamic Label is validated only after its callback resolves.
+    let app = app();
+    let modal = Modal::<TestData>::new("modal-dynamic-long-input-label")
+        .set_title("Label")
+        .add_text_input(
+            "field",
+            |_ctx: crate::app::RenderCtx, _data: std::sync::Arc<TestData>| async move {
+                Ok("x".repeat(46))
+            },
+            TextInputStyle::Short,
+        )
+        .on_submit(|_ctx, _data, _submission: ModalSubmission| async move { Ok(()) })
+        .register(&app)
+        .unwrap();
+
+    assert!(modal.render(&app, TestData::default()).await.is_err());
+}
+
+#[test]
+fn modal_rejects_a_static_text_input_placeholder_over_one_hundred_characters_at_registration() {
+    // FIRST: Text Input placeholders use Discord's 100-character limit.
+    let app = app();
+    let modal = Modal::<TestData>::new("modal-long-placeholder")
+        .set_title("Placeholder")
+        .add_input(ModalInput::Text(TextInput {
+            id: "field".into(),
+            label: Value::Static("Field".into()),
+            style: TextInputStyle::Short,
+            required: true,
+            placeholder: Some(Value::Static("x".repeat(101))),
+            min_length: None,
+            max_length: None,
+        }))
+        .on_submit(|_ctx, _data, _submission: ModalSubmission| async move { Ok(()) });
+    assert!(modal.register(&app).is_err());
+}
+
+#[tokio::test]
+async fn modal_rejects_a_dynamic_text_input_placeholder_over_one_hundred_characters_after_resolution() {
+    // FIRST: dynamically resolved placeholders are checked before the Modal
+    // response is constructed, using the same 100-character limit.
+    let app = app();
+    let modal = Modal::<TestData>::new("modal-dynamic-long-placeholder")
+        .set_title("Placeholder")
+        .add_input(ModalInput::Text(TextInput {
+            id: "field".into(),
+            label: Value::Static("Field".into()),
+            style: TextInputStyle::Short,
+            required: true,
+            placeholder: Some(crate::page::dynamic(
+                |_ctx: crate::app::RenderCtx, _data: std::sync::Arc<TestData>| async move {
+                    Ok("x".repeat(101))
+                },
+            )),
+            min_length: None,
+            max_length: None,
+        }))
+        .on_submit(|_ctx, _data, _submission: ModalSubmission| async move { Ok(()) })
+        .register(&app)
+        .unwrap();
+
+    assert!(modal.render(&app, TestData::default()).await.is_err());
+}
+
+#[test]
 fn modal_rejects_static_select_option_description_over_one_hundred_characters() {
     // FIRST: a static option description is validated before registration succeeds.
     let app = app();
