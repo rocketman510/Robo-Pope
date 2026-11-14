@@ -1,110 +1,5 @@
-warning: method `render_context_erased` is never used
-   --> src/app/mod.rs:140:19
-    |
-105 | / impl<D> App<D>
-106 | | where
-107 | |     D: Clone + Any + Send + Sync + 'static,
-    | |___________________________________________- method in this implementation
-...
-140 |       pub(crate) fn render_context_erased(
-    |                     ^^^^^^^^^^^^^^^^^^^^^
-    |
-    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
-
-warning: function `collect_component_frames` is never used
-   --> src/page/builder.rs:190:4
-    |
-190 | fn collect_component_frames<T>(
-    |    ^^^^^^^^^^^^^^^^^^^^^^^^
-
-warning: function `collect_paginated_frames_in_component` is never used
-   --> src/page/builder.rs:207:4
-    |
-207 | fn collect_paginated_frames_in_component<T>(
-    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-warning: function `render_component_list` is never used
-    --> src/page/builder.rs:1139:10
-     |
-1139 | async fn render_component_list<T>(
-     |          ^^^^^^^^^^^^^^^^^^^^^
-
-warning: function `message_budget_fits` is never used
-    --> src/page/builder.rs:1205:4
-     |
-1205 | fn message_budget_fits(budget: ComponentBudget) -> bool {
-     |    ^^^^^^^^^^^^^^^^^^^
-
-warning: function `plan_rendered_frame` is never used
-    --> src/page/builder.rs:1211:4
-     |
-1211 | fn plan_rendered_frame(
-     |    ^^^^^^^^^^^^^^^^^^^
-
-warning: function `create_pagination_navigation` is never used
-    --> src/page/builder.rs:1247:10
-     |
-1247 | async fn create_pagination_navigation(
-     |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-warning: function `as_container_child` is never used
-    --> src/page/builder.rs:1294:4
-     |
-1294 | fn as_container_child(part: RenderedComponent) -> anyhow::Result<CreateContainerComponent<'static>> {
-     |    ^^^^^^^^^^^^^^^^^^
-
-warning: function `render_container_items` is never used
-    --> src/page/builder.rs:1350:10
-     |
-1350 | async fn render_container_items<T>(
-     |          ^^^^^^^^^^^^^^^^^^^^^^
-
-warning: function `plan_container_frame_ranges` is never used
-    --> src/page/builder.rs:1393:4
-     |
-1393 | fn plan_container_frame_ranges(
-     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-warning: function `render_paginated_container` is never used
-    --> src/page/builder.rs:1462:10
-     |
-1462 | async fn render_paginated_container<T>(
-     |          ^^^^^^^^^^^^^^^^^^^^^^^^^^
-
+    Blocking waiting for file lock on build directory
    Compiling Robo-Pope v0.0.1 (/home/rocketman510/Programs/Robo-Pope-Rust)
-warning: `Robo-Pope` (lib) generated 11 warnings
-error: unknown start of token: \
-  --> src/tests/selection_contract.rs:96:41
-   |
-96 |     assert!(json.contains("\\"min_values\\":1"));
-   |                                         ^^
-   |
-   = note: character appears once more
-
-error: unknown start of token: \
-  --> src/tests/selection_contract.rs:97:41
-   |
-97 |     assert!(json.contains("\\"max_values\\":2"));
-   |                                         ^^
-   |
-   = note: character appears once more
-
-error: expected one of `)`, `,`, `.`, `?`, or an operator, found `":1"`
-  --> src/tests/selection_contract.rs:96:43
-   |
-96 |     assert!(json.contains("\\"min_values\\":1"));
-   |                                         - ^^^^ expected one of `)`, `,`, `.`, `?`, or an operator
-   |                                         |
-   |                                         help: missing `,`
-
-error: expected one of `)`, `,`, `.`, `?`, or an operator, found `":2"`
-  --> src/tests/selection_contract.rs:97:43
-   |
-97 |     assert!(json.contains("\\"max_values\\":2"));
-   |                                         - ^^^^ expected one of `)`, `,`, `.`, `?`, or an operator
-   |                                         |
-   |                                         help: missing `,`
-
 warning: unused import: `serenity::all::Http`
  --> src/tests/app.rs:2:5
   |
@@ -137,250 +32,80 @@ warning: unused imports: `ButtonStyle` and `Button`
 2 |     Button, ButtonStyle, Container, LinkButton, MediaGallery, MediaItem, Page,
   |     ^^^^^^  ^^^^^^^^^^^
 
-error: suffixes on string literals are invalid
-  --> src/tests/selection_contract.rs:96:27
-   |
-96 |     assert!(json.contains("\\"min_values\\":1"));
-   |                           ^^^^^^^^^^^^^^ invalid suffix `min_values`
-
-error: suffixes on string literals are invalid
-  --> src/tests/selection_contract.rs:97:27
-   |
-97 |     assert!(json.contains("\\"max_values\\":2"));
-   |                           ^^^^^^^^^^^^^^ invalid suffix `max_values`
-
 error[E0282]: type annotations needed
-  --> src/tests/builder.rs:26:20
-   |
-26 |         .add_text(|ctx, data| async move {
-   |                    ^^^
-27 |             let _db = ctx.app.db.clone();
-   |                       --- type must be known at this point
-   |
-help: consider giving this closure parameter an explicit type
-   |
-26 |         .add_text(|ctx: /* Type */, data| async move {
-   |                       ++++++++++++
-
-error[E0282]: type annotations needed for `Arc<_>`
-  --> src/tests/value.rs:32:15
-   |
-32 |         |ctx, data| async move {
-   |               ^^^^
-...
-35 |             Ok(format!("{}:{}", data.label, data.count))
-   |                                 ---------- type must be known at this point
-   |
-help: consider giving this closure parameter an explicit type, where the type for type parameter `T` is specified
-   |
-32 |         |ctx, data: Arc<T>| async move {
-   |                   ++++++++
-
-error[E0282]: type annotations needed for `Arc<_>`
-  --> src/tests/value.rs:76:16
-   |
-76 |         |_ctx, data| async move { Ok(data.label.clone()) },
-   |                ^^^^                  ---------- type must be known at this point
-   |
-help: consider giving this closure parameter an explicit type, where the type for type parameter `T` is specified
-   |
-76 |         |_ctx, data: Arc<T>| async move { Ok(data.label.clone()) },
-   |                    ++++++++
-
-error[E0282]: type annotations needed
-  --> src/tests/value.rs:90:20
-   |
-90 |         .add_text(|ctx, data| async move {
-   |                    ^^^
-91 |             assert_eq!(ctx.definition_id.as_ref(), "direct-closure");
-   |                        --- type must be known at this point
-   |
-help: consider giving this closure parameter an explicit type
-   |
-90 |         .add_text(|ctx: /* Type */, data| async move {
-   |                       ++++++++++++
-
-error[E0282]: type annotations needed
-   --> src/tests/value.rs:107:20
+   --> src/tests/property_contract.rs:136:24
     |
-107 |             |_ctx, data| async move { Ok(format!("Dynamic {}", data.count)) },
-    |                    ^^^^                                        ---- type must be known at this point
+136 |                 |_ctx, data| async move {
+    |                        ^^^^
+137 |                     Ok(format!("Choose for {}", data.label))
+    |                                                 ---- type must be known at this point
     |
 help: consider giving this closure parameter an explicit type
     |
-107 |             |_ctx, data: /* Type */| async move { Ok(format!("Dynamic {}", data.count)) },
-    |                        ++++++++++++
+136 |                 |_ctx, data: /* Type */| async move {
+    |                            ++++++++++++
 
-error[E0282]: type annotations needed
-   --> src/tests/value.rs:127:20
+warning: function `collect_component_frames` is never used
+   --> src/page/builder.rs:191:4
     |
-127 |             |_ctx, data| async move { Ok(format!("Hello {}", data.label)) },
-    |                    ^^^^                                      ---- type must be known at this point
+191 | fn collect_component_frames<T, D>(
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^
     |
-help: consider giving this closure parameter an explicit type
-    |
-127 |             |_ctx, data: /* Type */| async move { Ok(format!("Hello {}", data.label)) },
-    |                        ++++++++++++
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
 
-error[E0282]: type annotations needed
-  --> src/tests/property_contract.rs:15:24
-   |
-15 |                 |_ctx, data| async move {
-   |                        ^^^^
-16 |                     Ok(format!("{} docs", data.label))
-   |                                           ---- type must be known at this point
-   |
-help: consider giving this closure parameter an explicit type
-   |
-15 |                 |_ctx, data: /* Type */| async move {
-   |                            ++++++++++++
-
-error[E0282]: type annotations needed
-  --> src/tests/property_contract.rs:83:32
-   |
-83 |                         |_ctx, data| async move {
-   |                                ^^^^
-84 |                             Ok(format!("{} thumbnail", data.label))
-   |                                                        ---- type must be known at this point
-   |
-help: consider giving this closure parameter an explicit type
-   |
-83 |                         |_ctx, data: /* Type */| async move {
-   |                                    ++++++++++++
-
-error[E0282]: type annotations needed
-   --> src/tests/property_contract.rs:142:32
+warning: function `collect_paginated_frames_in_component` is never used
+   --> src/page/builder.rs:208:4
     |
-142 |                         |_ctx, data| async move {
-    |                                ^^^^
-143 |                             Ok(format!("Option {}", data.count))
-    |                                                     ---- type must be known at this point
-    |
-help: consider giving this closure parameter an explicit type
-    |
-142 |                         |_ctx, data: /* Type */| async move {
-    |                                    ++++++++++++
+208 | fn collect_paginated_frames_in_component<T, D>(
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error[E0282]: type annotations needed
-  --> src/tests/selection_contract.rs:71:32
-   |
-71 |                         |_ctx, data| async move {
-   |                                ^^^^
-72 |                             Ok(format!("{} role", data.label))
-   |                                                   ---- type must be known at this point
-   |
-help: consider giving this closure parameter an explicit type
-   |
-71 |                         |_ctx, data: /* Type */| async move {
-   |                                    ++++++++++++
+warning: function `render_component_list` is never used
+    --> src/page/builder.rs:1148:10
+     |
+1148 | async fn render_component_list<T, D>(
+     |          ^^^^^^^^^^^^^^^^^^^^^
 
-error[E0061]: this method takes 1 argument but 2 arguments were supplied
-    --> src/tests/selection_contract.rs:96:18
+warning: function `message_budget_fits` is never used
+    --> src/page/builder.rs:1216:4
      |
-  96 |     assert!(json.contains("\\"min_values\\":1"));
-     |                  ^^^^^^^^ -------------- unexpected argument #1
-     |
-note: method defined here
-    --> /home/rocketman510/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/str/mod.rs:1363:12
-     |
-1363 |     pub fn contains<P: Pattern>(&self, pat: P) -> bool {
-     |            ^^^^^^^^
-help: remove the extra argument
-     |
-  96 -     assert!(json.contains("\\"min_values\\":1"));
-  96 +     assert!(json.contains(":1"));
-     |
+1216 | fn message_budget_fits(budget: ComponentBudget) -> bool {
+     |    ^^^^^^^^^^^^^^^^^^^
 
-error[E0061]: this method takes 1 argument but 2 arguments were supplied
-    --> src/tests/selection_contract.rs:97:18
+warning: function `plan_rendered_frame` is never used
+    --> src/page/builder.rs:1222:4
      |
-  97 |     assert!(json.contains("\\"max_values\\":2"));
-     |                  ^^^^^^^^ -------------- unexpected argument #1
-     |
-note: method defined here
-    --> /home/rocketman510/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/str/mod.rs:1363:12
-     |
-1363 |     pub fn contains<P: Pattern>(&self, pat: P) -> bool {
-     |            ^^^^^^^^
-help: remove the extra argument
-     |
-  97 -     assert!(json.contains("\\"max_values\\":2"));
-  97 +     assert!(json.contains(":2"));
-     |
+1222 | fn plan_rendered_frame(
+     |    ^^^^^^^^^^^^^^^^^^^
 
-error[E0282]: type annotations needed
-   --> src/tests/frame_contract.rs:124:29
-    |
-124 |                 move |_ctx, data| async move {
-    |                             ^^^^
-125 |                     Ok(format!("{}:{}", data.label, data.count))
-    |                                         ---- type must be known at this point
-    |
-help: consider giving this closure parameter an explicit type
-    |
-124 |                 move |_ctx, data: /* Type */| async move {
-    |                                 ++++++++++++
-
-error[E0282]: type annotations needed
-   --> src/tests/rendering.rs:121:19
-    |
-121 |             move |ctx, data| {
-    |                   ^^^
-...
-124 |                     assert_eq!(ctx.definition_id.as_ref(), "render-dynamic");
-    |                                --- type must be known at this point
-    |
-help: consider giving this closure parameter an explicit type
-    |
-121 |             move |ctx: /* Type */, data| {
-    |                      ++++++++++++
-
-error[E0308]: mismatched types
-    --> src/tests/interaction.rs:29:25
+warning: function `create_pagination_navigation` is never used
+    --> src/page/builder.rs:1258:10
      |
-  29 |     assert!(Arc::ptr_eq(&ctx.app.db, &app.db));
-     |             ----------- ^^^^^^^^^^^ expected `&Arc<()>`, found `&Database`
-     |             |
-     |             arguments to this function are incorrect
+1258 | async fn create_pagination_navigation<D>(
+     |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `as_container_child` is never used
+    --> src/page/builder.rs:1305:4
      |
-     = note: expected reference `&Arc<()>`
-                found reference `&Database`
-note: associated function defined here
-    --> /home/rocketman510/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/sync.rs:2154:12
+1305 | fn as_container_child(part: RenderedComponent) -> anyhow::Result<CreateContainerComponent<'static>> {
+     |    ^^^^^^^^^^^^^^^^^^
+
+warning: function `render_container_items` is never used
+    --> src/page/builder.rs:1362:10
      |
-2154 |     pub fn ptr_eq(this: &Self, other: &Self) -> bool {
-     |            ^^^^^^
+1362 | async fn render_container_items<T, D>(
+     |          ^^^^^^^^^^^^^^^^^^^^^^
 
-error[E0308]: mismatched types
-  --> src/tests/interaction.rs:39:20
-   |
-39 |     let app: App = app();
-   |              ---   ^^^^^ expected `App`, found `App<Arc<()>>`
-   |              |
-   |              expected due to this
-   |
-   = note: expected struct `App<Database>`
-              found struct `App<Arc<()>>`
+warning: function `plan_container_frame_ranges` is never used
+    --> src/page/builder.rs:1406:4
+     |
+1406 | fn plan_container_frame_ranges(
+     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error[E0282]: type annotations needed
-  --> src/tests/database_contract.rs:84:25
-   |
-84 |         .add_text(move |ctx, _data| {
-   |                         ^^^
-...
-88 |                     ctx.app.db.users.as_ref() == "user repository",
-   |                     --- type must be known at this point
-   |
-help: consider giving this closure parameter an explicit type
-   |
-84 |         .add_text(move |ctx: /* Type */, _data| {
-   |                            ++++++++++++
-
-error[E0609]: no field `messages` on type `Database`
-   --> src/tests/database_contract.rs:105:40
-    |
-105 | ...                   ctx.app.db.messages.as_ref() == "message repository",
-    |                                  ^^^^^^^^ unknown field
+warning: function `render_paginated_container` is never used
+    --> src/page/builder.rs:1475:10
+     |
+1475 | async fn render_paginated_container<T, D>(
+     |          ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 warning: unused import: `Store`
  --> src/tests/routing_contract.rs:1:58
@@ -388,7 +113,16 @@ warning: unused import: `Store`
 1 | use crate::app::store::{derive_custom_id, RoutingRecord, Store};
   |                                                          ^^^^^
 
-Some errors have detailed explanations: E0061, E0282, E0308, E0609.
-For more information about an error, try `rustc --explain E0061`.
-warning: `Robo-Pope` (lib test) generated 6 warnings
-error: could not compile `Robo-Pope` (lib test) due to 24 previous errors; 6 warnings emitted
+warning: `Robo-Pope` (lib) generated 10 warnings
+warning: unused variable: `data`
+   --> src/tests/frame_contract.rs:122:27
+    |
+122 |         .add_frame(|_ctx, data| async move {
+    |                           ^^^^ help: if this is intentional, prefix it with an underscore: `_data`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+For more information about this error, try `rustc --explain E0282`.
+warning: `Robo-Pope` (lib test) generated 7 warnings
+error: could not compile `Robo-Pope` (lib test) due to 1 previous error; 7 warnings emitted
+warning: build failed, waiting for other jobs to finish...
