@@ -81,7 +81,7 @@ async fn dynamic_property_and_execution_callbacks_read_named_host_database_field
     let custom_id = derive_custom_id("typed-database-callback", "open-users", &serialized).unwrap();
 
     let page = Page::<TestData>::new("typed-database-callback")
-        .add_text(move |ctx: crate::app::RenderCtx, _data: Arc<TestData>| {
+        .add_text(move |ctx, _data| {
             let observed = render_flag.clone();
             async move {
                 observed.store(
