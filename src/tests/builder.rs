@@ -23,7 +23,7 @@ fn page_data_type_is_shared_by_static_and_dynamic_components() {
     // The closure reads T and the App-linked context without an extra generic.
     let page = Page::<TestData>::new("shared-data")
         .add_text("Static")
-        .add_text(|ctx, data| async move {
+        .add_text(|ctx: crate::app::RenderCtx<Arc<()>>, data: Arc<TestData>| async move {
             let _db = ctx.app.db.clone();
             Ok(format!("{} {}", data.label, data.count))
         });
