@@ -3,7 +3,7 @@ use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::time::timeout;
-use crate::app::{App, Ctx, Database};
+use crate::app::{App, Ctx};
 use crate::app::store::{MemoryStore, Store};
 use crate::page::{Modal, ModalSubmission, Page, TextInputStyle};
 use super::support::{component_interaction, TestData};
@@ -66,7 +66,7 @@ async fn mock_discord(max_requests: usize, reject_index: Option<usize>)
 }
 
 async fn setup(max_requests: usize, reject_index: Option<usize>)
-    -> (App, tokio::task::JoinHandle<Vec<String>>)
+    -> (App<Arc<()>>, tokio::task::JoinHandle<Vec<String>>)
 {
     let (address, server) = mock_discord(max_requests, reject_index).await;
     let http = Arc::new(
@@ -77,10 +77,10 @@ async fn setup(max_requests: usize, reject_index: Option<usize>)
             .build()
     );
     let store: Arc<dyn Store> = Arc::new(MemoryStore::default());
-    (App::new(http, Database::new(()), store), server)
+    (App::new(http, Arc::new(()), store), server)
 }
 
-fn context(app: &App) -> Ctx {
+fn context(app: &App<Arc<()>>) -> Ctx {
     Ctx::new(app.clone(), Arc::new(component_interaction("response-test")), None)
 }
 
