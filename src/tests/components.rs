@@ -139,7 +139,7 @@ fn link_button_is_configured_with_a_url_without_an_execution() {
 }
 
 #[test]
-fn file_component_references_an_outgoing_attachment_by_filename() {
+fn file_component_accepts_the_documented_attachment_uri_form() {
     // First-principles check: File references an attachment; bytes are attached separately.
     let file = File::new("attachment://report.pdf");
     assert_eq!(file.filename, "attachment://report.pdf");
