@@ -139,7 +139,7 @@ fn component_interaction(custom_id: &str, component_type: u64, values: &[&str]) 
         "data": data
     });
 
-    serde_json::from_value(payload).expect("Component interaction fixture should deserialize")
+    serde_json::from_str(&payload.to_string()).expect("Component interaction fixture should deserialize")
 }
 
 fn button_interaction(custom_id: &str) -> Interaction {
@@ -188,7 +188,7 @@ fn modal_submit_interaction(custom_id: &str, message: &str) -> Interaction {
         }
     });
 
-    serde_json::from_value(payload).expect("Modal submission fixture should deserialize")
+    serde_json::from_str(&payload.to_string()).expect("Modal submission fixture should deserialize")
 }
 
 async fn read_http_request(stream: &mut TcpStream) -> String {
