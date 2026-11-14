@@ -351,15 +351,14 @@ The gallery and item properties that can be resolved at render time should suppo
 
 ### File
 
-A File component exposes an attachment inside a Components V2 message.
+A File component exposes an attachment inside a Components V2 message. Its constructor accepts the complete Discord attachment URI, including the `attachment://` prefix.
 
 ```rust
 File::new("attachment://document.pdf")
     .set_spoiler(false)
 ```
 
-The file must correspond to an attachment included with the message. The File component references the attachment; it does not upload the file itself. File components use Discord's attachment:// reference form.
-
+The stored reference is named `attachment_uri`, because the value includes the URI scheme and is not merely a filename. The URI must identify an attachment included with the outgoing message. The File component references the attachment; it does not upload the file itself.
 ## 6. Interactive components
 
 Interactive components have a developer-defined execution ID and an explicit asynchronous callback. The execution ID is static and unique within its Page. It identifies the callback in the Page definition; it is not the Discord custom_id sent to Discord. The framework generates that custom_id from the persistent routing identity.
@@ -519,7 +518,7 @@ StringSelect::new(
 )
 ```
 
-The placeholder, option labels, option descriptions, option emoji, and other display properties should support static or dynamic values where appropriate. Developer-defined option values remain the values returned to the callback.
+The placeholder, option labels, option descriptions, option emoji, and other display properties should support static or dynamic values where appropriate. A SelectOption exposes `.set_description(...)` and `.set_emoji(...)` for its optional description and emoji. The emoji value is `Option<String>`: a static or dynamic value may resolve to `Some(emoji)` or `None`. Developer-defined option values remain the values returned to the callback.
 
 Message selection menus support a disabled Boolean. Modal selection inputs do not support disabled; the framework must reject or prevent that property when building a Modal.
 
