@@ -137,5 +137,5 @@ async fn button_properties_accept_direct_async_closures() {
     let output = json.to_string();
     assert!(output.contains("Hello sample"));
     assert!(output.contains("✨"));
-    assert!(output.contains("\\\"disabled\\\":true"));
+    assert!(output.contains("\"disabled\":true"));
 }
