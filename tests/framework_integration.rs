@@ -631,6 +631,62 @@ async fn modal_submit_dispatch_deserializes_typed_form_data_and_replies() {
     assert_eq!(payload["data"]["content"], "Received: Hello from the form");
 }
 
+
+#[tokio::test]
+async fn frame_generated_button_is_registered_and_dispatched_by_its_page_execution_id() {
+    let app = memory_app();
+    let calls = Arc::new(AtomicUsize::new(0));
+    let calls_in_callback = calls.clone();
+
+    let page = app
+        .page::<DemoData>("integration-frame-button")
+        .add_frame(move |_ctx: RenderCtx<DemoDatabase>, _data: Arc<DemoData>| {
+            let calls = calls_in_callback.clone();
+            async move {
+                Ok(vec![
+                    Element::text("Dynamically generated controls"),
+                    Element::button(Button::new(
+                        "Frame action",
+                        "frame-action",
+                        ButtonStyle::Secondary,
+                        None,
+                        false,
+                        move |_ctx: Ctx<DemoDatabase>, data: DemoData| {
+                            let calls = calls.clone();
+                            async move {
+                                assert_eq!(data, demo_data());
+                                calls.fetch_add(1, Ordering::SeqCst);
+                                Ok(())
+                            }
+                        },
+                    )),
+                ])
+            }
+        })
+        .register(&app)
+        .unwrap();
+
+    let data = demo_data();
+    let custom_id = derive_custom_id(
+        "integration-frame-button",
+        "frame-action",
+        &serialized_data(&data),
+    )
+    .unwrap();
+
+    page.render(&app, data).await.unwrap();
+    assert!(
+        app.store().resolve(&custom_id).await.unwrap().is_some(),
+        "Frame-generated Button route should be persisted"
+    );
+
+    app.dispatch_interaction(button_interaction(&custom_id.0))
+        .await
+        .expect("Frame-generated Button should dispatch");
+
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+}
+
 #[tokio::test]
 async fn invalid_resolved_frame_does_not_persist_any_of_its_interaction_routes() {
     let app = memory_app();
