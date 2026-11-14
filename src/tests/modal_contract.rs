@@ -116,6 +116,43 @@ async fn modal_channel_select_input_renders() {
 }
 
 #[tokio::test]
+async fn modal_render_wraps_each_input_in_a_discord_label_component() {
+    // FIRST: the public Modal builder accepts bare inputs, while rendering
+    // supplies the Discord Label wrapper around each component.
+    let app = app();
+    let modal = Modal::<TestData>::new("modal-label-wrappers")
+        .set_title("Edit profile")
+        .add_text_input("username", "Username", TextInputStyle::Short)
+        .add_select(
+            "category",
+            "Category",
+            [ModalOption::new("Support", "support")],
+        )
+        .on_submit(|_ctx, _data, _submission: ModalSubmission| async move { Ok(()) })
+        .register(&app)
+        .unwrap();
+
+    let rendered = modal.render(&app, TestData::default()).await.unwrap();
+    let components = serde_json::to_value(&rendered.components).unwrap();
+    let inputs = components.as_array().expect("Modal components must serialize as an array");
+
+    assert_eq!(inputs.len(), 2);
+    for input in inputs {
+        assert_eq!(input["type"], 18, "each top-level Modal input must be a Label");
+        assert!(input.get("label").is_some(), "Label must include its display text");
+        assert!(input.get("component").is_some(), "Label must wrap the actual input component");
+    }
+
+    assert_eq!(inputs[0]["label"], "Username");
+    assert_eq!(inputs[0]["component"]["type"], 4, "Text Input must be inside its Label");
+    assert_eq!(inputs[0]["component"]["custom_id"], "username");
+
+    assert_eq!(inputs[1]["label"], "Category");
+    assert_eq!(inputs[1]["component"]["type"], 3, "String Select must be inside its Label");
+    assert_eq!(inputs[1]["component"]["custom_id"], "category");
+}
+
+#[tokio::test]
 async fn failed_modal_render_does_not_leave_a_persisted_submit_record() {
     // FIRST: failed dynamic resolution must not leave an orphan custom-ID record.
     let app = app();
