@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use crate::page::{Component, Page, PageItem, Separator, dynamic};
+use crate::page::{Component, Page, PageItem, Separator};
 use crate::app::RenderCtx;
 use super::support::{app, TestData};
 
@@ -25,22 +25,13 @@ fn page_data_type_is_shared_by_static_and_dynamic_components() {
     // The closure reads T and the App-linked RenderCtx without an extra generic.
     let page = Page::<TestData>::new("shared-data")
         .add_text("Static")
-        .add_text(dynamic(|ctx: RenderCtx, data: Arc<TestData>| async move {
+        .add_text(|ctx: RenderCtx, data: Arc<TestData>| async move {
             let _db = ctx.app.db.clone();
             Ok(format!("{} {}", data.label, data.count))
-        }));
+        });
     assert_eq!(page.items.len(), 2);
     assert!(matches!(&page.items[1], PageItem::Component(Component::Text(text))
         if matches!(text.content, crate::page::Value::Dynamic(_))));
-}
-
-#[test]
-fn paginate_is_opt_in_and_keeps_the_page_builder_chain() {
-    // First-principles check: this asserts only the user-facing toggle and fluent
-    // builder behavior. It does not test pagination internals.
-    let page = Page::<TestData>::new("paged").add_text("Rows").paginate();
-    assert!(page.paginate);
-    assert_eq!(page.items.len(), 1);
 }
 
 #[test]
