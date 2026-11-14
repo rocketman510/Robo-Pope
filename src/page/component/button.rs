@@ -13,7 +13,7 @@ pub enum ButtonStyle {
     Danger,
 }
 
-impl<T> IntoValue<ButtonStyle, T, D> for ButtonStyle {
+impl<T, D> IntoValue<ButtonStyle, T, D> for ButtonStyle {
     fn into_value(self) -> Value<ButtonStyle, T, D> { Value::Static(self) }
 }
 
@@ -27,7 +27,7 @@ pub struct Button<T, D = std::sync::Arc<()>> {
     /// Visual Button style after render-time resolution.
     pub style: Value<ButtonStyle, T, D>,
     /// Optional Unicode emoji shown beside the Button label.
-    pub emoji: Value<Option<String>, T>,
+    pub emoji: Value<Option<String>, T, D>,
     /// Whether the Button is disabled in the rendered message.
     pub disabled: Value<bool, T, D>,
     pub(crate) execution: Execution<T, (), D>,
@@ -46,11 +46,12 @@ impl<T, D> Button<T, D> {
     where
         L: IntoValue<String, T, D>,
         S: IntoValue<ButtonStyle, T, D>,
-        E: IntoValue<Option<String>, T>,
+        E: IntoValue<Option<String>, T, D>,
         B: IntoValue<bool, T, D>,
         F: Fn(Ctx<D>, T) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,
         T: Send + 'static,
+        D: Send + Sync + 'static,
     {
         let id = id.into();
         Self {
@@ -64,7 +65,7 @@ impl<T, D> Button<T, D> {
     }
 
     /// Sets a static or dynamic optional emoji.
-    pub fn set_emoji<V: IntoValue<Option<String>, T>>(mut self, emoji: V) -> Self {
+    pub fn set_emoji<V: IntoValue<Option<String>, T, D>>(mut self, emoji: V) -> Self {
         self.emoji = emoji.into_value();
         self
     }
