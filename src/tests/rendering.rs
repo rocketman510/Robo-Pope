@@ -118,7 +118,7 @@ async fn page_render_resolves_dynamic_values_with_page_data_and_app_context() {
 
     let page = Page::<TestData>::new("render-dynamic")
         .add_text(
-            move |ctx: crate::app::RenderCtx<Arc<()>>, data: Arc<TestData>| {
+            move |ctx: crate::app::RenderCtx<std::sync::Arc<()>>, data: std::sync::Arc<TestData>| {
                 let observed = observed.clone();
                 async move {
                     assert_eq!(ctx.definition_id.as_ref(), "render-dynamic");
