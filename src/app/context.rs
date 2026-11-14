@@ -9,7 +9,7 @@ use crate::app::{App, BoxFuture};
 use crate::page::{ModalRender, RenderedMessage, Selection};
 
 /// Render-time context for resolving dynamic Page properties and Frame contents.
-pub struct RenderCtx<D = crate::app::Database> {
+pub struct RenderCtx<D = Arc<()>> {
     pub app: App<D>,
     pub definition_id: Arc<str>,
 }
@@ -28,7 +28,7 @@ pub struct Ctx<D = Arc<()>> {
     pub selection: Option<Selection>,
     acknowledged: Arc<AtomicBool>,
 }
-impl<D: Sync> Ctx<D> {
+impl<D: Send + Sync + 'static> Ctx<D> {
     pub(crate) fn new(
         app: App<D>,
         interaction: Arc<Interaction>,
