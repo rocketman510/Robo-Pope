@@ -61,7 +61,7 @@ async fn dynamic_property_and_execution_callbacks_read_named_host_database_field
     // render-time and interaction-time callbacks.
     use std::sync::atomic::{AtomicBool, Ordering};
     use crate::app::store::derive_custom_id;
-    use crate::page::{Button, ButtonStyle, Page};
+    use crate::page::{Button, ButtonStyle};
     use super::support::{component_interaction, TestData};
 
     let database = Arc::new(HostDatabase {
@@ -80,7 +80,7 @@ async fn dynamic_property_and_execution_callbacks_read_named_host_database_field
     let serialized = serde_json::to_vec(&data).unwrap();
     let custom_id = derive_custom_id("typed-database-callback", "open-users", &serialized).unwrap();
 
-    let page = Page::<TestData>::new("typed-database-callback")
+    let page = app.page::<TestData>("typed-database-callback")
         .add_text(move |ctx, _data| {
             let observed = render_flag.clone();
             async move {
