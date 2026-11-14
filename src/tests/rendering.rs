@@ -67,7 +67,7 @@ async fn page_render_renders_container_children_in_order() {
     let rendered = page.render(&app, TestData::default()).await.unwrap();
 
     assert_eq!(rendered.components().len(), 1);
-    let (components, attachments, _) = rendered.into_parts();
+    let (components, attachments) = rendered.into_parts();
     assert_eq!(components.len(), 1);
     assert!(attachments.is_empty());
     let serialized = serde_json::to_value(&components[0]).unwrap();
