@@ -111,7 +111,6 @@ fn static_component_count<T, D>(component: &Component<T, D>) -> usize {
         C::Container(container) => {
             1 + container.children.iter().map(|child| match child {
                 ContainerItem::Component(component) => static_component_count(component),
-                ContainerItem::Frame(_) => 0,
             }).sum::<usize>()
         }
         C::Text(_) | C::Separator(_) | C::MediaGallery(_) | C::File(_) => 1,
@@ -690,19 +689,6 @@ where
                     component, &mut children, &mut budget, app, ctx, data, serialized_data,
                     definition_id, execution_ids, routes,
                 ).await?;
-            }
-            ContainerItem::Frame(frame) => {
-                let elements = (frame.resolver)(ctx.clone(), data.clone()).await
-                    .context("Resolving Frame inside Container")?;
-                validate_frame_elements(&elements, execution_ids)
-                    .context("Validating Container Frame elements")?;
-                for element in elements {
-                    register_component_executions(&element.component, app, definition_id)?;
-                    append_component(
-                        &element.component, &mut children, &mut budget, app, ctx, data,
-                        serialized_data, definition_id, execution_ids, routes,
-                    ).await.context("Rendering an element from a Container Frame")?;
-                }
             }
         }
     }
