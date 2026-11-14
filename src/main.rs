@@ -17,7 +17,7 @@ use serenity::{
 };
 
 use robo_pope::{
-    app::{store::{SqliteStore, Store}, App, RenderCtx},
+    app::{store::{SqliteStore, Store}, App, Ctx, RenderCtx},
     page::{
         Button, ButtonStyle, Container, Element, LinkButton, MediaGallery, Modal,
         Page, Section, SelectOption, Separator, StringSelect, TextInputStyle,
@@ -82,7 +82,7 @@ fn register_demo_page(app: &App<DemoDatabase>) -> anyhow::Result<()> {
                 ButtonStyle::Primary,
                 None,
                 false,
-                |ctx, data: DemoData| async move {
+                |ctx: Ctx<DemoDatabase>, data: DemoData| async move {
                     ctx.app.db.button_clicks.fetch_add(1, Ordering::Relaxed);
 
                     let updated = ctx
@@ -132,7 +132,7 @@ fn register_demo_page(app: &App<DemoDatabase>) -> anyhow::Result<()> {
                 SelectOption::new("Second option", "second"),
                 SelectOption::new("Third option", "third"),
             ],
-            |ctx, _data: DemoData, selected: Vec<String>| async move {
+            |ctx: Ctx<DemoDatabase>, _data: DemoData, selected: Vec<String>| async move {
                 ctx.app.db.selections.fetch_add(1, Ordering::Relaxed);
                 ctx.reply(format!("Selected: {}", selected.join(", ")))
                     .await?;
@@ -144,7 +144,7 @@ fn register_demo_page(app: &App<DemoDatabase>) -> anyhow::Result<()> {
                 .add_media("https://cdn.discordapp.com/embed/avatars/0.png")
                 .add_media("https://cdn.discordapp.com/embed/avatars/1.png"),
         )
-        .add_frame(|ctx, _data| async move {
+        .add_frame(|ctx: RenderCtx<DemoDatabase>, _data: Arc<DemoData>| async move {
             let clicks = ctx.app.db.button_clicks.load(Ordering::Relaxed);
             let selections = ctx.app.db.selections.load(Ordering::Relaxed);
             let submissions = ctx.app.db.modal_submissions.load(Ordering::Relaxed);
@@ -164,7 +164,7 @@ fn register_demo_modal(app: &App<DemoDatabase>) -> anyhow::Result<()> {
     let modal = Modal::<DemoData, DemoDatabase>::new("framework-demo-modal")
         .set_title("Framework Demo Form")
         .add_text_input("message", "Your message", TextInputStyle::Short)
-        .on_submit_typed(|ctx, _data: DemoData, form: DemoForm| async move {
+        .on_submit_typed(|ctx: Ctx<DemoDatabase>, _data: DemoData, form: DemoForm| async move {
             ctx.app
                 .db
                 .modal_submissions
@@ -242,7 +242,7 @@ impl EventHandler for DemoHandler {
                 }
             }
 
-            FullEvent::InteractionCreate { interaction } => {
+            FullEvent::InteractionCreate { interaction, .. } => {
                 if let Err(error) = self.app.dispatch_interaction(interaction.clone()).await {
                     eprintln!("Failed to dispatch demo interaction: {error:#}");
                 }
