@@ -287,3 +287,20 @@ fn static_string_select_option_description_over_100_characters_is_rejected_at_re
     assert!(page.register(&app).is_err());
 }
 
+
+
+#[test]
+fn statically_disabled_string_select_option_is_rejected_at_registration() {
+    // Page API §§6 and 12: String Select options have no disabled field, and a
+    // statically unsupported setting must be rejected during registration.
+    let app = app();
+    let page = Page::<TestData>::new("static-disabled-option")
+        .add_selection_menu(StringSelect::new(
+            "Choose",
+            "choose",
+            [SelectOption::new("Disabled", "disabled").set_disabled(true)],
+            |_ctx, _data: TestData, _values: Vec<String>| async move { Ok(()) },
+        ));
+
+    assert!(page.register(&app).is_err());
+}
