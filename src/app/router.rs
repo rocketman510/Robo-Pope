@@ -127,7 +127,7 @@ impl InteractionRouter {
     /// from the Modal's originally serialized data.
     pub async fn dispatch_modal_submit<D: Clone + Send + Sync + 'static>(
         &self,
-        app: &App<Database>,
+        app: &App<D>,
         interaction: Interaction,
     ) -> anyhow::Result<()> {
         let modal = match &interaction {
