@@ -6,7 +6,7 @@ use tokio::time::timeout;
 use crate::app::{App, Ctx};
 use crate::app::store::{derive_custom_id, MemoryStore, Store};
 use crate::page::{Button, ButtonStyle, Modal, ModalSubmission, Page, TextInputStyle};
-use super::support::{component_interaction, TestData};
+use super::support::{component_interaction, modal_submit_interaction, TestData};
 
 const MESSAGE_JSON: &str = r#"{"id":"500","channel_id":"300","author":{"id":"200","username":"bot","discriminator":"0","global_name":null,"avatar":null},"content":"","timestamp":"2024-01-01T00:00:00.000000+00:00","edited_timestamp":null,"tts":false,"mention_everyone":false,"mentions":[],"mention_roles":[],"attachments":[],"embeds":[],"pinned":false,"type":0,"flags":0,"components":[]}"#;
 
@@ -249,4 +249,40 @@ async fn an_interaction_cannot_receive_two_initial_responses() {
     assert!(ctx.defer().await.is_err());
     let requests = server.await.unwrap();
     assert!(requests.len() == 1 || requests.len() == 2);
+}
+
+
+#[tokio::test]
+async fn locally_rejected_edit_message_does_not_consume_modal_initial_response() {
+    // Page API §10: edit_message is only valid for a Component interaction.
+    // A local validation error sends no Discord response, so the callback must
+    // still be able to use a valid initial response operation afterward.
+    let (app, server) = setup(1, None).await;
+    let ctx = Ctx::new(
+        app.clone(),
+        Arc::new(modal_submit_interaction("modal-edit-is-invalid")),
+        None,
+    );
+
+    let page = Page::<TestData>::new("invalid-edit-payload")
+        .add_text("fallback")
+        .register(&app)
+        .unwrap();
+    let rendered = page.render(&app, TestData::default()).await.unwrap();
+
+    assert!(ctx.edit_message(rendered).await.is_err());
+    ctx.reply("valid fallback response").await.unwrap();
+
+    let requests = server.await.unwrap();
+    assert_eq!(requests.len(), 1);
+    assert!(
+        requests[0].lines().next().unwrap().contains(
+            "POST /api/v10/interactions/9002/modal-token/callback"
+        ),
+        "the valid fallback must be sent as the Modal interaction's initial response",
+    );
+    let body = requests[0].split_once("\r\n\r\n").unwrap().1;
+    let payload: serde_json::Value = serde_json::from_str(body).unwrap();
+    assert_eq!(payload["type"], 4);
+    assert_eq!(payload["data"]["content"], "valid fallback response");
 }
