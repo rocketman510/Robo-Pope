@@ -191,7 +191,7 @@ A fully populated row is:
 ))
 ```
 
-The API should implement each slot as a value convertible into Option<Button>. Rust provides the conversion from T to Option<T>, so a Button can be passed directly and becomes Some(button) internally. Callers therefore write button1, not Some(button1). They write None only for an empty position.
+Each row slot uses a small ButtonSlot conversion type. Button converts directly into ButtonSlot, and LinkButton converts directly into ButtonSlot. None is also accepted and represents an empty position. The fixed tuple therefore accepts Button, LinkButton, or None without requiring Some(...) around present values. This conversion is explicit in the public API contract and keeps the call site simple.
 
 This is deliberate. The public examples and method signatures must consistently use direct Button values and None; they must not alternate between direct values and explicit Some(...) wrappers.
 
@@ -240,7 +240,7 @@ Section::new()
             "View profile",
             "ViewProfile",
             ButtonStyle::Secondary,
-            Some("👤"),
+            Some("👤".into()),
             false,
             |ctx, data| async move {
                 Ok(())
@@ -266,7 +266,7 @@ Container::new()
 
 A Page may contain multiple independent Containers. A Container is not a nested Page and does not have its own Page data type or registration lifecycle. It should expose the same general composition style as a Page for the component types Discord permits inside a Container.
 
-The supported Container children are Action Rows, Text Displays, Sections, Media Galleries, Separators, and File components. A Container cannot contain another Container. The framework validates the child structure against Discord's rules.
+The supported Container children are Action Rows, Text Displays, Sections, Media Galleries, Separators, and File components. A Container cannot contain another Container. The framework validates the child structure against Discord's rules. The Container builder should expose the same conversion and static-or-dynamic property behavior as the Page builder for every child type that Discord allows in a Container.
 
 ### Separator
 
@@ -344,7 +344,7 @@ Button::new(
     "Show Level",
     "ShowLevel",
     ButtonStyle::Secondary,
-    Some("📊"),
+    Some("📊".into()),
     false,
     |ctx, data: UserLevelData| async move {
         let user = sqlx::query_as::<_, User>(
@@ -361,7 +361,7 @@ Button::new(
 )
 ```
 
-The emoji argument is an Option value. Some("📊") supplies an emoji; None means the Button has no emoji. The disabled argument is a Boolean, where true disables the Button and false leaves it enabled.
+The emoji argument is an Option value. Some("📊".into()) supplies an emoji; None means the Button has no emoji. The disabled argument is a Boolean, where true disables the Button and false leaves it enabled.
 
 A Button with no emoji is written explicitly:
 
@@ -378,7 +378,7 @@ Button::new(
 )
 ```
 
-The label, style, emoji, and disabled state each accept either a static value or an asynchronous callback that resolves to that value. In particular, a dynamic emoji callback returns Option<Emoji> so it can resolve to either Some(emoji) or None. The execution ID is always a static string, and the execution callback is always explicit.
+The label and style accept a static value or an asynchronous callback returning that value. The emoji is an optional Unicode emoji string, so its value is Option<String>; it may be supplied statically or by an asynchronous callback returning Option<String>. The disabled property is a Boolean and may be supplied statically or by an asynchronous callback returning bool. The execution ID is always a static string, and the execution callback is always explicit.
 
 A dynamic-property example is:
 
@@ -392,7 +392,7 @@ Button::new(
         Ok(ButtonStyle::Secondary)
     },
     |ctx, data| async move {
-        Ok(Some("📊"))
+        Ok(Some("📊".into()))
     },
     |ctx, data| async move {
         Ok(false)
@@ -412,12 +412,12 @@ A Link Button opens a URL. It is a separate type because clicking it navigates t
 LinkButton::new(
     "Visit Website",
     "https://example.com",
-    Some("🌐"),
+    Some("🌐".into()),
     false,
 )
 ```
 
-The Link Button's style is always Discord's Link style. Its label, URL, optional emoji, and disabled Boolean each accept a static value or a dynamic callback. Some("🌐") supplies an emoji and None omits it.
+The Link Button's style is always Discord's Link style. Its label, URL, optional emoji, and disabled Boolean each accept a static value or a dynamic callback. Some("🌐".into()) supplies an emoji and None omits it.
 
 Discord's current Button component schema includes disabled for Link-style Buttons as well as callback Buttons. Therefore LinkButton must expose a disabled property. A disabled Link Button remains a link-style component but cannot be activated.
 
@@ -425,7 +425,7 @@ A Link Button has no execution ID and must not create a callback-routing record.
 
 ### Button rows
 
-Developers add Buttons to a Page through a fixed five-slot tuple. The framework creates the Action Row.
+Developers add Buttons and Link Buttons to a Page through a fixed five-slot tuple. The framework creates the Action Row. Each tuple position accepts Button, LinkButton, or None through the ButtonSlot conversion type.
 
 ```rust
 Page::<Dataless>::new("Actions")
@@ -434,7 +434,7 @@ Page::<Dataless>::new("Actions")
             "Confirm",
             "Confirm",
             ButtonStyle::Success,
-            Some("✅"),
+            Some("✅".into()),
             false,
             |ctx, data| async move { Ok(()) },
         ),
@@ -598,7 +598,7 @@ Button::new(
     "Edit User",
     "EditUser",
     ButtonStyle::Primary,
-    Some("✏️"),
+    Some("✏️".into()),
     false,
     |ctx, data: EditUserData| async move {
         let modal = ctx.app.modals
@@ -939,31 +939,32 @@ let page = Page::<UserListData>::new("UserList")
             .set_accent_color(0x5865F2)
             .add_text("# User Directory")
             .add_separator()
-            .add_frame(|ctx, data| async move {
-                let users = sqlx::query_as::<_, User>(
-                    "SELECT * FROM users WHERE guild_id = ? ORDER BY username"
-                )
-                .bind(&data.guild_id)
-                .fetch_all(&ctx.app.db.pool)
-                .await?;
-
-                Ok(users.into_iter()
-                    .map(|user| {
-                        Element::text(format!(
-                            "{} - Level {}",
-                            user.username,
-                            user.level
-                        ))
-                    })
-                    .collect())
-            })
+            .add_text("Directory entries follow below.")
     )
+    .add_frame(|ctx, data| async move {
+        let users = sqlx::query_as::<_, User>(
+            "SELECT * FROM users WHERE guild_id = ? ORDER BY username"
+        )
+        .bind(&data.guild_id)
+        .fetch_all(&ctx.app.db.pool)
+        .await?;
+
+        Ok(users.into_iter()
+            .map(|user| {
+                Element::text(format!(
+                    "{} - Level {}",
+                    user.username,
+                    user.level
+                ))
+            })
+            .collect())
+    })
     .add_button_row((
         Button::new(
             "Refresh",
             "RefreshUsers",
             ButtonStyle::Secondary,
-            Some("🔄"),
+            Some("🔄".into()),
             false,
             |ctx, data: UserListData| async move {
                 ctx.reply("Refreshing the user directory.").await?;
