@@ -13,7 +13,7 @@ use serenity::builder::{
 };
 use serenity::all::ButtonStyle as SerenityButtonStyle;
 use serde::{Serialize, de::DeserializeOwned};
-use crate::app::{App, RenderCtx<D>};
+use crate::app::{App, RenderCtx};
 use crate::app::store::{derive_custom_id_with_frame, DefinitionKind, StoreRecord};
 use super::component::*;
 use super::frame::Frame;
@@ -60,7 +60,7 @@ fn validate_frame_id(id: &str, ids: &mut HashSet<String>) -> anyhow::Result<()> 
 }
 
 fn validate_component_ids<T, D>(
-    component: &Component<T>,
+    component: &Component<T, D>,
     execution_ids: &mut HashSet<String>,
     frame_ids: &mut HashSet<String>,
 ) -> anyhow::Result<()> {
@@ -115,13 +115,14 @@ fn validate_component_ids<T, D>(
 }
 
 fn register_component_executions<T, D>(
-    component: &Component<T>,
+    component: &Component<T, D>,
     app: &App<D>,
     definition_id: &str,
     frame_identity: Option<&str>,
 ) -> anyhow::Result<()>
 where
     T: DeserializeOwned + Send + Sync + 'static,
+    D: Clone + Send + Sync + 'static,
 {
     use super::component::{ContainerItem, SectionAccessory};
     match component {
@@ -188,7 +189,7 @@ fn pagination_execution_id(frame_id: &str, direction: &str) -> String {
 }
 
 fn collect_component_frames<T, D>(
-    component: &Component<T>,
+    component: &Component<T, D>,
     page_paginate: bool,
     output: &mut Vec<String>,
 ) {
@@ -205,7 +206,7 @@ fn collect_component_frames<T, D>(
 }
 
 fn collect_paginated_frames_in_component<T, D>(
-    component: &Component<T>,
+    component: &Component<T, D>,
     page_paginate: bool,
     output: &mut Vec<(usize, String)>,
 ) {
@@ -376,6 +377,7 @@ impl<T, D> Page<T, D> {
     /// Appends a dynamic region whose elements are resolved when the Page renders.
     pub fn add_frame<F, Fut>(mut self, resolver: F) -> Self
     where
+        D: Send + Sync + 'static,
         F: Fn(RenderCtx<D>, Arc<T>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = anyhow::Result<Vec<super::frame::Element<T, D>>>> + Send + 'static,
         T: Send + Sync + 'static,
@@ -464,9 +466,9 @@ fn validate_message_budget(budget: ComponentBudget) -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn persist_button_execution<T>(
+async fn persist_button_execution<T, D>(
     app: &App<D>,
-    button: &Button<T>,
+    button: &Button<T, D>,
     definition_id: &str,
     serialized_data: &[u8],
     frame_identity: Option<&str>,
@@ -493,7 +495,7 @@ async fn persist_button_execution<T>(
     Ok(custom_id.0)
 }
 
-async fn persist_select_execution(
+async fn persist_select_execution<D>(
     app: &App<D>,
     execution_id: &str,
     definition_id: &str,
@@ -518,8 +520,8 @@ async fn persist_select_execution(
     Ok(custom_id.0)
 }
 
-async fn render_link_button<T>(
-    button: &LinkButton<T>,
+async fn render_link_button<T, D>(
+    button: &LinkButton<T, D>,
     ctx: &RenderCtx<D>,
     data: &Arc<T>,
 ) -> anyhow::Result<CreateButton<'static>>
@@ -542,9 +544,9 @@ where
     Ok(rendered.into_owned())
 }
 
-async fn render_button<T>(
+async fn render_button<T, D>(
     app: &App<D>,
-    button: &Button<T>,
+    button: &Button<T, D>,
     ctx: &RenderCtx<D>,
     data: &Arc<T>,
     definition_id: &str,
@@ -583,8 +585,8 @@ where
     Ok(rendered.into_owned())
 }
 
-async fn render_select_menu<T>(
-    menu: &SelectMenu<T>,
+async fn render_select_menu<T, D>(
+    menu: &SelectMenu<T, D>,
     app: &App<D>,
     ctx: &RenderCtx<D>,
     data: &Arc<T>,
@@ -719,8 +721,8 @@ where
     Ok(rendered.into_owned())
 }
 
-async fn render_media_gallery<T>(
-    gallery: &super::component::MediaGallery<T>,
+async fn render_media_gallery<T, D>(
+    gallery: &super::component::MediaGallery<T, D>,
     ctx: &RenderCtx<D>,
     data: &Arc<T>,
 ) -> anyhow::Result<CreateMediaGallery<'static>>
@@ -765,8 +767,8 @@ where
     Ok(CreateMediaGallery::new(items).into_owned())
 }
 
-async fn render_container<T>(
-    container: &super::component::Container<T>,
+async fn render_container<T, D>(
+    container: &super::component::Container<T, D>,
     app: &App<D>,
     ctx: &RenderCtx<D>,
     data: &Arc<T>,
@@ -782,7 +784,7 @@ where
     let mut children = Vec::new();
     let mut budget = ComponentBudget::default();
 
-    async fn append_component<T>(
+    async fn append_component<T, D>(
         component: &C<T>,
         key: Option<&str>,
         children: &mut Vec<CreateContainerComponent<'static>>,
@@ -882,8 +884,8 @@ where
     Ok((rendered.into_owned(), budget))
 }
 
-async fn render_component<T>(
-    component: &Component<T>,
+async fn render_component<T, D>(
+    component: &Component<T, D>,
     app: &App<D>,
     ctx: &RenderCtx<D>,
     data: &Arc<T>,
@@ -1135,7 +1137,7 @@ where
     }
 }
 
-async fn render_component_list<T>(
+async fn render_component_list<T, D>(
     components: &[&Component<T, D>],
     app: &App<D>,
     ctx: &RenderCtx<D>,
@@ -1177,7 +1179,7 @@ struct RenderedFrameElement {
     budget: ComponentBudget,
 }
 
-async fn render_frame_elements<T>(
+async fn render_frame_elements<T, D>(
     elements: &[super::frame::Element<T, D>],
     app: &App<D>,
     ctx: &RenderCtx<D>,
@@ -1243,7 +1245,7 @@ fn plan_rendered_frame(
     Ok((pages, page_count))
 }
 
-async fn create_pagination_navigation(
+async fn create_pagination_navigation<D>(
     app: &App<D>,
     definition_id: &str,
     frame_id: &str,
@@ -1303,7 +1305,7 @@ fn as_container_child(part: RenderedComponent) -> anyhow::Result<CreateContainer
     }
 }
 
-async fn render_page_items<T>(
+async fn render_page_items<T, D>(
     items: &[PageItem<T, D>],
     app: &App<D>,
     ctx: &RenderCtx<D>,
@@ -1346,7 +1348,7 @@ where
     Ok((rendered, budget))
 }
 
-async fn render_container_items<T>(
+async fn render_container_items<T, D>(
     items: &[super::component::ContainerItem<T>],
     app: &App<D>,
     ctx: &RenderCtx<D>,
@@ -1458,8 +1460,8 @@ fn plan_container_frame_ranges(
     Ok(ranges)
 }
 
-async fn render_paginated_container<T>(
-    container: &super::component::Container<T>,
+async fn render_paginated_container<T, D>(
+    container: &super::component::Container<T, D>,
     app: &App<D>,
     ctx: &RenderCtx<D>,
     data: &Arc<T>,
@@ -1586,7 +1588,7 @@ where
     Ok(RenderedPage { pages, current_index: 0 })
 }
 
-impl<T> RegisteredPage<T, D>
+impl<T, D> RegisteredPage<T, D>
 where
     T: Serialize + DeserializeOwned + Send + Sync + 'static
 {
@@ -1598,7 +1600,7 @@ where
     pub async fn render(&self, app: &App<D>, data: T)
         -> anyhow::Result<RenderedMessage>
     where
-        D: Clone + std::any::Any + Send + Sync + 'static,
+        D: Clone + Send + Sync + 'static,
     {
         let mut rendered = self.render_pages(app, data).await
             .with_context(|| format!("Rendering Page '{}'", self.id()))?;
@@ -1610,7 +1612,7 @@ where
     pub async fn render_pages(&self, app: &App<D>, data: T)
         -> anyhow::Result<RenderedPage>
     where
-        D: Clone + std::any::Any + Send + Sync + 'static,
+        D: Clone + Send + Sync + 'static,
     {
         let data = Arc::new(data);
         let serialized_data = serde_json::to_vec(data.as_ref())
