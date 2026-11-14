@@ -5,6 +5,16 @@ use crate::page::modal::input::{ModalSelectInput, TextInput};
 use crate::page::value::Value;
 use super::support::{app, TestData};
 
+fn assert_label_wrapped_input(value: &serde_json::Value, input_id: &str, component_type: u64) {
+    let inputs = value.as_array().expect("Modal components must serialize as an array");
+    let label = inputs.first().expect("Modal must contain the configured input");
+    assert_eq!(label["type"], 18, "Modal input must be wrapped in a Label");
+    assert_eq!(label["component"]["type"], component_type);
+    assert_eq!(label["component"]["custom_id"], input_id);
+    assert!(label.get("label").is_some());
+    assert_ne!(label["component"]["disabled"], true, "Modal inputs must not be disabled");
+}
+
 fn entity_input(id: &str, label: &str, kind: &str) -> ModalInput<TestData> {
     let input = ModalSelectInput { id: id.into(), label: Value::Static(label.into()), options: vec![] };
     match kind {
@@ -24,7 +34,9 @@ async fn modal_string_select_input_renders() {
         .add_select("choice", "Choice", [ModalOption::new("Alpha", "a"), ModalOption::new("Beta", "b")])
         .on_submit(|_ctx, _data, _submission: ModalSubmission| async move { Ok(()) })
         .register(&app).unwrap();
-    assert!(modal.render(&app, TestData::default()).await.is_ok());
+    let rendered = modal.render(&app, TestData::default()).await.unwrap();
+    let payload = serde_json::to_value(&rendered.components).unwrap();
+    assert_label_wrapped_input(&payload, "choice", 3);
 }
 
 #[tokio::test]
@@ -35,7 +47,9 @@ async fn modal_checkbox_input_renders() {
         .add_checkbox("urgent", "Urgent")
         .on_submit(|_ctx, _data, _submission: ModalSubmission| async move { Ok(()) })
         .register(&app).unwrap();
-    assert!(modal.render(&app, TestData::default()).await.is_ok());
+    let rendered = modal.render(&app, TestData::default()).await.unwrap();
+    let payload = serde_json::to_value(&rendered.components).unwrap();
+    assert_label_wrapped_input(&payload, "urgent", 23);
 }
 
 #[tokio::test]
@@ -46,7 +60,9 @@ async fn modal_checkbox_group_input_renders() {
         .add_checkbox_group("features", "Features", [ModalOption::new("One", "one"), ModalOption::new("Two", "two")])
         .on_submit(|_ctx, _data, _submission: ModalSubmission| async move { Ok(()) })
         .register(&app).unwrap();
-    assert!(modal.render(&app, TestData::default()).await.is_ok());
+    let rendered = modal.render(&app, TestData::default()).await.unwrap();
+    let payload = serde_json::to_value(&rendered.components).unwrap();
+    assert_label_wrapped_input(&payload, "features", 22);
 }
 
 #[tokio::test]
@@ -57,7 +73,9 @@ async fn modal_radio_group_input_renders() {
         .add_radio_group("level", "Level", [ModalOption::new("Low", "low"), ModalOption::new("High", "high")])
         .on_submit(|_ctx, _data, _submission: ModalSubmission| async move { Ok(()) })
         .register(&app).unwrap();
-    assert!(modal.render(&app, TestData::default()).await.is_ok());
+    let rendered = modal.render(&app, TestData::default()).await.unwrap();
+    let payload = serde_json::to_value(&rendered.components).unwrap();
+    assert_label_wrapped_input(&payload, "level", 21);
 }
 
 #[tokio::test]
@@ -68,7 +86,9 @@ async fn modal_file_upload_input_renders() {
         .add_file_upload("attachment", "Attachment")
         .on_submit(|_ctx, _data, _submission: ModalSubmission| async move { Ok(()) })
         .register(&app).unwrap();
-    assert!(modal.render(&app, TestData::default()).await.is_ok());
+    let rendered = modal.render(&app, TestData::default()).await.unwrap();
+    let payload = serde_json::to_value(&rendered.components).unwrap();
+    assert_label_wrapped_input(&payload, "attachment", 19);
 }
 
 #[tokio::test]
@@ -79,7 +99,9 @@ async fn modal_user_select_input_renders() {
         .add_input(entity_input("users", "Users", "user"))
         .on_submit(|_ctx, _data, _submission: ModalSubmission| async move { Ok(()) })
         .register(&app).unwrap();
-    assert!(modal.render(&app, TestData::default()).await.is_ok());
+    let rendered = modal.render(&app, TestData::default()).await.unwrap();
+    let payload = serde_json::to_value(&rendered.components).unwrap();
+    assert_label_wrapped_input(&payload, "users", 5);
 }
 
 #[tokio::test]
@@ -90,7 +112,9 @@ async fn modal_role_select_input_renders() {
         .add_input(entity_input("roles", "Roles", "role"))
         .on_submit(|_ctx, _data, _submission: ModalSubmission| async move { Ok(()) })
         .register(&app).unwrap();
-    assert!(modal.render(&app, TestData::default()).await.is_ok());
+    let rendered = modal.render(&app, TestData::default()).await.unwrap();
+    let payload = serde_json::to_value(&rendered.components).unwrap();
+    assert_label_wrapped_input(&payload, "roles", 6);
 }
 
 #[tokio::test]
@@ -101,7 +125,9 @@ async fn modal_mentionable_select_input_renders() {
         .add_input(entity_input("mentions", "Mentions", "mentionable"))
         .on_submit(|_ctx, _data, _submission: ModalSubmission| async move { Ok(()) })
         .register(&app).unwrap();
-    assert!(modal.render(&app, TestData::default()).await.is_ok());
+    let rendered = modal.render(&app, TestData::default()).await.unwrap();
+    let payload = serde_json::to_value(&rendered.components).unwrap();
+    assert_label_wrapped_input(&payload, "mentions", 7);
 }
 
 #[tokio::test]
@@ -112,7 +138,9 @@ async fn modal_channel_select_input_renders() {
         .add_input(entity_input("channels", "Channels", "channel"))
         .on_submit(|_ctx, _data, _submission: ModalSubmission| async move { Ok(()) })
         .register(&app).unwrap();
-    assert!(modal.render(&app, TestData::default()).await.is_ok());
+    let rendered = modal.render(&app, TestData::default()).await.unwrap();
+    let payload = serde_json::to_value(&rendered.components).unwrap();
+    assert_label_wrapped_input(&payload, "channels", 8);
 }
 
 #[tokio::test]
@@ -137,19 +165,11 @@ async fn modal_render_wraps_each_input_in_a_discord_label_component() {
     let inputs = components.as_array().expect("Modal components must serialize as an array");
 
     assert_eq!(inputs.len(), 2);
-    for input in inputs {
-        assert_eq!(input["type"], 18, "each top-level Modal input must be a Label");
-        assert!(input.get("label").is_some(), "Label must include its display text");
-        assert!(input.get("component").is_some(), "Label must wrap the actual input component");
-    }
-
     assert_eq!(inputs[0]["label"], "Username");
-    assert_eq!(inputs[0]["component"]["type"], 4, "Text Input must be inside its Label");
-    assert_eq!(inputs[0]["component"]["custom_id"], "username");
-
     assert_eq!(inputs[1]["label"], "Category");
-    assert_eq!(inputs[1]["component"]["type"], 3, "String Select must be inside its Label");
-    assert_eq!(inputs[1]["component"]["custom_id"], "category");
+    assert_label_wrapped_input(&components, "username", 4);
+    let second = serde_json::json!([inputs[1].clone()]);
+    assert_label_wrapped_input(&second, "category", 3);
 }
 
 #[tokio::test]
