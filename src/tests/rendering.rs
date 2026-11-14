@@ -6,7 +6,7 @@ use std::sync::{
 use crate::{
     app::{RenderCtx, store::{CustomId, derive_custom_id}},
     page::{
-        Button, ButtonStyle, Container, Element, Modal, Page, Separator, TextInputStyle,
+        Button, ButtonStyle, Container, Element, LinkButton, Modal, Page, Separator, TextInputStyle,
     },
 };
 use super::support::{app, TestData};
@@ -128,6 +128,90 @@ async fn page_render_persists_button_execution_identity_and_page_data() {
     assert_eq!(record.definition_id, "render-persist");
     assert_eq!(record.execution_id, "open-profile");
     assert_eq!(record.serialized_data, serialized_data);
+}
+
+#[tokio::test]
+async fn link_buttons_render_without_routing_records() {
+    // FIRST: Link Buttons are URL components, not callback executions. A
+    // sibling callback Button still receives its ordinary deterministic route.
+    let app = app();
+    let data = TestData::default();
+    let serialized = serde_json::to_vec(&data).unwrap();
+    let callback_id = derive_custom_id("link-and-callback", "refresh", &serialized).unwrap();
+
+    let page = Page::<TestData>::new("link-and-callback")
+        .add_button_row((
+            Button::new(
+                "Refresh",
+                "refresh",
+                ButtonStyle::Secondary,
+                None,
+                false,
+                |_ctx, _data: TestData| async move { Ok(()) },
+            ),
+            LinkButton::new(
+                "Documentation",
+                "https://example.test/docs",
+                Some("🌐".into()),
+                true,
+            ),
+            None,
+            None,
+            None,
+        ))
+        .register(&app)
+        .unwrap();
+
+    let rendered = page.render(&app, data).await.unwrap();
+    let json = serde_json::to_value(rendered.into_components()).unwrap();
+
+    fn find_label<'a>(value: &'a serde_json::Value, label: &str) -> Option<&'a serde_json::Value> {
+        match value {
+            serde_json::Value::Object(map) => {
+                if map.get("label").and_then(serde_json::Value::as_str) == Some(label) {
+                    return Some(value);
+                }
+                map.values().find_map(|child| find_label(child, label))
+            }
+            serde_json::Value::Array(items) => items.iter().find_map(|child| find_label(child, label)),
+            _ => None,
+        }
+    }
+
+    fn collect_custom_ids(value: &serde_json::Value, ids: &mut Vec<String>) {
+        match value {
+            serde_json::Value::Object(map) => {
+                if let Some(id) = map.get("custom_id").and_then(serde_json::Value::as_str) {
+                    ids.push(id.to_owned());
+                }
+                for child in map.values() {
+                    collect_custom_ids(child, ids);
+                }
+            }
+            serde_json::Value::Array(items) => {
+                for child in items {
+                    collect_custom_ids(child, ids);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    let link = find_label(&json, "Documentation").expect("Link Button must be rendered");
+    assert_eq!(link["url"], "https://example.test/docs");
+    assert_eq!(link["disabled"], true);
+    assert!(link.get("custom_id").is_none(), "Link Button must not have a custom_id");
+
+    let callback = find_label(&json, "Refresh").expect("callback Button must be rendered");
+    assert_eq!(callback["custom_id"], callback_id.0);
+
+    let mut ids = Vec::new();
+    collect_custom_ids(&json, &mut ids);
+    assert_eq!(ids, vec![callback_id.0.clone()]);
+
+    let record = app.store().resolve(&callback_id).await.unwrap()
+        .expect("callback Button must have a routing record");
+    assert_eq!(record.execution_id, "refresh");
 }
 
 #[tokio::test]
