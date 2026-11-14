@@ -61,8 +61,8 @@ impl<D> App<D> {
         Self {
             db,
             store,
-            pages: PageRegistry::default(),
-            modals: ModalRegistry::default(),
+            pages: PageRegistry::<D>::new(),
+            modals: ModalRegistry::<D>::new(),
             http,
             router: InteractionRouter::default(),
             executions: ExecutionRegistry::default(),
