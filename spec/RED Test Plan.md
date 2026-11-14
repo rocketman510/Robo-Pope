@@ -179,7 +179,7 @@ Contracts:
 
 - Invalid structures and unsupported component properties return errors rather than panic or silently changing the requested UI.
 - The final resolved Page is validated after dynamic properties and Frame contents are expanded.
-- Message component limits, Section slot requirements, Action Row slot requirements, Media Gallery item counts, selection menu option counts, and Modal input limits are enforced.
+- Message component limits, the 4,000-character Text Display limit, the Container ten-direct-child limit, Section slot requirements, Action Row slot requirements, Media Gallery item counts, selection menu option counts, and Modal input limits are enforced.
 - Static violations are rejected during registration where possible; dynamic violations are rejected after resolution and before sending the payload.
 - A component tree that exceeds Discord's message limits returns an error. The framework does not silently truncate it or implicitly paginate it.
 
