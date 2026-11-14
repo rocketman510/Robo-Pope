@@ -164,8 +164,7 @@ fn register_demo_modal(app: &App<DemoDatabase>) -> anyhow::Result<()> {
     let modal = Modal::<DemoData, DemoDatabase>::new("framework-demo-modal")
         .set_title("Framework Demo Form")
         .add_text_input("message", "Your message", TextInputStyle::Short)
-        .on_submit(|ctx, _data: DemoData, submission| async move {
-            let form = submission.deserialize::<DemoForm>()?;
+        .on_submit_typed(|ctx, _data: DemoData, form: DemoForm| async move {
             ctx.app
                 .db
                 .modal_submissions
@@ -229,7 +228,7 @@ impl EventHandler for DemoHandler {
 
                 let response = CreateMessage::new()
                     .components(rendered.into_components())
-                    .flags(MessageFlags::IS_COMPONENTS_V2)
+                    .flags(MessageFlags::from_bits_retain(1 << 15))
                     .reference_message(new_message);
 
                 if let Err(error) = new_message
