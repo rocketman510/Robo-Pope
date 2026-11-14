@@ -87,7 +87,7 @@ async fn direct_async_closure_is_accepted_without_dynamic_adapter() {
     use std::sync::Arc;
     let app = app();
     let page = Page::<TestData>::new("direct-closure")
-        .add_text(|ctx, data| async move {
+        .add_text(|ctx: crate::app::RenderCtx<std::sync::Arc<()>>, data: std::sync::Arc<TestData>| async move {
             assert_eq!(ctx.definition_id.as_ref(), "direct-closure");
             Ok(format!("{}:{}", data.label, data.count))
         }).register(&app).unwrap();
