@@ -12,7 +12,7 @@ fn assert_label_wrapped_input(value: &serde_json::Value, input_id: &str, compone
     assert_eq!(label["component"]["type"], component_type);
     assert_eq!(label["component"]["custom_id"], input_id);
     assert!(label.get("label").is_some());
-    assert_ne!(label["component"]["disabled"], true, "Modal inputs must not be disabled");
+    assert!(label["component"].get("disabled").is_none(), "Modal inputs must not serialize a disabled property");
 }
 
 fn entity_input(id: &str, label: &str, kind: &str) -> ModalInput<TestData> {
