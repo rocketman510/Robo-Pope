@@ -18,19 +18,19 @@ pub struct ComponentBudget {
     pub direct_container_children:usize,
 }
 /// Complete pagination result, preserving each element intact and its page state.
-pub struct PaginationPlan<T> {
-    pub pages:Vec<Vec<Element<T>>>,
+pub struct PaginationPlan<T, D = std::sync::Arc<()>> {
+    pub pages:Vec<Vec<Element<T, D>>>,
     pub state:PaginationState,
 }
 
 /// Splits Frame elements into the largest valid pages after subtracting reserved
 /// static and navigation budgets. It never truncates or splits an element.
-pub fn plan<T>(
+pub fn plan<T, D>(
     frame_id:impl Into<String>,
-    elements:Vec<Element<T>>,
+    elements:Vec<Element<T, D>>,
     reserved_static:ComponentBudget,
     reserved_navigation:ComponentBudget,
-)->anyhow::Result<PaginationPlan<T>> {
+)->anyhow::Result<PaginationPlan<T, D>> {
     use crate::page::component::{Component, ContainerItem};
     use crate::page::value::{Slot, Value};
 
@@ -48,7 +48,7 @@ pub fn plan<T>(
             && budget.direct_container_children <= crate::page::limits::CONTAINER_MAX_DIRECT_CHILDREN
     }
 
-    fn measure<T>(component: &Component<T>) -> anyhow::Result<ComponentBudget> {
+    fn measure<T, D>(component: &Component<T, D>) -> anyhow::Result<ComponentBudget> {
         let mut budget = ComponentBudget {
             total_components: 1,
             text_display_chars: 0,
@@ -123,7 +123,7 @@ pub fn plan<T>(
     anyhow::ensure!(fits(reserved), "Static and navigation components exceed Discord message limits");
 
     let frame_id = frame_id.into();
-    let mut pages: Vec<Vec<Element<T>>> = Vec::new();
+    let mut pages: Vec<Vec<Element<T, D>>> = Vec::new();
     let mut current = Vec::new();
     let mut used = reserved;
 
