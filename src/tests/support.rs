@@ -1,7 +1,7 @@
 //! Shared test fixtures for isolated framework contract tests.
 use std::sync::Arc;
 use serde::{Deserialize, Serialize};
-use crate::app::{App, Database};
+use crate::app::App;
 use crate::app::store::{MemoryStore, Store};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -12,12 +12,12 @@ impl Default for TestData {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct OtherData { pub enabled: bool }
 
-pub fn app() -> App {
+pub fn app() -> App<Arc<()>> {
     let store: Arc<dyn Store> = Arc::new(MemoryStore::default());
-    App::new(Arc::new(serenity::http::HttpBuilder::without_token().build()), Database::new(()), store)
+    App::new(Arc::new(serenity::http::HttpBuilder::without_token().build()), Arc::new(()), store)
 }
-pub fn app_with_http_and_store(http: Arc<serenity::all::Http>, store: Arc<dyn Store>) -> App {
-    App::new(http, Database::new(()), store)
+pub fn app_with_http_and_store(http: Arc<serenity::all::Http>, store: Arc<dyn Store>) -> App<Arc<()>> {
+    App::new(http, Arc::new(()), store)
 }
 pub fn ping_interaction() -> serenity::all::Interaction {
     serde_json::from_str(r#"{"type":1,"id":"100","application_id":"200","token":"test-token","version":1,"app_permissions":"0"}"#)
