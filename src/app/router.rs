@@ -14,7 +14,7 @@ use serenity::all::{
 
 use crate::app::executions::{ExecutionKey, InteractionPayload};
 use crate::app::store::CustomId;
-use crate::app::{App, Ctx, Database};
+use crate::app::{App, Ctx};
 use crate::page::{ModalSubmission, Selection};
 use crate::page::frame::pagination::{PaginationRequest, PaginationState};
 fn routed_execution_id(frame_identity: Option<&str>, execution_id: &str) -> String {
@@ -39,7 +39,7 @@ pub struct InteractionRouter;
 
 impl InteractionRouter {
     /// Dispatches a supported interaction kind to its specialized route.
-    pub async fn dispatch(&self, app: &App<Database>, interaction: Interaction) -> anyhow::Result<()> {
+    pub async fn dispatch<D: Clone + Send + Sync + 'static>(&self, app: &App<D>, interaction: Interaction) -> anyhow::Result<()> {
         match interaction.kind() {
             InteractionType::Component => self.dispatch_component(app, interaction).await,
             InteractionType::Modal => self.dispatch_modal_submit(app, interaction).await,
@@ -48,9 +48,9 @@ impl InteractionRouter {
     }
 
     /// Resolves and invokes a registered component execution from its custom ID.
-    pub async fn dispatch_component(
+    pub async fn dispatch_component<D: Clone + Send + Sync + 'static>(
         &self,
-        app: &App<Database>,
+        app: &App<D>,
         interaction: Interaction,
     ) -> anyhow::Result<()> {
         let component = match &interaction {
@@ -125,7 +125,7 @@ impl InteractionRouter {
 
     /// Resolves the Modal execution and supplies submitted values separately
     /// from the Modal's originally serialized data.
-    pub async fn dispatch_modal_submit(
+    pub async fn dispatch_modal_submit<D: Clone + Send + Sync + 'static>(
         &self,
         app: &App<Database>,
         interaction: Interaction,
