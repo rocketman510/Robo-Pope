@@ -178,7 +178,7 @@ async fn failed_modal_render_does_not_leave_a_persisted_submit_record() {
     let app = app();
     let modal = Modal::<TestData>::new("modal-no-orphan").set_title("Failure")
         .add_text_input("field", crate::page::dynamic(
-            |_ctx: crate::app::RenderCtx, _data: std::sync::Arc<TestData>| async move {
+            |_ctx, _data| async move {
                 anyhow::bail!("dynamic label failed")
             },
         ), TextInputStyle::Short)
@@ -374,7 +374,7 @@ async fn modal_rejects_a_dynamic_input_label_over_forty_five_characters_after_re
         .set_title("Label")
         .add_text_input(
             "field",
-            |_ctx: crate::app::RenderCtx, _data: std::sync::Arc<TestData>| async move {
+            |_ctx, _data| async move {
                 Ok("x".repeat(46))
             },
             TextInputStyle::Short,
@@ -444,7 +444,7 @@ async fn modal_rejects_a_dynamic_text_input_placeholder_over_one_hundred_charact
             style: TextInputStyle::Short,
             required: true,
             placeholder: Some(crate::page::dynamic(
-                |_ctx: crate::app::RenderCtx, _data: std::sync::Arc<TestData>| async move {
+                |_ctx, _data| async move {
                     Ok("x".repeat(101))
                 },
             )),
