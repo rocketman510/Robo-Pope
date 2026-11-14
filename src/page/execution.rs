@@ -3,15 +3,15 @@ use std::future::Future;
 use std::sync::Arc;
 use serde::de::DeserializeOwned;
 
-use crate::app::{App, BoxFuture, Ctx, Database};
+use crate::app::{App, BoxFuture, Ctx};
 use crate::app::executions::{ErasedCallback, ExecutionKey, InteractionPayload};
 use crate::page::ModalSubmission;
 use crate::page::frame::pagination::PaginationRequest;
 
-pub struct Execution<T, I = ()> {
+pub struct Execution<T, I = (), D = Arc<()>> {
     /// Stable ID within the containing Page or Modal definition.
     pub id: String,
-    pub(crate) callback: Arc<dyn Fn(Ctx<Database>, T, I)
+    pub(crate) callback: Arc<dyn Fn(Ctx<D>, T, I)
         -> BoxFuture<'static, anyhow::Result<()>> + Send + Sync>,
 }
 
@@ -63,22 +63,22 @@ impl FromInteractionPayload for PaginationRequest {
     }
 }
 
-impl<T> Execution<T> {
+impl<T, D> Execution<T, (), D> {
     /// Creates an execution with no additional interaction payload.
     pub fn new<F, Fut>(id: impl Into<String>, callback: F) -> Self
     where
-        F: Fn(Ctx<Database>, T) -> Fut + Send + Sync + 'static,
+        F: Fn(Ctx<D>, T) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = anyhow::Result<()>> + Send + 'static,
         T: Send + 'static,
     {
         Self { id: id.into(), callback: Arc::new(move |ctx, data, _input| Box::pin(callback(ctx, data))) }
     }
 }
-impl<T, I> Execution<T, I> {
+impl<T, I, D> Execution<T, I, D> {
     /// Creates an execution whose callback also receives a typed interaction payload.
     pub fn with_input<F, Fut>(id: impl Into<String>, callback: F) -> Self
     where
-        F: Fn(Ctx<Database>, T, I) -> Fut + Send + Sync + 'static,
+        F: Fn(Ctx<D>, T, I) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = anyhow::Result<()>> + Send + 'static,
         T: Send + 'static,
         I: Send + 'static,
@@ -90,13 +90,14 @@ impl<T, I> Execution<T, I> {
     /// Frame identity is part of the process-local lookup key.
     pub(crate) fn register(
         &self,
-        app: &App<Database>,
+        app: &App<D>,
         definition_id: &str,
         frame_identity: Option<&str>,
     ) -> anyhow::Result<()>
     where
         T: DeserializeOwned + Send + 'static,
         I: FromInteractionPayload,
+        D: Clone + Send + Sync + 'static,
     {
         let execution_id = match frame_identity {
             Some(identity) => format!("{identity}::{}", self.id),
@@ -104,7 +105,7 @@ impl<T, I> Execution<T, I> {
         };
         let key = ExecutionKey { definition_id: definition_id.to_owned(), execution_id };
         let callback = self.callback.clone();
-        let erased: ErasedCallback = Arc::new(move |ctx, json, payload| {
+        let erased: ErasedCallback<D> = Arc::new(move |ctx, json, payload| {
             let callback = callback.clone();
             Box::pin(async move {
                 let data: T = serde_json::from_value(json)
