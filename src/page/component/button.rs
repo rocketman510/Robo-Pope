@@ -1,4 +1,5 @@
 //! Interactive Button with display properties and an explicit execution.
+use std::future::Future;
 use crate::app::{Ctx, Result};
 use crate::page::execution::Execution;
 use crate::page::value::{IntoValue, Value};
@@ -17,7 +18,7 @@ impl<T> IntoValue<ButtonStyle, T> for ButtonStyle {
 }
 
 /// Interactive Button. Its display properties may be static or dynamic, while
-/// its callback is an explicit execution tied to the containing Page's `T`.
+/// its callback is an explicit execution tied to the containing Page's data.
 pub struct Button<T> {
     /// Stable developer-defined execution ID within the containing Page.
     pub id: String,
@@ -25,36 +26,47 @@ pub struct Button<T> {
     pub label: Value<String, T>,
     /// Visual Button style after render-time resolution.
     pub style: Value<ButtonStyle, T>,
+    /// Optional Unicode emoji shown beside the Button label.
+    pub emoji: Value<Option<String>, T>,
     /// Whether the Button is disabled in the rendered message.
     pub disabled: Value<bool, T>,
     pub(crate) execution: Execution<T>,
 }
 
 impl<T> Button<T> {
-    /// Creates a Button and binds its callback to an explicit execution.
-    ///
-    /// The callback receives the interaction Ctx and the Page's reconstructed data.
-    pub fn new<L, S, F, Fut>(
+    /// Creates a Button with its display properties and execution callback.
+    pub fn new<L, S, E, B, F, Fut>(
         label: L,
         id: impl Into<String>,
         style: S,
+        emoji: E,
+        disabled: B,
         callback: F,
     ) -> Self
     where
         L: IntoValue<String, T>,
         S: IntoValue<ButtonStyle, T>,
+        E: IntoValue<Option<String>, T>,
+        B: IntoValue<bool, T>,
         F: Fn(Ctx, T) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,
-        T: Send + 'static
-{
+        T: Send + 'static,
+    {
         let id = id.into();
         Self {
             id: id.clone(),
             label: label.into_value(),
             style: style.into_value(),
-            disabled: crate::page::value::Value::Static(false),
+            emoji: emoji.into_value(),
+            disabled: disabled.into_value(),
             execution: Execution::new(id, callback),
         }
+    }
+
+    /// Sets a static or dynamic optional emoji.
+    pub fn set_emoji<V: IntoValue<Option<String>, T>>(mut self, emoji: V) -> Self {
+        self.emoji = emoji.into_value();
+        self
     }
 
     /// Sets a static or dynamic disabled state.
@@ -63,5 +75,3 @@ impl<T> Button<T> {
         self
     }
 }
-
-use std::future::Future;

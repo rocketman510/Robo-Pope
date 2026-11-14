@@ -12,6 +12,8 @@ pub struct SelectOption<T> {
     pub value:String,
     /// Optional option description shown in the menu.
     pub description:Option<Value<String,T>>,
+    /// Optional emoji shown beside the option label.
+    pub emoji:Option<Value<Option<String>,T>>,
     /// Whether the option can be selected.
     pub disabled:Value<bool,T>,
 }
@@ -22,12 +24,17 @@ impl<T> SelectOption<T> {
             label: label.into_value(),
             value: value.into(),
             description: None,
+            emoji: None,
             disabled: Value::Static(false),
         }
     }
     /// Sets an optional static or dynamic option description.
     pub fn set_description<V:IntoValue<String,T>>(mut self,value:V)->Self {
         self.description=Some(value.into_value()); self
+    }
+    /// Sets an optional static or dynamic option emoji.
+    pub fn set_emoji<V:IntoValue<Option<String>,T>>(mut self,value:V)->Self {
+        self.emoji=Some(value.into_value()); self
     }
     /// Sets a static or dynamic disabled state for this option.
     pub fn set_disabled<V:IntoValue<bool,T>>(mut self,value:V)->Self {

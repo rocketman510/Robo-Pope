@@ -25,6 +25,17 @@ pub struct RenderedPage {
     pub pages:Vec<RenderedMessage>,
     pub current_index:usize,
 }
+impl std::fmt::Debug for RenderedMessage {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("RenderedMessage")
+            .field("component_count", &self.components.len())
+            .field("attachment_count", &self.attachments.len())
+            .field("pagination", &self.pagination)
+            .finish()
+    }
+}
+
 impl RenderedMessage {
     /// Borrows the rendered component tree.
     pub fn components(&self)->&[RenderedComponent] { &self.components }
@@ -109,7 +120,15 @@ pub(crate) fn validate_component<T>(
             );
             if let Some(accessory) = &section.accessory {
                 match accessory {
-                    SectionAccessory::Thumbnail(_) | SectionAccessory::Button(_) => {}
+                    SectionAccessory::Thumbnail(thumbnail) => {
+                        if let Some(Value::Static(description)) = &thumbnail.description {
+                            anyhow::ensure!(
+                                description.chars().count() <= 1_024,
+                                "Thumbnail description exceeds 1024 characters"
+                            );
+                        }
+                    }
+                    SectionAccessory::Button(_) => {}
                 }
             }
         }
@@ -137,11 +156,23 @@ pub(crate) fn validate_component<T>(
         }
         Component::MediaGallery(gallery) => {
             anyhow::ensure!(
+                !gallery.items.is_empty(),
+                "Media Gallery must contain at least one item"
+            );
+            anyhow::ensure!(
                 gallery.items.len() <= super::limits::MEDIA_GALLERY_MAX_ITEMS,
                 "Media Gallery has {} items; maximum is {}",
                 gallery.items.len(),
                 super::limits::MEDIA_GALLERY_MAX_ITEMS
             );
+            for item in &gallery.items {
+                if let Some(Value::Static(description)) = &item.description {
+                    anyhow::ensure!(
+                        description.chars().count() <= 1_024,
+                        "Media Gallery item description exceeds 1024 characters"
+                    );
+                }
+            }
         }
         Component::Select(crate::page::select::SelectMenu::String(menu)) => {
             anyhow::ensure!(

@@ -1,4 +1,4 @@
-//! App ownership, typed definition registries, persistence, and interaction routing.
+//! App ownership, typed host database, persistent routing, and interaction routing.
 pub mod context;
 pub mod database;
 pub mod error;
@@ -8,10 +8,12 @@ pub mod router;
 pub mod store;
 pub mod executions;
 
+use std::any::Any;
+use std::collections::HashSet;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
-use std::collections::HashSet;
+
 use serenity::all::Http;
 use registry::{ModalRegistry, PageRegistry};
 use router::InteractionRouter;
@@ -24,27 +26,22 @@ pub use database::Database;
 
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
-/// Monolithic owner of framework and application state.
-///
-/// Registered definitions, the database, HTTP client, and interaction router
-/// live here. Pages and components carry only their own serialized data type;
-/// callbacks reach all application state through Ctx or RenderCtx.
-pub struct App {
-    /// Shared host application's database aggregate.
-    pub db: Arc<Database>,
-    /// Framework persistence for custom-ID execution and pagination records.
+/// App owns the host application's concrete database type and the framework's
+/// separate interaction Store.
+pub struct App<D = Database> {
+    /// The concrete database or repository aggregate supplied by the host application.
+    pub db: D,
+    /// Framework persistence for custom-ID routing records.
     pub(crate) store: Arc<dyn Store>,
-    /// Heterogeneous registry of immutable registered Page definitions.
     pub pages: PageRegistry,
-    /// Heterogeneous registry of immutable registered Modal definitions.
     pub modals: ModalRegistry,
     pub(crate) http: Arc<Http>,
     pub(crate) router: InteractionRouter,
-    /// Process-local type-erased execution callbacks (never persisted).
     pub(crate) executions: ExecutionRegistry,
     definition_ids: Arc<Mutex<HashSet<String>>>,
 }
-impl Clone for App {
+
+impl<D: Clone> Clone for App<D> {
     fn clone(&self) -> Self {
         Self {
             db: self.db.clone(),
@@ -58,11 +55,12 @@ impl Clone for App {
         }
     }
 }
-impl App {
-    /// Creates an App with empty definition registries and shared infrastructure.
-    pub fn new(http: Arc<Http>, db: Database, store: Arc<dyn Store>) -> Self {
+
+impl<D> App<D> {
+    /// Creates an App with empty registries and the supplied host database and Store.
+    pub fn new(http: Arc<Http>, db: D, store: Arc<dyn Store>) -> Self {
         Self {
-            db: Arc::new(db),
+            db,
             store,
             pages: PageRegistry::default(),
             modals: ModalRegistry::default(),
@@ -72,6 +70,21 @@ impl App {
             definition_ids: Arc::new(Mutex::new(HashSet::new())),
         }
     }
+
+    /// Creates another App view sharing framework state but using a different DB handle.
+    fn with_database<E>(&self, db: E) -> App<E> {
+        App {
+            db,
+            store: self.store.clone(),
+            pages: self.pages.clone(),
+            modals: self.modals.clone(),
+            http: self.http.clone(),
+            router: self.router.clone(),
+            executions: self.executions.clone(),
+            definition_ids: self.definition_ids.clone(),
+        }
+    }
+
     /// Atomically reserves a Page or Modal ID in the shared namespace.
     pub(crate) fn reserve_definition_id(&self, id: &str) -> anyhow::Result<()> {
         let mut ids = self.definition_ids.lock()
@@ -85,17 +98,49 @@ impl App {
         if let Ok(mut ids) = self.definition_ids.lock() { ids.remove(id); }
     }
 
-    /// Routes an incoming Discord interaction to its registered execution.
-    ///
-    /// Unknown or malformed execution references are returned as errors. A
-    /// valid custom ID identifies an execution but does not authorize it.
-    pub async fn dispatch_interaction(&self, interaction: serenity::all::Interaction) -> anyhow::Result<()> {
-        self.router.dispatch(self, interaction).await
-    }
-    /// Creates a render-time context tied to this App and definition ID.
-    pub fn render_context(&self, definition_id: impl Into<Arc<str>>) -> RenderCtx {
-        RenderCtx::new(self.clone(), definition_id.into())
-    }
     /// Borrows the Store used for persisted interaction execution records.
     pub fn store(&self) -> &dyn Store { self.store.as_ref() }
+}
+
+impl<D> App<D>
+where
+    D: Clone + Any + Send + Sync + 'static,
+{
+    /// Creates an erased framework context for dynamic callbacks and interactions.
+    ///
+    /// The typed host DB remains available on the original App. The erased view
+    /// preserves it in Database::get without requiring Page or Modal data types
+    /// to carry a second host-specific generic parameter.
+    pub(crate) fn erased(&self) -> App<Database> {
+        let database = (&self.db as &dyn Any)
+            .downcast_ref::<Database>()
+            .cloned()
+            .unwrap_or_else(|| Database::new(self.db.clone()));
+        self.with_database(database)
+    }
+
+    /// Routes an incoming Discord interaction to its registered execution.
+    pub async fn dispatch_interaction(
+        &self,
+        interaction: serenity::all::Interaction,
+    ) -> anyhow::Result<()> {
+        let erased = self.erased();
+        self.router.dispatch(&erased, interaction).await
+    }
+
+    /// Creates a render-time context tied to the typed App and definition ID.
+    pub fn render_context(
+        &self,
+        definition_id: impl Into<Arc<str>>,
+    ) -> RenderCtx<D> {
+        RenderCtx::new(self.clone(), definition_id.into())
+    }
+
+    /// Creates the context used by framework values, whose callback ABI is DB-erased.
+    pub(crate) fn render_context_erased(
+        &self,
+        definition_id: impl Into<Arc<str>>,
+    ) -> RenderCtx<Database> {
+        RenderCtx::new(self.erased(), definition_id.into())
+    }
 }

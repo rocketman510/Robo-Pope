@@ -2,7 +2,7 @@
 use crate::page::frame::Frame;
 use crate::page::select::SelectMenu;
 use crate::page::value::{IntoValue,Value};
-use super::{Button,ButtonRow,ButtonSlots,Component,File,LinkButton,MediaGallery,
+use super::{Button,ButtonRow,ButtonSlot,ButtonSlots,Component,File,LinkButton,MediaGallery,
     Section,Separator,Text};
 
 /// An ordered Container child, either a component or a dynamically expanded Frame.
@@ -44,8 +44,26 @@ impl<T> Container<T> {
         self.children.push(ContainerItem::Component(Component::Button(value))); self
     }
     /// Appends a fixed-slot Button Action Row child.
-    pub fn add_button_row(mut self,slots:ButtonSlots<T>)->Self {
-        self.children.push(ContainerItem::Component(Component::ButtonRow(ButtonRow::new(slots)))); self
+    pub fn add_button_row<A, B, C, D, E>(
+        mut self,
+        slots: (A, B, C, D, E),
+    ) -> Self
+    where
+        A: Into<ButtonSlot<T>>,
+        B: Into<ButtonSlot<T>>,
+        C: Into<ButtonSlot<T>>,
+        D: Into<ButtonSlot<T>>,
+        E: Into<ButtonSlot<T>>,
+    {
+        let slots = (
+            slots.0.into(),
+            slots.1.into(),
+            slots.2.into(),
+            slots.3.into(),
+            slots.4.into(),
+        );
+        self.children.push(ContainerItem::Component(Component::ButtonRow(ButtonRow::new(slots))));
+        self
     }
     /// Appends a URL Link Button child.
     pub fn add_link_button(mut self,value:LinkButton<T>)->Self {

@@ -12,11 +12,11 @@ pub mod text;
 pub mod thumbnail;
 
 pub use button::{Button,ButtonStyle};
-pub use button_row::{ButtonRow,ButtonSlots};
+pub use button_row::{ButtonRow,ButtonSlot,ButtonSlots};
 pub use container::{Container,ContainerItem};
 pub use file::File;
 pub use link_button::LinkButton;
-pub use media_gallery::{MediaGallery,MediaItem};
+pub use media_gallery::{IntoMediaItem,MediaGallery,MediaItem};
 pub use section::{Section,SectionAccessory};
 pub use separator::{Separator,SeparatorSpacing};
 pub use text::Text;

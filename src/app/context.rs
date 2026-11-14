@@ -9,15 +9,15 @@ use crate::app::{App, BoxFuture};
 use crate::page::{ModalRender, RenderedMessage, Selection};
 
 /// Render-time context for resolving dynamic Page properties and Frame contents.
-pub struct RenderCtx {
-    pub app: App,
+pub struct RenderCtx<D = crate::app::Database> {
+    pub app: App<D>,
     pub definition_id: Arc<str>,
 }
-impl Clone for RenderCtx {
+impl<D: Clone> Clone for RenderCtx<D> {
     fn clone(&self) -> Self { Self { app: self.app.clone(), definition_id: self.definition_id.clone() } }
 }
-impl RenderCtx {
-    pub(crate) fn new(app: App, definition_id: Arc<str>) -> Self { Self { app, definition_id } }
+impl<D> RenderCtx<D> {
+    pub(crate) fn new(app: App<D>, definition_id: Arc<str>) -> Self { Self { app, definition_id } }
 }
 
 /// Interaction-specific view of the App with correctly scoped Discord response operations.
@@ -29,7 +29,15 @@ pub struct Ctx {
     acknowledged: Arc<AtomicBool>,
 }
 impl Ctx {
-    pub(crate) fn new(app: App, interaction: Arc<Interaction>, selection: Option<Selection>) -> Self {
+    pub(crate) fn new<D>(
+        app: App<D>,
+        interaction: Arc<Interaction>,
+        selection: Option<Selection>,
+    ) -> Self
+    where
+        D: Clone + std::any::Any + Send + Sync + 'static,
+    {
+        let app = app.erased();
         let http = app.http.clone();
         Self { app, interaction, http, selection, acknowledged: Arc::new(AtomicBool::new(false)) }
     }

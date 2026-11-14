@@ -3,13 +3,16 @@ use serenity::{all::{Context, EventHandler, FullEvent}, async_trait};
 use crate::app::App;
 
 /// Serenity gateway adapter that forwards gateway events to the App.
-pub struct AppHandler {
+pub struct AppHandler<D = crate::app::Database> {
     /// The single App instance that owns framework state.
-    pub app: App,
+    pub app: App<D>,
 }
-impl AppHandler {
+impl<D> AppHandler<D>
+where
+    D: Clone + std::any::Any + Send + Sync + 'static,
+{
     /// Creates an event handler bound to the supplied App.
-    pub fn new(app: App) -> Self { Self { app } }
+    pub fn new(app: App<D>) -> Self { Self { app } }
 
     /// Routes one gateway interaction through the App's interaction router.
     pub async fn dispatch_interaction(&self, interaction: serenity::all::Interaction) -> anyhow::Result<()> {
@@ -17,7 +20,10 @@ impl AppHandler {
     }
 }
 #[async_trait]
-impl EventHandler for AppHandler {
+impl<D> EventHandler for AppHandler<D>
+where
+    D: Clone + std::any::Any + Send + Sync + 'static,
+{
     async fn dispatch(&self, _ctx: &Context, event: &FullEvent) {
         match event {
             FullEvent::Ready { data_about_bot, .. } => {

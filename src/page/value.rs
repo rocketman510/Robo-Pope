@@ -15,17 +15,20 @@ impl<V: Clone, T> Clone for Value<V, T> {
 }
 
 /// Explicit adapter for callbacks. Direct async closures are accepted by the same API.
-pub fn dynamic<V, T, F, Fut>(callback: F) -> Dynamic<V, T>
+pub fn dynamic<V, T, F, Fut>(callback: F) -> Value<V, T>
 where
     F: Fn(RenderCtx, Arc<T>) -> Fut + Send + Sync + 'static,
     Fut: Future<Output = anyhow::Result<V>> + Send + 'static,
     V: Send + 'static,
     T: Send + Sync + 'static,
 {
-    Arc::new(move |ctx, data| Box::pin(callback(ctx, data)))
+    Value::Dynamic(Arc::new(move |ctx, data| Box::pin(callback(ctx, data))))
 }
 
 pub trait IntoValue<V, T> { fn into_value(self) -> Value<V, T>; }
+impl<V, T> IntoValue<V, T> for Value<V, T> {
+    fn into_value(self) -> Value<V, T> { self }
+}
 impl<V, T> IntoValue<V, T> for Dynamic<V, T> {
     fn into_value(self) -> Value<V, T> { Value::Dynamic(self) }
 }
@@ -46,6 +49,9 @@ impl<T> IntoValue<String, T> for String {
 impl<'a, T> IntoValue<String, T> for &'a str {
     fn into_value(self) -> Value<String, T> { Value::Static(self.to_owned()) }
 }
+impl<T> IntoValue<Option<String>, T> for Option<String> {
+    fn into_value(self) -> Value<Option<String>, T> { Value::Static(self) }
+}
 macro_rules! impl_static_value {
     ($($ty:ty),+ $(,)?) => {
         $(impl<T> IntoValue<$ty, T> for $ty {
@@ -62,6 +68,9 @@ impl<V: Clone, T> Clone for Slot<V, T> {
     }
 }
 pub trait IntoSlot<V, T> { fn into_slot(self) -> Slot<V, T>; }
+impl<V, T> IntoSlot<V, T> for Value<V, T> {
+    fn into_slot(self) -> Slot<V, T> { Slot::Value(self) }
+}
 impl<V, T> IntoSlot<V, T> for Dynamic<V, T> {
     fn into_slot(self) -> Slot<V, T> { Slot::Value(Value::Dynamic(self)) }
 }
@@ -86,7 +95,19 @@ impl<T> IntoSlot<String, T> for Option<String> {
     }
 }
 
-pub async fn resolve<V, T>(value: &Value<V, T>, ctx: RenderCtx, data: Arc<T>) -> anyhow::Result<V>
-where V: Clone + Send + 'static, T: Send + Sync + 'static {
-    match value { Value::Static(value) => Ok(value.clone()), Value::Dynamic(callback) => callback(ctx, data).await }
+pub async fn resolve<V, T, D>(
+    value: &Value<V, T>,
+    ctx: RenderCtx<D>,
+    data: Arc<T>,
+) -> anyhow::Result<V>
+where
+    V: Clone + Send + 'static,
+    T: Send + Sync + 'static,
+    D: Clone + std::any::Any + Send + Sync + 'static,
+{
+    let ctx = ctx.app.erased().render_context(ctx.definition_id.clone());
+    match value {
+        Value::Static(value) => Ok(value.clone()),
+        Value::Dynamic(callback) => callback(ctx, data).await,
+    }
 }

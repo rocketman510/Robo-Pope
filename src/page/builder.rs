@@ -1,5 +1,6 @@
 //! Page<T> builder and immutable RegisteredPage<T> typestate.
 use std::sync::Arc;
+use std::future::Future;
 use std::collections::HashSet;
 use anyhow::Context as _;
 use serenity::builder::{
@@ -13,7 +14,7 @@ use serenity::builder::{
 use serenity::all::ButtonStyle as SerenityButtonStyle;
 use serde::{Serialize, de::DeserializeOwned};
 use crate::app::{App, RenderCtx};
-use crate::app::store::{derive_custom_id, DefinitionKind, StoreRecord};
+use crate::app::store::{derive_custom_id_with_frame, DefinitionKind, StoreRecord};
 use super::component::*;
 use super::frame::Frame;
 use super::frame::pagination::PaginationRequest;
@@ -34,7 +35,6 @@ pub struct Page<T> {
 pub struct PageDefinition<T> {
     pub(crate) id: String,
     pub(crate) items: Vec<PageItem<T>>,
-    pub(crate) paginate: bool,
 }
 /// One ordered top-level entry in a Page: a fixed component or dynamic Frame.
 pub enum PageItem<T> {
@@ -64,7 +64,7 @@ fn validate_component_ids<T>(
     execution_ids: &mut HashSet<String>,
     frame_ids: &mut HashSet<String>,
 ) -> anyhow::Result<()> {
-    use super::component::{ContainerItem, SectionAccessory};
+    use super::component::{ButtonSlot, ContainerItem, SectionAccessory};
     use super::select::SelectMenu;
 
     match component {
@@ -72,14 +72,10 @@ fn validate_component_ids<T>(
             validate_execution_id(&button.id, execution_ids)?;
         }
         Component::ButtonRow(row) => {
-            for button in [
-                row.slots.0.as_ref(),
-                row.slots.1.as_ref(),
-                row.slots.2.as_ref(),
-                row.slots.3.as_ref(),
-                row.slots.4.as_ref(),
-            ].into_iter().flatten() {
-                validate_execution_id(&button.id, execution_ids)?;
+            for slot in [&row.slots.0, &row.slots.1, &row.slots.2, &row.slots.3, &row.slots.4] {
+                if let ButtonSlot::Button(button) = slot {
+                    validate_execution_id(&button.id, execution_ids)?;
+                }
             }
         }
         Component::Section(section) => {
@@ -131,11 +127,10 @@ where
     match component {
         Component::Button(button) => button.execution.register(app, definition_id, frame_identity)?,
         Component::ButtonRow(row) => {
-            for button in [
-                row.slots.0.as_ref(), row.slots.1.as_ref(), row.slots.2.as_ref(),
-                row.slots.3.as_ref(), row.slots.4.as_ref(),
-            ].into_iter().flatten() {
-                button.execution.register(app, definition_id, frame_identity)?;
+            for slot in [&row.slots.0, &row.slots.1, &row.slots.2, &row.slots.3, &row.slots.4] {
+                if let ButtonSlot::Button(button) = slot {
+                    button.execution.register(app, definition_id, frame_identity)?;
+                }
             }
         }
         Component::Section(section) => {
@@ -153,7 +148,7 @@ where
         Component::Container(container) => {
             for child in &container.children {
                 if let ContainerItem::Component(component) = child {
-                    register_component_executions(component, app, definition_id, frame_identity)?;
+                    register_component_executions(component, &app, definition_id, frame_identity)?;
                 }
             }
         }
@@ -230,26 +225,8 @@ fn collect_paginated_frames_in_component<T>(
     }
 }
 
-fn collect_paginated_frames<T>(definition: &PageDefinition<T>) -> Vec<String> {
-    use super::component::ContainerItem;
-    let mut output = Vec::new();
-    for item in &definition.items {
-        match item {
-            PageItem::Frame(frame) if frame.paginate || definition.paginate => output.push(frame.id.clone()),
-            PageItem::Component(component) => collect_component_frames(component, definition.paginate, &mut output),
-            PageItem::Frame(_) => {}
-        }
-        if let PageItem::Component(Component::Container(container)) = item {
-            for child in &container.children {
-                if let ContainerItem::Frame(frame) = child {
-                    if frame.paginate || definition.paginate { output.push(frame.id.clone()); }
-                }
-            }
-        }
-    }
-    output.sort();
-    output.dedup();
-    output
+fn collect_paginated_frames<T>(_definition: &PageDefinition<T>) -> Vec<String> {
+    Vec::new()
 }
 
 fn register_pagination_callbacks<T>(
@@ -306,7 +283,7 @@ where
                             let identity = pagination_identity(&frame_id, page_index);
                             for name in ["previous", "next"] {
                                 let execution_id = pagination_execution_id(&frame_id, name);
-                                let candidate = derive_custom_id(
+                                let candidate = derive_custom_id_with_frame(
                                     &definition.id,
                                     &execution_id,
                                     &serde_json::to_vec(&data)?,
@@ -366,7 +343,21 @@ impl<T> Page<T> {
         self.items.push(PageItem::Component(Component::LinkButton(value))); self
     }
     /// Appends an Action Row with up to five fixed Button slots.
-    pub fn add_button_row(mut self, slots: ButtonSlots<T>) -> Self {
+    pub fn add_button_row<A, B, C, D, E>(mut self, slots: (A, B, C, D, E)) -> Self
+    where
+        A: Into<ButtonSlot<T>>,
+        B: Into<ButtonSlot<T>>,
+        C: Into<ButtonSlot<T>>,
+        D: Into<ButtonSlot<T>>,
+        E: Into<ButtonSlot<T>>,
+    {
+        let slots = (
+            slots.0.into(),
+            slots.1.into(),
+            slots.2.into(),
+            slots.3.into(),
+            slots.4.into(),
+        );
         self.items.push(PageItem::Component(Component::ButtonRow(ButtonRow::new(slots))));
         self
     }
@@ -383,18 +374,27 @@ impl<T> Page<T> {
         self.items.push(PageItem::Component(Component::File(value))); self
     }
     /// Appends a dynamic region whose elements are resolved when the Page renders.
-    pub fn add_frame(mut self, value: Frame<T>) -> Self {
-        self.items.push(PageItem::Frame(value)); self
+    pub fn add_frame<F, Fut>(mut self, resolver: F) -> Self
+    where
+        F: Fn(RenderCtx, Arc<T>) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = anyhow::Result<Vec<super::frame::Element<T>>>> + Send + 'static,
+        T: Send + Sync + 'static,
+    {
+        let frame_id = format!("frame-{}", self.items.len());
+        self.items.push(PageItem::Frame(Frame::new(frame_id, resolver)));
+        self
     }
     /// Enables framework-managed pagination for dynamic Frame content.
     pub fn paginate(mut self) -> Self { self.paginate = true; self }
 
     /// Validates and registers this definition. Registration consumes the builder;
     /// a duplicate Page ID is an error.
-    pub fn register(self, app: &App) -> anyhow::Result<RegisteredPage<T>>
+    pub fn register<D>(self, app: &App<D>) -> anyhow::Result<RegisteredPage<T>>
     where
+        D: Clone + std::any::Any + Send + Sync + 'static,
         T: Serialize + DeserializeOwned + Send + Sync + 'static
-{
+    {
+        let app = app.erased();
         anyhow::ensure!(!self.id.trim().is_empty(), "Page ID must not be empty");
         let mut execution_ids = HashSet::new();
         let mut frame_ids = HashSet::new();
@@ -412,7 +412,7 @@ impl<T> Page<T> {
         app.reserve_definition_id(&self.id)?;
         for item in &self.items {
             if let PageItem::Component(component) = item {
-                if let Err(error) = register_component_executions(component, app, &self.id, None) {
+                if let Err(error) = register_component_executions(component, &app, &self.id, None) {
                     app.executions.remove_definition(&self.id);
                     app.release_definition_id(&self.id);
                     return Err(error);
@@ -422,10 +422,9 @@ impl<T> Page<T> {
         let definition = Arc::new(PageDefinition {
             id: self.id,
             items: self.items,
-            paginate: self.paginate,
         });
         let frame_ids = collect_paginated_frames(&definition);
-        if let Err(error) = register_pagination_callbacks(app, definition.clone(), &frame_ids) {
+        if let Err(error) = register_pagination_callbacks(&app, definition.clone(), &frame_ids) {
             app.executions.remove_definition(&definition.id);
             app.release_definition_id(&definition.id);
             return Err(error);
@@ -473,13 +472,13 @@ async fn persist_button_execution<T>(
     serialized_data: &[u8],
     frame_identity: Option<&str>,
 ) -> anyhow::Result<String> {
-    let custom_id = derive_custom_id(
+    let custom_id = derive_custom_id_with_frame(
         definition_id,
         &button.execution.id,
         serialized_data,
         frame_identity,
     )?;
-    app.store().insert(StoreRecord {
+    app.store().insert_record(StoreRecord {
         custom_id: custom_id.0.clone(),
         definition_kind: DefinitionKind::Page,
         definition_id: definition_id.to_owned(),
@@ -502,10 +501,10 @@ async fn persist_select_execution(
     serialized_data: &[u8],
     frame_identity: Option<&str>,
 ) -> anyhow::Result<String> {
-    let custom_id = derive_custom_id(
+    let custom_id = derive_custom_id_with_frame(
         definition_id, execution_id, serialized_data, frame_identity,
     )?;
-    app.store().insert(StoreRecord {
+    app.store().insert_record(StoreRecord {
         custom_id: custom_id.0.clone(),
         definition_kind: DefinitionKind::Page,
         definition_id: definition_id.to_owned(),
@@ -518,6 +517,30 @@ async fn persist_select_execution(
         "Persisting selection execution '{execution_id}' for Page '{definition_id}'"
     ))?;
     Ok(custom_id.0)
+}
+
+async fn render_link_button<T>(
+    button: &LinkButton<T>,
+    ctx: &RenderCtx,
+    data: &Arc<T>,
+) -> anyhow::Result<CreateButton<'static>>
+where
+    T: Send + Sync + 'static,
+{
+    let label = super::value::resolve(&button.label, ctx.clone(), data.clone())
+        .await.context("Resolving Link Button label")?;
+    let url = super::value::resolve(&button.url, ctx.clone(), data.clone())
+        .await.context("Resolving Link Button URL")?;
+    let emoji = super::value::resolve(&button.emoji, ctx.clone(), data.clone())
+        .await.context("Resolving Link Button emoji")?;
+    let disabled = super::value::resolve(&button.disabled, ctx.clone(), data.clone())
+        .await.context("Resolving Link Button disabled state")?;
+
+    let mut rendered = CreateButton::new_link(url).label(label).disabled(disabled);
+    if let Some(emoji) = emoji {
+        rendered = rendered.emoji(emoji);
+    }
+    Ok(rendered.into_owned())
 }
 
 async fn render_button<T>(
@@ -536,6 +559,8 @@ where
         .await.with_context(|| format!("Resolving label for Button '{}'", button.id))?;
     let style = super::value::resolve(&button.style, ctx.clone(), data.clone())
         .await.with_context(|| format!("Resolving style for Button '{}'", button.id))?;
+    let emoji = super::value::resolve(&button.emoji, ctx.clone(), data.clone())
+        .await.with_context(|| format!("Resolving emoji for Button '{}'", button.id))?;
     let disabled = super::value::resolve(&button.disabled, ctx.clone(), data.clone())
         .await.with_context(|| format!("Resolving disabled state for Button '{}'", button.id))?;
     let custom_id = persist_button_execution(
@@ -549,11 +574,14 @@ where
         super::component::ButtonStyle::Danger => SerenityButtonStyle::Danger,
     };
 
-    Ok(CreateButton::new(custom_id)
+    let mut rendered = CreateButton::new(custom_id)
         .label(label)
         .style(serenity_style)
-        .disabled(disabled)
-        .into_owned())
+        .disabled(disabled);
+    if let Some(emoji) = emoji {
+        rendered = rendered.emoji(emoji);
+    }
+    Ok(rendered.into_owned())
 }
 
 async fn render_select_menu<T>(
@@ -589,6 +617,12 @@ where
                         description, ctx.clone(), data.clone()
                     ).await.context("Resolving String Select option description")?;
                     rendered = rendered.description(description);
+                }
+                if let Some(emoji) = &option.emoji {
+                    if let Some(emoji) = super::value::resolve(emoji, ctx.clone(), data.clone())
+                        .await.context("Resolving String Select option emoji")? {
+                        rendered = rendered.emoji(emoji);
+                    }
                 }
                 options.push(rendered);
             }
@@ -695,6 +729,10 @@ where
     T: Send + Sync + 'static,
 {
     anyhow::ensure!(
+        !gallery.items.is_empty(),
+        "Media Gallery must contain at least one item"
+    );
+    anyhow::ensure!(
         gallery.items.len() <= super::limits::MEDIA_GALLERY_MAX_ITEMS,
         "Media Gallery has {} items; maximum is {}",
         gallery.items.len(),
@@ -705,8 +743,15 @@ where
         let url = super::value::resolve(&item.url, ctx.clone(), data.clone())
             .await.context("Resolving Media Gallery URL")?;
         let description = match &item.description {
-            Some(value) => Some(super::value::resolve(value, ctx.clone(), data.clone())
-                .await.context("Resolving Media Gallery description")?),
+            Some(value) => {
+                let description = super::value::resolve(value, ctx.clone(), data.clone())
+                    .await.context("Resolving Media Gallery description")?;
+                anyhow::ensure!(
+                    description.chars().count() <= 1_024,
+                    "Media Gallery item description exceeds 1024 characters"
+                );
+                Some(description)
+            }
             None => None,
         };
         let spoiler = super::value::resolve(&item.spoiler, ctx.clone(), data.clone())
@@ -882,16 +927,18 @@ where
         }
         C::ButtonRow(row) => {
             let mut buttons = Vec::with_capacity(row.populated());
-            for button in [
-                row.slots.0.as_ref(),
-                row.slots.1.as_ref(),
-                row.slots.2.as_ref(),
-                row.slots.3.as_ref(),
-                row.slots.4.as_ref(),
-            ].into_iter().flatten() {
-                buttons.push(render_button(
-                    app, button, ctx, data, definition_id, serialized_data, frame_identity,
-                ).await?);
+            for slot in [&row.slots.0, &row.slots.1, &row.slots.2, &row.slots.3, &row.slots.4] {
+                match slot {
+                    super::component::ButtonSlot::Button(button) => {
+                        buttons.push(render_button(
+                            app, button, ctx, data, definition_id, serialized_data, frame_identity,
+                        ).await?);
+                    }
+                    super::component::ButtonSlot::LinkButton(button) => {
+                        buttons.push(render_link_button(button, ctx, data).await?);
+                    }
+                    super::component::ButtonSlot::Empty => {}
+                }
             }
             anyhow::ensure!(!buttons.is_empty(), "Button Action Row cannot be empty");
             let count = buttons.len();
@@ -903,13 +950,7 @@ where
             ))
         }
         C::LinkButton(button) => {
-            let label = super::value::resolve(&button.label, ctx.clone(), data.clone()).await
-                .context("Resolving Link Button label")?;
-            let url = super::value::resolve(&button.url, ctx.clone(), data.clone()).await
-                .context("Resolving Link Button URL")?;
-            let disabled = super::value::resolve(&button.disabled, ctx.clone(), data.clone()).await
-                .context("Resolving Link Button disabled state")?;
-            let rendered = CreateButton::new_link(url).label(label).disabled(disabled).into_owned();
+            let rendered = render_link_button(button, ctx, data).await?;
             Ok((
                 vec![RenderedComponent {
                     component: CreateComponent::ActionRow(CreateActionRow::buttons(vec![rendered]).into()),
@@ -965,6 +1006,12 @@ where
                         &thumbnail.spoiler, ctx.clone(), data.clone()
                     ).await.context("Resolving Section Thumbnail spoiler state")?;
 
+                    if let Some(description) = &description {
+                        anyhow::ensure!(
+                            description.chars().count() <= 1_024,
+                            "Thumbnail description exceeds 1024 characters"
+                        );
+                    }
                     let mut rendered = CreateThumbnail::new(CreateUnfurledMediaItem::new(url));
                     if let Some(description) = description {
                         rendered = rendered.description(description);
@@ -1057,7 +1104,7 @@ where
             );
             let rendered = CreateFile::new(CreateUnfurledMediaItem::new(
                 file.attachment_uri.clone()
-            )).into_owned();
+            )).spoiler(file.spoiler).into_owned();
             Ok((
                 vec![RenderedComponent {
                     component: CreateComponent::File(rendered),
@@ -1117,22 +1164,11 @@ fn validate_frame_elements<T>(
     elements: &[super::frame::Element<T>],
     frame_id: &str,
 ) -> anyhow::Result<()> {
-    let mut element_keys = HashSet::new();
+    let mut execution_ids = HashSet::new();
     let mut nested_frame_ids = HashSet::new();
     for element in elements {
-        if let Some(key) = element.key.as_deref() {
-            anyhow::ensure!(!key.trim().is_empty(),
-                "Frame '{frame_id}' contains an empty element key");
-            anyhow::ensure!(element_keys.insert(key.to_owned()),
-                "Frame '{frame_id}' contains duplicate element key '{key}'");
-        }
-        let mut execution_ids = HashSet::new();
-        validate_component_ids(&element.component, &mut execution_ids, &mut nested_frame_ids)?;
-        let interactive = contains_interactive_component(&element.component);
-        anyhow::ensure!(
-            !interactive || element.key.as_ref().is_some_and(|key| !key.trim().is_empty()),
-            "Interactive Frame element in Frame '{frame_id}' requires a non-empty stable developer key"
-        );
+        validate_component_ids(&element.component, &mut execution_ids, &mut nested_frame_ids)
+            .with_context(|| format!("Validating interactive IDs in Frame '{frame_id}'"))?;
     }
     Ok(())
 }
@@ -1157,17 +1193,9 @@ where
     validate_frame_elements(elements, frame_id)?;
     let mut rendered = Vec::with_capacity(elements.len());
     for element in elements {
-        let frame_identity = element.key.as_deref()
-            .map(|key| append_frame_identity(None, frame_id, key));
-        let has_execution = contains_interactive_component(&element.component);
-        anyhow::ensure!(
-            !has_execution || frame_identity.is_some(),
-            "Interactive Frame element in Frame '{frame_id}' requires a stable developer key"
-        );
-        let frame_identity = frame_identity.as_deref();
-        register_component_executions(&element.component, app, definition_id, frame_identity)?;
+        register_component_executions(&element.component, app, definition_id, None)?;
         let (components, budget) = render_component(
-            &element.component, app, ctx, data, serialized_data, definition_id, frame_identity,
+            &element.component, app, ctx, data, serialized_data, definition_id, None,
         ).await?;
         rendered.push(RenderedFrameElement { components, budget });
     }
@@ -1230,14 +1258,14 @@ async fn create_pagination_navigation(
         ("next", "Next", state.page_index + 1 == state.page_count),
     ] {
         let execution_id = pagination_execution_id(frame_id, direction);
-        let custom_id = derive_custom_id(
+        let custom_id = derive_custom_id_with_frame(
             definition_id,
             &execution_id,
             serialized_data,
             Some(&identity),
         )?;
-        if app.store().resolve(&custom_id).await?.is_none() {
-            app.store().insert(StoreRecord {
+        if app.store().resolve_record(&custom_id).await?.is_none() {
+            app.store().insert_record(StoreRecord {
                 custom_id: custom_id.0.clone(),
                 definition_kind: DefinitionKind::Page,
                 definition_id: definition_id.to_owned(),
@@ -1568,8 +1596,10 @@ where
 
     /// Resolves dynamic properties and Frames for one Page instance, persists
     /// execution references, checks Discord limits, and returns the first message.
-    pub async fn render(&self, app: &App, data: T)
+    pub async fn render<D>(&self, app: &App<D>, data: T)
         -> anyhow::Result<RenderedMessage>
+    where
+        D: Clone + std::any::Any + Send + Sync + 'static,
     {
         let mut rendered = self.render_pages(app, data).await
             .with_context(|| format!("Rendering Page '{}'", self.id()))?;
@@ -1578,165 +1608,32 @@ where
     }
 
     /// Renders the Page's complete Frame pagination and reports its current position.
-    pub async fn render_pages(&self, app: &App, data: T)
+    pub async fn render_pages<D>(&self, app: &App<D>, data: T)
         -> anyhow::Result<RenderedPage>
+    where
+        D: Clone + std::any::Any + Send + Sync + 'static,
     {
+        let app = app.erased();
         let data = Arc::new(data);
         let serialized_data = serde_json::to_vec(data.as_ref())
             .with_context(|| format!("Serializing data for Page '{}'", self.id()))?;
         let ctx = app.render_context(self.id());
-
-        // Only Frames with their own paginate flag, or Frames covered by Page::paginate,
-        // compete for the single pagination slot. Ordinary Frames can coexist freely.
-        let top_paginated_frames: Vec<usize> = self.definition.items.iter().enumerate()
-            .filter_map(|(index, item)| match item {
-                PageItem::Frame(frame) if self.definition.paginate || frame.paginate => Some(index),
-                _ => None,
-            })
-            .collect();
-
-        let mut nested_paginated_frames: Vec<(usize, String)> = Vec::new();
-        for (item_index, item) in self.definition.items.iter().enumerate() {
-            if let PageItem::Component(component) = item {
-                let mut found = Vec::new();
-                collect_paginated_frames_in_component(
-                    component, self.definition.paginate, &mut found,
-                );
-                for (_, frame_id) in found {
-                    nested_paginated_frames.push((item_index, frame_id));
-                }
-            }
-        }
-
-        anyhow::ensure!(
-            top_paginated_frames.len() + nested_paginated_frames.len() <= 1,
-            "Page '{}' cannot contain more than one paginated Frame across its component tree",
-            self.id()
-        );
-
-        if let Some((container_item_index, frame_id)) = nested_paginated_frames.first().cloned() {
-            anyhow::ensure!(
-                top_paginated_frames.is_empty(),
-                "Page '{}' cannot paginate both a top-level Frame and a nested Container Frame",
-                self.id()
-            );
-            let container = match &self.definition.items[container_item_index] {
-                PageItem::Component(Component::Container(container)) => container,
-                _ => anyhow::bail!(
-                    "Paginated nested Frame '{}' must be inside a Page-level Container",
-                    frame_id
-                ),
-            };
-            let direct_matches = container.children.iter().filter(|child| {
-                matches!(child, super::component::ContainerItem::Frame(frame) if frame.id == frame_id)
-            }).count();
-            anyhow::ensure!(
-                direct_matches == 1,
-                "Paginated Frame '{}' must be a direct child of its Container",
-                frame_id
-            );
-            let (page_prefix, page_prefix_budget) = render_page_items(
-                &self.definition.items[..container_item_index],
-                app, &ctx, &data, &serialized_data, self.id(),
-            ).await.context("Rendering Page items before nested Container Frame")?;
-            let (page_suffix, page_suffix_budget) = render_page_items(
-                &self.definition.items[container_item_index + 1..],
-                app, &ctx, &data, &serialized_data, self.id(),
-            ).await.context("Rendering Page items after nested Container Frame")?;
-            return render_paginated_container(
-                container,
-                app,
-                &ctx,
-                &data,
-                &serialized_data,
-                self.id(),
-                &frame_id,
-                page_prefix,
-                page_prefix_budget,
-                page_suffix,
-                page_suffix_budget,
-            ).await;
-        }
-
-        let Some(&frame_position) = top_paginated_frames.first() else {
-            // No pagination is requested. Expand all ordinary Frames in Page order.
-            let (components, budget) = render_page_items(
-                &self.definition.items,
-                app, &ctx, &data, &serialized_data, self.id(),
-            ).await?;
-            validate_message_budget(budget)
-                .with_context(|| format!("Validating Page '{}'", self.id()))?;
-            return Ok(RenderedPage {
-                pages: vec![RenderedMessage {
-                    components,
-                    attachments: Vec::new(),
-                    pagination: None,
-                }],
-                current_index: 0,
-            });
-        };
-
-        let frame = match &self.definition.items[frame_position] {
-            PageItem::Frame(frame) => frame,
-            PageItem::Component(_) => unreachable!("paginated Frame position came from a Frame item"),
-        };
-        let (prefix_components, prefix_budget) = render_page_items(
-            &self.definition.items[..frame_position],
-            app, &ctx, &data, &serialized_data, self.id(),
-        ).await.with_context(|| format!("Rendering Page content before Frame '{}'", frame.id))?;
-        let (suffix_components, suffix_budget) = render_page_items(
-            &self.definition.items[frame_position + 1..],
-            app, &ctx, &data, &serialized_data, self.id(),
-        ).await.with_context(|| format!("Rendering Page content after Frame '{}'", frame.id))?;
-
-        let elements = (frame.resolver)(ctx.clone(), data.clone()).await
-            .with_context(|| format!("Resolving Frame '{}' in Page '{}'", frame.id, self.id()))?;
-        let reserved = add_budgets(prefix_budget, suffix_budget);
-        let rendered_elements = render_frame_elements(
-            &elements, app, &ctx, &data, &serialized_data, self.id(), &frame.id,
-        ).await.with_context(|| format!(
-            "Rendering resolved Frame '{}' in Page '{}'", frame.id, self.id()
-        ))?;
-
-        // Reserve the navigation row before splitting; the measured Frame output
-        // is reused for both the plan and the final messages.
-        let navigation_budget = ComponentBudget {
-            total_components: 3,
-            text_display_chars: 0,
-            direct_container_children: 0,
-        };
-        let (planned_pages, page_count) = plan_rendered_frame(
-            rendered_elements,
-            add_budgets(reserved, navigation_budget),
-        ).with_context(|| format!("Paginating Frame '{}' in Page '{}'", frame.id, self.id()))?;
-
-        let mut pages = Vec::with_capacity(page_count);
-        for (page_index, (frame_components, budget)) in planned_pages.into_iter().enumerate() {
-            validate_message_budget(budget)
-                .with_context(|| format!(
-                    "Validating Frame '{}' page {} in Page '{}'",
-                    frame.id, page_index, self.id()
-                ))?;
-            let mut components = prefix_components.clone();
-            components.extend(frame_components);
-            components.extend(suffix_components.clone());
-
-            let pagination = super::frame::pagination::PaginationState {
-                frame_id: frame.id.clone(),
-                page_index,
-                page_count,
-            };
-            if page_count > 1 {
-                components.push(create_pagination_navigation(
-                    app, self.id(), &frame.id, &serialized_data, &pagination,
-                ).await?);
-            }
-            pages.push(RenderedMessage {
+        let (components, budget) = render_page_items(
+            &self.definition.items,
+            &app,
+            &ctx,
+            &data,
+            &serialized_data,
+            self.id(),
+        ).await.with_context(|| format!("Expanding components and Frames for Page '{}'", self.id()))?;
+        validate_message_budget(budget)
+            .with_context(|| format!("Validating Page '{}'", self.id()))?;
+        Ok(RenderedPage {
+            pages: vec![RenderedMessage {
                 components,
                 attachments: Vec::new(),
-                pagination: (page_count > 1).then_some(pagination),
-            });
-        }
-        Ok(RenderedPage { pages, current_index: 0 })
-    }
-}
+                pagination: None,
+            }],
+            current_index: 0,
+        })
+    }}

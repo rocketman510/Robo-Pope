@@ -13,8 +13,8 @@ pub mod select;
 pub mod value;
 
 pub use builder::{Page,PageDefinition,PageItem,RegisteredPage};
-pub use component::{Button,ButtonRow,ButtonSlots,ButtonStyle,Component,Container,
-    ContainerItem,File,LinkButton,MediaGallery,MediaItem,Section,SectionAccessory,
+pub use component::{Button,ButtonRow,ButtonSlot,ButtonSlots,ButtonStyle,Component,Container,
+    ContainerItem,File,IntoMediaItem,LinkButton,MediaGallery,MediaItem,Section,SectionAccessory,
     Separator,SeparatorSpacing,Text,Thumbnail};
 pub use execution::{Execution,Selection,SelectedUser,SelectedRole,SelectedMentionable,SelectedChannel};
 pub use frame::{Element,Frame,FrameIdentity};

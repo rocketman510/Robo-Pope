@@ -61,7 +61,7 @@ impl InteractionRouter {
         let custom_id = CustomId(component.data.custom_id.to_string());
         let record = app
             .store()
-            .resolve(&custom_id)
+            .resolve_record(&custom_id)
             .await?
             .ok_or_else(|| {
                 anyhow::anyhow!("No execution record for custom ID '{}'", custom_id.0)
@@ -138,7 +138,7 @@ impl InteractionRouter {
         let custom_id = CustomId(modal.data.custom_id.to_string());
         let record = app
             .store()
-            .resolve(&custom_id)
+            .resolve_record(&custom_id)
             .await?
             .ok_or_else(|| {
                 anyhow::anyhow!("No execution record for Modal custom ID '{}'", custom_id.0)

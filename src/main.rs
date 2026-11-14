@@ -16,7 +16,7 @@ use serenity::{
 use robo_pope::{
     app::{store::{FileStore, Store}, App, Database},
     page::{
-        dynamic, Button, ButtonStyle, Container, Element, Frame, LinkButton,
+        dynamic, Button, ButtonStyle, Container, Element, LinkButton,
         MediaGallery, Modal, Page, Section, SelectOption, Separator, StringSelect,
         TextInputStyle, Thumbnail,
     },
@@ -59,15 +59,17 @@ fn register_demo_page(app: &App) -> anyhow::Result<()> {
                 .add_text("Container children retain their declared order."),
         )
         .add_button_row((
-            Some(Button::new(
+            Button::new(
                 "Test button",
                 "demo-button",
                 ButtonStyle::Primary,
+                None,
+                false,
                 |_ctx, _data: DemoData| async move {
                     println!("The demo button callback was invoked.");
                     Ok(())
                 },
-            )),
+            ),
             None,
             None,
             None,
@@ -76,6 +78,8 @@ fn register_demo_page(app: &App) -> anyhow::Result<()> {
         .add_link_button(LinkButton::new(
             "Robo-Pope repository",
             "https://github.com/rocketman510/Robo-Pope",
+            None,
+            false,
         ))
         .add_selection_menu(StringSelect::new(
             "Choose an option",
@@ -95,19 +99,14 @@ fn register_demo_page(app: &App) -> anyhow::Result<()> {
                 .add_media("https://example.com/first-image.png")
                 .add_media("https://example.com/second-image.png"),
         )
-        .add_frame(
-            Frame::<DemoData>::new("demo-frame", |_ctx, data| async move {
-                Ok(vec![
-                    Element::text(format!(
-                        "Generated Frame content for {}.",
-                        data.username
-                    ))
-                    .keyed("demo-frame-entry"),
-                ])
-            })
-            .paginate(),
-        )
-        .paginate();
+        .add_frame(|_ctx, data| async move {
+            Ok(vec![
+                Element::text(format!(
+                    "Generated Frame content for {}.",
+                    data.username
+                )),
+            ])
+        });
 
     page.register(app)?;
     println!("Registered demo Page: framework-demo");
