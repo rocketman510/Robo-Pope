@@ -118,7 +118,7 @@ async fn fixed_section_slots_accept_direct_async_closures() {
 }
 
 #[tokio::test]
-async fn button_labels_and_styles_accept_direct_async_closures() {
+async fn button_properties_accept_direct_async_closures() {
     // FIRST: all display properties share the static-or-dynamic input interface.
     use crate::page::{Button, ButtonStyle, Page};
     use std::sync::Arc;
@@ -129,10 +129,13 @@ async fn button_labels_and_styles_accept_direct_async_closures() {
             "dynamic-button",
             |_ctx: RenderCtx, _data: Arc<TestData>| async move { Ok(ButtonStyle::Success) },
             |_ctx: RenderCtx, _data: Arc<TestData>| async move { Ok(Some("✨".into())) },
-            |_ctx: RenderCtx, _data: Arc<TestData>| async move { Ok(false) },
+            |_ctx: RenderCtx, _data: Arc<TestData>| async move { Ok(true) },
             |_ctx, _data: TestData| async move { Ok(()) },
         ), None, None, None, None)).register(&app).unwrap();
     let rendered = page.render(&app, TestData::default()).await.unwrap();
     let json = serde_json::to_value(rendered.into_components()).unwrap();
-    assert!(json.to_string().contains("Hello sample"));
+    let output = json.to_string();
+    assert!(output.contains("Hello sample"));
+    assert!(output.contains("✨"));
+    assert!(output.contains("\\\"disabled\\\":true"));
 }
