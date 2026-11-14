@@ -1,4 +1,4 @@
-//! Page<T> builder and immutable RegisteredPage<T> typestate.
+//! Page<T> builder and immutable RegisteredPage<T, D> typestate.
 use std::sync::Arc;
 use std::future::Future;
 use std::collections::HashSet;
@@ -13,7 +13,7 @@ use serenity::builder::{
 };
 use serenity::all::ButtonStyle as SerenityButtonStyle;
 use serde::{Serialize, de::DeserializeOwned};
-use crate::app::{App, Database, RenderCtx};
+use crate::app::{App, RenderCtx<D>};
 use crate::app::store::{derive_custom_id_with_frame, DefinitionKind, StoreRecord};
 use super::component::*;
 use super::frame::Frame;
@@ -26,24 +26,24 @@ use super::value::IntoValue;
 ///
 /// `T` is the Page's shared data type. It is serialized for each rendered
 /// instance and reconstructed before an interaction callback runs.
-pub struct Page<T> {
+pub struct Page<T, D = Arc<()>> {
     pub(crate) id: String,
-    pub(crate) items: Vec<PageItem<T>>,
+    pub(crate) items: Vec<PageItem<T, D>>,
     pub(crate) paginate: bool,
 }
 /// Immutable definition retained by the App after Page registration.
-pub struct PageDefinition<T> {
+pub struct PageDefinition<T, D = Arc<()>> {
     pub(crate) id: String,
-    pub(crate) items: Vec<PageItem<T>>,
+    pub(crate) items: Vec<PageItem<T, D>>,
 }
 /// One ordered top-level entry in a Page: a fixed component or dynamic Frame.
-pub enum PageItem<T> {
-    Component(Component<T>),
-    Frame(Frame<T>),
+pub enum PageItem<T, D = Arc<()>> {
+    Component(Component<T, D>),
+    Frame(Frame<T, D>),
 }
 /// Registered, immutable Page handle. Rendering is only available after registration.
-pub struct RegisteredPage<T> {
-    pub(crate) definition: Arc<PageDefinition<T>>,
+pub struct RegisteredPage<T, D = Arc<()>> {
+    pub(crate) definition: Arc<PageDefinition<T, D>>,
 }
 
 
@@ -59,7 +59,7 @@ fn validate_frame_id(id: &str, ids: &mut HashSet<String>) -> anyhow::Result<()> 
     Ok(())
 }
 
-fn validate_component_ids<T>(
+fn validate_component_ids<T, D>(
     component: &Component<T>,
     execution_ids: &mut HashSet<String>,
     frame_ids: &mut HashSet<String>,
@@ -114,9 +114,9 @@ fn validate_component_ids<T>(
     Ok(())
 }
 
-fn register_component_executions<T>(
+fn register_component_executions<T, D>(
     component: &Component<T>,
-    app: &App<Database>,
+    app: &App<D>,
     definition_id: &str,
     frame_identity: Option<&str>,
 ) -> anyhow::Result<()>
@@ -158,7 +158,7 @@ where
     Ok(())
 }
 
-fn contains_interactive_component<T>(component: &Component<T>) -> bool {
+fn contains_interactive_component<T, D>(component: &Component<T, D>) -> bool {
     use super::component::{ContainerItem, SectionAccessory};
     match component {
         Component::Button(_) | Component::ButtonRow(_) | Component::Select(_) => true,
@@ -187,7 +187,7 @@ fn pagination_execution_id(frame_id: &str, direction: &str) -> String {
     format!("__frame:{frame_id}:{direction}")
 }
 
-fn collect_component_frames<T>(
+fn collect_component_frames<T, D>(
     component: &Component<T>,
     page_paginate: bool,
     output: &mut Vec<String>,
@@ -204,7 +204,7 @@ fn collect_component_frames<T>(
     }
 }
 
-fn collect_paginated_frames_in_component<T>(
+fn collect_paginated_frames_in_component<T, D>(
     component: &Component<T>,
     page_paginate: bool,
     output: &mut Vec<(usize, String)>,
@@ -225,13 +225,13 @@ fn collect_paginated_frames_in_component<T>(
     }
 }
 
-fn collect_paginated_frames<T>(_definition: &PageDefinition<T>) -> Vec<String> {
+fn collect_paginated_frames<T, D>(_definition: &PageDefinition<T, D>) -> Vec<String> {
     Vec::new()
 }
 
-fn register_pagination_callbacks<T>(
-    app: &App<Database>,
-    definition: Arc<PageDefinition<T>>,
+fn register_pagination_callbacks<T, D>(
+    app: &App<D>,
+    definition: Arc<PageDefinition<T, D>>,
     frame_ids: &[String],
 ) -> anyhow::Result<()>
 where
@@ -243,7 +243,7 @@ where
             let callback_definition = definition.clone();
             let callback_frame_id = frame_id.clone();
             let callback_direction = direction.to_owned();
-            let execution = super::execution::Execution::with_input(
+            let execution = super::execution::Execution::<T, PaginationRequest, D>::with_input(
                 execution_id,
                 move |ctx, data: T, request: PaginationRequest| {
                     let definition = callback_definition.clone();
@@ -310,7 +310,7 @@ where
     Ok(())
 }
 
-impl<T> Page<T> {
+impl<T, D> Page<T, D> {
     /// Starts a Page definition with a globally unique application-wide ID.
     pub fn new(id: impl Into<String>) -> Self {
         Self { id:id.into(), items:Vec::new(), paginate:false }
@@ -318,38 +318,38 @@ impl<T> Page<T> {
     /// Returns the developer-defined Page ID.
     pub fn id(&self) -> &str { &self.id }
     /// Appends a Text Display. Its content may be static or resolved at render time.
-    pub fn add_text<V: IntoValue<String, T>>(mut self, value: V) -> Self {
+    pub fn add_text<V: IntoValue<String, T, D>>(mut self, value: V) -> Self {
         self.items.push(PageItem::Component(Component::Text(Text::new(value))));
         self
     }
     /// Appends a Section with one to three Text Display slots and one optional accessory.
-    pub fn add_section(mut self, value: Section<T>) -> Self {
+    pub fn add_section(mut self, value: Section<T, D>) -> Self {
         self.items.push(PageItem::Component(Component::Section(value))); self
     }
     /// Appends a Container while preserving the order of its children.
-    pub fn add_container(mut self, value: Container<T>) -> Self {
+    pub fn add_container(mut self, value: Container<T, D>) -> Self {
         self.items.push(PageItem::Component(Component::Container(value))); self
     }
     /// Appends a Separator with dynamic spacing and divider properties.
-    pub fn add_separator(mut self, value: Separator<T>) -> Self {
+    pub fn add_separator(mut self, value: Separator<T, D>) -> Self {
         self.items.push(PageItem::Component(Component::Separator(value))); self
     }
     /// Appends an interactive Button with an explicit execution callback.
-    pub fn add_button(mut self, value: Button<T>) -> Self {
+    pub fn add_button(mut self, value: Button<T, D>) -> Self {
         self.items.push(PageItem::Component(Component::Button(value))); self
     }
     /// Appends a URL button. Link buttons do not create interaction executions.
-    pub fn add_link_button(mut self, value: LinkButton<T>) -> Self {
+    pub fn add_link_button(mut self, value: LinkButton<T, D>) -> Self {
         self.items.push(PageItem::Component(Component::LinkButton(value))); self
     }
     /// Appends an Action Row with up to five fixed Button slots.
-    pub fn add_button_row<A, B, C, D, E>(mut self, slots: (A, B, C, D, E)) -> Self
+    pub fn add_button_row<A, B, C, SlotD, SlotE>(mut self, slots: (A, B, C, SlotD, SlotE)) -> Self
     where
-        A: Into<ButtonSlot<T>>,
-        B: Into<ButtonSlot<T>>,
-        C: Into<ButtonSlot<T>>,
-        D: Into<ButtonSlot<T>>,
-        E: Into<ButtonSlot<T>>,
+        A: Into<ButtonSlot<T, D>>,
+        B: Into<ButtonSlot<T, D>>,
+        C: Into<ButtonSlot<T, D>>,
+        SlotD: Into<ButtonSlot<T, D>>,
+        SlotE: Into<ButtonSlot<T, D>>,
     {
         let slots = (
             slots.0.into(),
@@ -362,11 +362,11 @@ impl<T> Page<T> {
         self
     }
     /// Appends one String, User, Role, Mentionable, or Channel Select menu.
-    pub fn add_selection_menu<M: Into<SelectMenu<T>>>(mut self, value: M) -> Self {
+    pub fn add_selection_menu<M: Into<SelectMenu<T, D>>>(mut self, value: M) -> Self {
         self.items.push(PageItem::Component(Component::Select(value.into()))); self
     }
     /// Appends a Media Gallery containing at most ten media items.
-    pub fn add_gallery(mut self, value: MediaGallery<T>) -> Self {
+    pub fn add_gallery(mut self, value: MediaGallery<T, D>) -> Self {
         self.items.push(PageItem::Component(Component::MediaGallery(value))); self
     }
     /// Appends a reference to an attachment included in the outgoing message.
@@ -376,8 +376,8 @@ impl<T> Page<T> {
     /// Appends a dynamic region whose elements are resolved when the Page renders.
     pub fn add_frame<F, Fut>(mut self, resolver: F) -> Self
     where
-        F: Fn(RenderCtx, Arc<T>) -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = anyhow::Result<Vec<super::frame::Element<T>>>> + Send + 'static,
+        F: Fn(RenderCtx<D>, Arc<T>) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = anyhow::Result<Vec<super::frame::Element<T, D>>>> + Send + 'static,
         T: Send + Sync + 'static,
     {
         let frame_id = format!("frame-{}", self.items.len());
@@ -389,12 +389,11 @@ impl<T> Page<T> {
 
     /// Validates and registers this definition. Registration consumes the builder;
     /// a duplicate Page ID is an error.
-    pub fn register<D>(self, app: &App<D>) -> anyhow::Result<RegisteredPage<T>>
+    pub fn register(self, app: &App<D>) -> anyhow::Result<RegisteredPage<T, D>>
     where
-        D: Clone + std::any::Any + Send + Sync + 'static,
+        D: Clone + Send + Sync + 'static,
         T: Serialize + DeserializeOwned + Send + Sync + 'static
     {
-        let app = app.erased();
         anyhow::ensure!(!self.id.trim().is_empty(), "Page ID must not be empty");
         let mut execution_ids = HashSet::new();
         let mut frame_ids = HashSet::new();
@@ -466,7 +465,7 @@ fn validate_message_budget(budget: ComponentBudget) -> anyhow::Result<()> {
 }
 
 async fn persist_button_execution<T>(
-    app: &App<Database>,
+    app: &App<D>,
     button: &Button<T>,
     definition_id: &str,
     serialized_data: &[u8],
@@ -495,7 +494,7 @@ async fn persist_button_execution<T>(
 }
 
 async fn persist_select_execution(
-    app: &App<Database>,
+    app: &App<D>,
     execution_id: &str,
     definition_id: &str,
     serialized_data: &[u8],
@@ -521,7 +520,7 @@ async fn persist_select_execution(
 
 async fn render_link_button<T>(
     button: &LinkButton<T>,
-    ctx: &RenderCtx,
+    ctx: &RenderCtx<D>,
     data: &Arc<T>,
 ) -> anyhow::Result<CreateButton<'static>>
 where
@@ -544,9 +543,9 @@ where
 }
 
 async fn render_button<T>(
-    app: &App<Database>,
+    app: &App<D>,
     button: &Button<T>,
-    ctx: &RenderCtx,
+    ctx: &RenderCtx<D>,
     data: &Arc<T>,
     definition_id: &str,
     serialized_data: &[u8],
@@ -586,8 +585,8 @@ where
 
 async fn render_select_menu<T>(
     menu: &SelectMenu<T>,
-    app: &App<Database>,
-    ctx: &RenderCtx,
+    app: &App<D>,
+    ctx: &RenderCtx<D>,
     data: &Arc<T>,
     serialized_data: &[u8],
     definition_id: &str,
@@ -722,7 +721,7 @@ where
 
 async fn render_media_gallery<T>(
     gallery: &super::component::MediaGallery<T>,
-    ctx: &RenderCtx,
+    ctx: &RenderCtx<D>,
     data: &Arc<T>,
 ) -> anyhow::Result<CreateMediaGallery<'static>>
 where
@@ -768,8 +767,8 @@ where
 
 async fn render_container<T>(
     container: &super::component::Container<T>,
-    app: &App<Database>,
-    ctx: &RenderCtx,
+    app: &App<D>,
+    ctx: &RenderCtx<D>,
     data: &Arc<T>,
     serialized_data: &[u8],
     definition_id: &str,
@@ -788,8 +787,8 @@ where
         key: Option<&str>,
         children: &mut Vec<CreateContainerComponent<'static>>,
         budget: &mut ComponentBudget,
-        app: &App<Database>,
-        ctx: &RenderCtx,
+        app: &App<D>,
+        ctx: &RenderCtx<D>,
         data: &Arc<T>,
         serialized_data: &[u8],
         definition_id: &str,
@@ -885,8 +884,8 @@ where
 
 async fn render_component<T>(
     component: &Component<T>,
-    app: &App<Database>,
-    ctx: &RenderCtx,
+    app: &App<D>,
+    ctx: &RenderCtx<D>,
     data: &Arc<T>,
     serialized_data: &[u8],
     definition_id: &str,
@@ -1137,9 +1136,9 @@ where
 }
 
 async fn render_component_list<T>(
-    components: &[&Component<T>],
-    app: &App<Database>,
-    ctx: &RenderCtx,
+    components: &[&Component<T, D>],
+    app: &App<D>,
+    ctx: &RenderCtx<D>,
     data: &Arc<T>,
     serialized_data: &[u8],
     definition_id: &str,
@@ -1160,8 +1159,8 @@ where
     Ok((rendered, budget))
 }
 
-fn validate_frame_elements<T>(
-    elements: &[super::frame::Element<T>],
+fn validate_frame_elements<T, D>(
+    elements: &[super::frame::Element<T, D>],
     frame_id: &str,
 ) -> anyhow::Result<()> {
     let mut execution_ids = HashSet::new();
@@ -1179,9 +1178,9 @@ struct RenderedFrameElement {
 }
 
 async fn render_frame_elements<T>(
-    elements: &[super::frame::Element<T>],
-    app: &App<Database>,
-    ctx: &RenderCtx,
+    elements: &[super::frame::Element<T, D>],
+    app: &App<D>,
+    ctx: &RenderCtx<D>,
     data: &Arc<T>,
     serialized_data: &[u8],
     definition_id: &str,
@@ -1245,7 +1244,7 @@ fn plan_rendered_frame(
 }
 
 async fn create_pagination_navigation(
-    app: &App<Database>,
+    app: &App<D>,
     definition_id: &str,
     frame_id: &str,
     serialized_data: &[u8],
@@ -1305,9 +1304,9 @@ fn as_container_child(part: RenderedComponent) -> anyhow::Result<CreateContainer
 }
 
 async fn render_page_items<T>(
-    items: &[PageItem<T>],
-    app: &App<Database>,
-    ctx: &RenderCtx,
+    items: &[PageItem<T, D>],
+    app: &App<D>,
+    ctx: &RenderCtx<D>,
     data: &Arc<T>,
     serialized_data: &[u8],
     definition_id: &str,
@@ -1349,8 +1348,8 @@ where
 
 async fn render_container_items<T>(
     items: &[super::component::ContainerItem<T>],
-    app: &App<Database>,
-    ctx: &RenderCtx,
+    app: &App<D>,
+    ctx: &RenderCtx<D>,
     data: &Arc<T>,
     serialized_data: &[u8],
     definition_id: &str,
@@ -1461,8 +1460,8 @@ fn plan_container_frame_ranges(
 
 async fn render_paginated_container<T>(
     container: &super::component::Container<T>,
-    app: &App<Database>,
-    ctx: &RenderCtx,
+    app: &App<D>,
+    ctx: &RenderCtx<D>,
     data: &Arc<T>,
     serialized_data: &[u8],
     definition_id: &str,
@@ -1587,7 +1586,7 @@ where
     Ok(RenderedPage { pages, current_index: 0 })
 }
 
-impl<T> RegisteredPage<T>
+impl<T> RegisteredPage<T, D>
 where
     T: Serialize + DeserializeOwned + Send + Sync + 'static
 {
@@ -1596,7 +1595,7 @@ where
 
     /// Resolves dynamic properties and Frames for one Page instance, persists
     /// execution references, checks Discord limits, and returns the first message.
-    pub async fn render<D>(&self, app: &App<D>, data: T)
+    pub async fn render(&self, app: &App<D>, data: T)
         -> anyhow::Result<RenderedMessage>
     where
         D: Clone + std::any::Any + Send + Sync + 'static,
@@ -1608,12 +1607,11 @@ where
     }
 
     /// Renders the Page's complete Frame pagination and reports its current position.
-    pub async fn render_pages<D>(&self, app: &App<D>, data: T)
+    pub async fn render_pages(&self, app: &App<D>, data: T)
         -> anyhow::Result<RenderedPage>
     where
         D: Clone + std::any::Any + Send + Sync + 'static,
     {
-        let app = app.erased();
         let data = Arc::new(data);
         let serialized_data = serde_json::to_vec(data.as_ref())
             .with_context(|| format!("Serializing data for Page '{}'", self.id()))?;
