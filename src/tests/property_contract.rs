@@ -145,7 +145,7 @@ async fn string_select_placeholder_option_label_and_description_resolve_dynamica
                         "option-value",
                     )
                     .set_description(
-                        |_ctx, data| async move {
+                        |_ctx: crate::app::RenderCtx<std::sync::Arc<()>>, data: std::sync::Arc<TestData>| async move {
                             Ok(format!("Description {}", data.label))
                         },
                     )
