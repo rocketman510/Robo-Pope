@@ -57,16 +57,42 @@ impl InteractionRouter {
             definition_id: record.definition_id.clone(),
             execution_id: record.execution_id.clone(),
         };
-        let callback = app.executions.get(&key).ok_or_else(|| {
-            anyhow::anyhow!(
-                "No process-local execution registered for definition '{}' execution '{}'",
-                key.definition_id,
-                key.execution_id
-            )
-        })?;
-
         let data: JsonValue = serde_json::from_slice(&record.serialized_data)
             .map_err(|e| anyhow::anyhow!("Failed to deserialize stored Page data: {e}"))?;
+
+        let mut frame_dispatch = false;
+        let callback = match app.executions.get(&key) {
+            Some(callback) => callback,
+            None => {
+                let resolver_found = app.executions.resolve_frame_callbacks(
+                    &record.definition_id,
+                    app.clone(),
+                    record.serialized_data.clone(),
+                ).await?;
+                if !resolver_found {
+                    anyhow::bail!(
+                        "No process-local execution registered for definition '{}' execution '{}'",
+                        key.definition_id,
+                        key.execution_id
+                    );
+                }
+                frame_dispatch = true;
+                match app.executions.get_frame(&key, &record.serialized_data) {
+                    Some(callback) => callback,
+                    None => {
+                        app.executions.remove_frame_callbacks(
+                            &record.definition_id,
+                            &record.serialized_data,
+                        )?;
+                        anyhow::bail!(
+                            "No Frame execution '{}' is currently produced by Page '{}'",
+                            key.execution_id,
+                            key.definition_id
+                        );
+                    }
+                }
+            }
+        };
 
         let selection = extract_selection(&component.data.kind, &component.data.resolved)?;
         let payload = match &selection {
@@ -74,7 +100,14 @@ impl InteractionRouter {
             None => InteractionPayload::None,
         };
         let ctx = Ctx::new(app.clone(), Arc::new(interaction), selection);
-        callback(ctx, data, payload).await
+        let result = callback(ctx, data, payload).await;
+        if frame_dispatch {
+            app.executions.remove_frame_callbacks(
+                &record.definition_id,
+                &record.serialized_data,
+            )?;
+        }
+        result
     }
 
     /// Resolves the Modal execution and supplies submitted values separately
@@ -152,7 +185,10 @@ fn extract_modal_submission(
                         let selected = values.iter().map(|value| {
                             Ok(crate::page::SelectedUser {
                                 id: serenity::all::UserId::new(parse_u64(value, &id)?),
-                                resolved: None,
+                                resolved: {
+                                    let user_id = serenity::all::UserId::new(parse_u64(value, &id)?);
+                                    modal.data.resolved.users.get(&user_id).cloned().map(Arc::new)
+                                },
                             })
                         }).collect::<anyhow::Result<Vec<_>>>()?;
                         crate::page::SubmittedValue::Users(selected)
@@ -161,7 +197,10 @@ fn extract_modal_submission(
                         let selected = values.iter().map(|value| {
                             Ok(crate::page::SelectedRole {
                                 id: serenity::all::RoleId::new(parse_u64(value, &id)?),
-                                resolved: None,
+                                resolved: {
+                                    let role_id = serenity::all::RoleId::new(parse_u64(value, &id)?);
+                                    modal.data.resolved.roles.get(&role_id).cloned().map(Arc::new)
+                                },
                             })
                         }).collect::<anyhow::Result<Vec<_>>>()?;
                         crate::page::SubmittedValue::Roles(selected)
@@ -174,11 +213,17 @@ fn extract_modal_submission(
                             let role_id = serenity::all::RoleId::new(raw_id);
                             if modal.data.resolved.users.get(&user_id).is_some() {
                                 selected.push(crate::page::SelectedMentionable::User(
-                                    crate::page::SelectedUser { id: user_id, resolved: None }
+                                    crate::page::SelectedUser {
+                                        id: user_id,
+                                        resolved: modal.data.resolved.users.get(&user_id).cloned().map(Arc::new),
+                                    }
                                 ));
                             } else if modal.data.resolved.roles.get(&role_id).is_some() {
                                 selected.push(crate::page::SelectedMentionable::Role(
-                                    crate::page::SelectedRole { id: role_id, resolved: None }
+                                    crate::page::SelectedRole {
+                                        id: role_id,
+                                        resolved: modal.data.resolved.roles.get(&role_id).cloned().map(Arc::new),
+                                    }
                                 ));
                             } else {
                                 anyhow::bail!(
@@ -192,7 +237,10 @@ fn extract_modal_submission(
                         let selected = values.iter().map(|value| {
                             Ok(crate::page::SelectedChannel {
                                 id: serenity::all::ChannelId::new(parse_u64(value, &id)?),
-                                resolved: None,
+                                resolved: {
+                                    let channel_id = serenity::all::ChannelId::new(parse_u64(value, &id)?);
+                                    modal.data.resolved.channels.get(&channel_id).cloned().map(Arc::new)
+                                },
                             })
                         }).collect::<anyhow::Result<Vec<_>>>()?;
                         crate::page::SubmittedValue::Channels(selected)
@@ -290,7 +338,10 @@ fn extract_selection(
         ComponentInteractionDataKind::ChannelSelect { values } => Some(Selection::Channels(
             values.iter().map(|id| crate::page::SelectedChannel {
                 id: serenity::all::ChannelId::new(id.get()),
-                resolved: None,
+                resolved: {
+                    let channel_id = serenity::all::ChannelId::new(id.get());
+                    resolved.channels.get(&channel_id).cloned().map(Arc::new)
+                },
             }).collect(),
         )),
         ComponentInteractionDataKind::Button => None,

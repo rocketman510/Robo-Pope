@@ -117,10 +117,28 @@ fn static_component_count<T, D>(component: &Component<T, D>) -> usize {
     }
 }
 
+fn register_one_execution<T, I, D>(
+    execution: &crate::page::execution::Execution<T, I, D>,
+    app: &App<D>,
+    definition_id: &str,
+    frame_data: Option<&[u8]>,
+) -> anyhow::Result<()>
+where
+    T: DeserializeOwned + Send + 'static,
+    I: crate::page::execution::FromInteractionPayload,
+    D: Clone + Send + Sync + 'static,
+{
+    match frame_data {
+        Some(data) => execution.register_frame(app, definition_id, data),
+        None => execution.register(app, definition_id),
+    }
+}
+
 fn register_component_executions<T, D>(
     component: &Component<T, D>,
     app: &App<D>,
     definition_id: &str,
+    frame_data: Option<&[u8]>,
 ) -> anyhow::Result<()>
 where
     T: DeserializeOwned + Send + Sync + 'static,
@@ -132,26 +150,26 @@ where
         Component::ButtonRow(row) => {
             for slot in [&row.slots.0, &row.slots.1, &row.slots.2, &row.slots.3, &row.slots.4] {
                 if let ButtonSlot::Button(button) = slot {
-                    button.execution.register(app, definition_id)?;
+                    register_one_execution(&button.execution, app, definition_id, frame_data)?;
                 }
             }
         }
         Component::Section(section) => {
             if let Some(SectionAccessory::Button(button)) = &section.accessory {
-                button.execution.register(app, definition_id)?;
+                register_one_execution(&button.execution, app, definition_id, frame_data)?;
             }
         }
         Component::Select(menu) => match menu {
-            SelectMenu::String(menu) => menu.execution.register(app, definition_id)?,
-            SelectMenu::User(menu) => menu.execution.register(app, definition_id)?,
-            SelectMenu::Role(menu) => menu.execution.register(app, definition_id)?,
-            SelectMenu::Mentionable(menu) => menu.execution.register(app, definition_id)?,
-            SelectMenu::Channel(menu) => menu.execution.register(app, definition_id)?,
+            SelectMenu::String(menu) => register_one_execution(&menu.execution, app, definition_id, frame_data)?,
+            SelectMenu::User(menu) => register_one_execution(&menu.execution, app, definition_id, frame_data)?,
+            SelectMenu::Role(menu) => register_one_execution(&menu.execution, app, definition_id, frame_data)?,
+            SelectMenu::Mentionable(menu) => register_one_execution(&menu.execution, app, definition_id, frame_data)?,
+            SelectMenu::Channel(menu) => register_one_execution(&menu.execution, app, definition_id, frame_data)?,
         },
         Component::Container(container) => {
             for child in &container.children {
                 if let ContainerItem::Component(component) = child {
-                    register_component_executions(component, app, definition_id)?;
+                    register_component_executions(component, app, definition_id, frame_data)?;
                 }
             }
         }
@@ -159,6 +177,58 @@ where
         | Component::File(_) | Component::LinkButton(_) => {}
     }
     Ok(())
+}
+
+
+fn page_frame_resolver<T, D>(
+    definition: Arc<PageDefinition<T, D>>,
+) -> crate::app::executions::ErasedFrameResolver<D>
+where
+    T: DeserializeOwned + Send + Sync + 'static,
+    D: Clone + Send + Sync + 'static,
+{
+    Arc::new(move |app, serialized_data| {
+        let definition = definition.clone();
+        Box::pin(async move {
+            let restored: T = serde_json::from_slice(&serialized_data)
+                .context("Deserializing Page data while restoring Frame executions")?;
+            let data = Arc::new(restored);
+            let ctx = app.render_context(definition.id.clone());
+
+            let mut execution_ids = HashSet::new();
+            for item in &definition.items {
+                if let PageItem::Component(component) = item {
+                    validate_component_ids(component, &mut execution_ids)?;
+                }
+            }
+
+            let mut resolved_frames = Vec::new();
+            for item in &definition.items {
+                if let PageItem::Frame(frame) = item {
+                    let elements = (frame.resolver)(ctx.clone(), data.clone())
+                        .await
+                        .with_context(|| format!(
+                            "Resolving Frame callbacks for Page '{}'",
+                            definition.id
+                        ))?;
+                    validate_frame_elements(&elements, &mut execution_ids)?;
+                    resolved_frames.push(elements);
+                }
+            }
+
+            for elements in resolved_frames {
+                for element in elements {
+                    register_component_executions(
+                        &element.component,
+                        &app,
+                        &definition.id,
+                        Some(&serialized_data),
+                    )?;
+                }
+            }
+            Ok(())
+        })
+    })
 }
 
 impl<T, D> Page<T, D> {
@@ -264,7 +334,7 @@ impl<T, D> Page<T, D> {
         app.reserve_definition_id(&self.id)?;
         for item in &self.items {
             if let PageItem::Component(component) = item {
-                if let Err(error) = register_component_executions(component, &app, &self.id) {
+                if let Err(error) = register_component_executions(component, &app, &self.id, None) {
                     app.executions.remove_definition(&self.id);
                     app.release_definition_id(&self.id);
                     return Err(error);
@@ -275,6 +345,17 @@ impl<T, D> Page<T, D> {
             id: self.id,
             items: self.items,
         });
+        if definition.items.iter().any(|item| matches!(item, PageItem::Frame(_))) {
+            let resolver = page_frame_resolver(definition.clone());
+            if let Err(error) = app.executions.insert_frame_resolver(
+                definition.id.clone(),
+                resolver,
+            ) {
+                app.executions.remove_definition(&definition.id);
+                app.release_definition_id(&definition.id);
+                return Err(error);
+            }
+        }
         if let Err(error) = app.pages.insert(definition.clone()) {
             app.executions.remove_definition(&definition.id);
             app.release_definition_id(&definition.id);
@@ -1000,7 +1081,7 @@ where
     let mut rendered = Vec::new();
     let mut budget = ComponentBudget::default();
     for element in elements {
-        register_component_executions(&element.component, app, definition_id)?;
+        register_component_executions(&element.component, app, definition_id, Some(serialized_data))?;
         let (mut parts, item_budget) = render_component(
             &element.component, app, ctx, data, serialized_data, definition_id,
             execution_ids, routes,

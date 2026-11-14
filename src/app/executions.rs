@@ -35,15 +35,27 @@ pub(crate) type ErasedCallback<D = Arc<()>> = Arc<
         + Sync,
 >;
 
+/// Rebuilds Frame-generated callbacks from the registered Page and the
+/// serialized data stored in the clicked component's routing record.
+pub(crate) type ErasedFrameResolver<D = Arc<()>> = Arc<
+    dyn Fn(App<D>, Vec<u8>) -> BoxFuture<'static, anyhow::Result<()>> + Send + Sync,
+>;
+
 /// Process-local map from (definition_id, execution_id) to a type-erased callback.
 #[derive(Clone)]
 pub struct ExecutionRegistry<D = Arc<()>> {
     entries: Arc<RwLock<HashMap<ExecutionKey, ErasedCallback<D>>>>,
+    frame_entries: Arc<RwLock<HashMap<(ExecutionKey, Vec<u8>), ErasedCallback<D>>>>,
+    frame_resolvers: Arc<RwLock<HashMap<String, ErasedFrameResolver<D>>>>,
 }
 
 impl<D> Default for ExecutionRegistry<D> {
     fn default() -> Self {
-        Self { entries: Arc::new(RwLock::new(HashMap::new())) }
+        Self {
+            entries: Arc::new(RwLock::new(HashMap::new())),
+            frame_entries: Arc::new(RwLock::new(HashMap::new())),
+            frame_resolvers: Arc::new(RwLock::new(HashMap::new())),
+        }
     }
 }
 
@@ -71,10 +83,92 @@ impl<D> ExecutionRegistry<D> {
         Ok(())
     }
 
-    /// Removes all callbacks owned by a definition after failed registration.
+    /// Registers a resolver used to reconstruct dynamic Frame callbacks.
+    pub(crate) fn insert_frame_resolver(
+        &self,
+        definition_id: String,
+        resolver: ErasedFrameResolver<D>,
+    ) -> anyhow::Result<()> {
+        let mut resolvers = self.frame_resolvers.write()
+            .map_err(|_| anyhow::anyhow!("Frame resolver registry lock was poisoned"))?;
+        anyhow::ensure!(
+            !resolvers.contains_key(&definition_id),
+            "Frame resolver already registered for definition '{definition_id}'"
+        );
+        resolvers.insert(definition_id, resolver);
+        Ok(())
+    }
+
+    /// Registers a callback against the exact serialized Page data that
+    /// generated it. Distinct Page renders cannot overwrite one another.
+    pub(crate) fn insert_frame(
+        &self,
+        key: ExecutionKey,
+        serialized_data: Vec<u8>,
+        callback: ErasedCallback<D>,
+    ) -> anyhow::Result<()> {
+        let mut entries = self.frame_entries.write()
+            .map_err(|_| anyhow::anyhow!("Frame execution registry lock was poisoned"))?;
+        entries.insert((key, serialized_data), callback);
+        Ok(())
+    }
+
+    pub(crate) fn get_frame(
+        &self,
+        key: &ExecutionKey,
+        serialized_data: &[u8],
+    ) -> Option<ErasedCallback<D>> {
+        self.frame_entries.read().ok().and_then(|entries| {
+            entries.get(&(key.clone(), serialized_data.to_vec())).cloned()
+        })
+    }
+
+    /// Re-resolves all Frames for one stored Page instance before dispatch.
+    /// This prevents stale or data-mismatched closures from being reused.
+    pub(crate) async fn resolve_frame_callbacks(
+        &self,
+        definition_id: &str,
+        app: App<D>,
+        serialized_data: Vec<u8>,
+    ) -> anyhow::Result<bool>
+    where
+        D: Clone + Send + Sync + 'static,
+    {
+        let resolver = self.frame_resolvers.read()
+            .map_err(|_| anyhow::anyhow!("Frame resolver registry lock was poisoned"))?
+            .get(definition_id)
+            .cloned();
+        let Some(resolver) = resolver else {
+            return Ok(false);
+        };
+        self.remove_frame_callbacks(definition_id, &serialized_data)?;
+        resolver(app, serialized_data).await?;
+        Ok(true)
+    }
+
+    pub(crate) fn remove_frame_callbacks(
+        &self,
+        definition_id: &str,
+        serialized_data: &[u8],
+    ) -> anyhow::Result<()> {
+        let mut entries = self.frame_entries.write()
+            .map_err(|_| anyhow::anyhow!("Frame execution registry lock was poisoned"))?;
+        entries.retain(|(key, bytes), _| {
+            key.definition_id != definition_id || bytes.as_slice() != serialized_data
+        });
+        Ok(())
+    }
+
+    /// Removes all callbacks and Frame resolvers owned by a definition.
     pub fn remove_definition(&self, definition_id: &str) {
         if let Ok(mut entries) = self.entries.write() {
             entries.retain(|key, _| key.definition_id != definition_id);
+        }
+        if let Ok(mut entries) = self.frame_entries.write() {
+            entries.retain(|(key, _), _| key.definition_id != definition_id);
+        }
+        if let Ok(mut resolvers) = self.frame_resolvers.write() {
+            resolvers.remove(definition_id);
         }
     }
 

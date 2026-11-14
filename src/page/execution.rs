@@ -76,6 +76,24 @@ impl<T, I, D> Execution<T, I, D> {
         Self { id: id.into(), callback: Arc::new(move |ctx, data, input| Box::pin(callback(ctx, data, input))) }
     }
 
+    fn erased_callback(&self) -> ErasedCallback<D>
+    where
+        T: DeserializeOwned + Send + 'static,
+        I: FromInteractionPayload,
+        D: Clone + Send + Sync + 'static,
+    {
+        let callback = self.callback.clone();
+        Arc::new(move |ctx, json, payload| {
+            let callback = callback.clone();
+            Box::pin(async move {
+                let data: T = serde_json::from_value(json)
+                    .map_err(|error| anyhow::anyhow!("Deserializing execution data: {error}"))?;
+                let input = I::from_payload(payload)?;
+                callback(ctx, data, input).await
+            })
+        })
+    }
+
     /// Registers a type-erased adapter under the definition and execution IDs.
     pub(crate) fn register(
         &self,
@@ -91,17 +109,30 @@ impl<T, I, D> Execution<T, I, D> {
             definition_id: definition_id.to_owned(),
             execution_id: self.id.clone(),
         };
-        let callback = self.callback.clone();
-        let erased: ErasedCallback<D> = Arc::new(move |ctx, json, payload| {
-            let callback = callback.clone();
-            Box::pin(async move {
-                let data: T = serde_json::from_value(json)
-                    .map_err(|error| anyhow::anyhow!("Deserializing execution data: {error}"))?;
-                let input = I::from_payload(payload)?;
-                callback(ctx, data, input).await
-            })
-        });
-        app.executions.insert_or_replace(key, erased)
+        app.executions.insert_or_replace(key, self.erased_callback())
+    }
+
+    /// Registers a Frame callback under the exact serialized data that produced it.
+    pub(crate) fn register_frame(
+        &self,
+        app: &App<D>,
+        definition_id: &str,
+        serialized_data: &[u8],
+    ) -> anyhow::Result<()>
+    where
+        T: DeserializeOwned + Send + 'static,
+        I: FromInteractionPayload,
+        D: Clone + Send + Sync + 'static,
+    {
+        let key = ExecutionKey {
+            definition_id: definition_id.to_owned(),
+            execution_id: self.id.clone(),
+        };
+        app.executions.insert_frame(
+            key,
+            serialized_data.to_vec(),
+            self.erased_callback(),
+        )
     }
 }
 
@@ -128,5 +159,5 @@ pub enum SelectedMentionable { User(SelectedUser), Role(SelectedRole) }
 #[derive(Debug, Clone)]
 pub struct SelectedChannel {
     pub id: serenity::all::ChannelId,
-    pub resolved: Option<Arc<serenity::all::GuildChannel>>,
+    pub resolved: Option<Arc<serenity::all::PartialChannel>>,
 }
