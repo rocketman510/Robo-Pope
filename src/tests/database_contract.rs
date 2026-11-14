@@ -98,7 +98,7 @@ async fn dynamic_property_and_execution_callbacks_read_named_host_database_field
                 ButtonStyle::Primary,
                 None,
                 false,
-                move |ctx, _data: TestData| {
+                move |ctx: crate::app::Ctx<std::sync::Arc<HostDatabase>>, _data: TestData| {
                     let observed = execution_flag.clone();
                     async move {
                         observed.store(
