@@ -38,9 +38,15 @@ pub(crate) type ErasedCallback<D = Arc<()>> = Arc<
 >;
 
 /// Process-local map from (definition_id, execution_id) to a type-erased callback.
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct ExecutionRegistry<D = Arc<()>> {
     entries: Arc<RwLock<HashMap<ExecutionKey, ErasedCallback<D>>>>,
+}
+
+impl<D> Default for ExecutionRegistry<D> {
+    fn default() -> Self {
+        Self { entries: Arc::new(RwLock::new(HashMap::new())) }
+    }
 }
 
 impl<D> ExecutionRegistry<D> {
