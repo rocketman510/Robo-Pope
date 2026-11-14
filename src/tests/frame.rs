@@ -3,7 +3,6 @@ use std::sync::{
     atomic::{AtomicUsize, Ordering},
 };
 
-use crate::app::RenderCtx;
 use crate::page::{Container, Element, Page, Section, Separator};
 use super::support::{app, TestData};
 
@@ -13,7 +12,7 @@ async fn frame_resolver_receives_render_context_and_shared_page_data() {
     // generic Page data used by ordinary dynamic properties.
     let app = app();
     let page = Page::<TestData>::new("frame-context")
-        .add_frame(|ctx: RenderCtx, data: Arc<TestData>| async move {
+        .add_frame(|ctx, data| async move {
             let _database = ctx.app.db.clone();
             Ok(vec![Element::text(format!("{}:{}", data.label, data.count))])
         })
