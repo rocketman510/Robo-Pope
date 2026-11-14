@@ -17,15 +17,16 @@ pub struct Section<T, D = std::sync::Arc<()>> {
     /// Optional Button or Thumbnail accessory. Only one is allowed.
     pub accessory: Option<SectionAccessory<T, D>>,
 }
+
 impl<T, D> Section<T, D> {
     /// Starts a Section with all text slots empty and no accessory.
     pub fn new() -> Self {
-        Self { text:(Slot::Empty, Slot::Empty, Slot::Empty), accessory:None }
+        Self { text: (Slot::Empty, Slot::Empty, Slot::Empty), accessory: None }
     }
 
     /// Replaces all three text slots. Each slot accepts a static value, a dynamic
-    /// value, or an empty `Option`; at least one must be populated for rendering.
-    pub fn set_text<A, B, C>(mut self, first:A, second:B, third:C) -> Self
+    /// value, or an empty Option; at least one must be populated for rendering.
+    pub fn set_text<A, B, C>(mut self, first: A, second: B, third: C) -> Self
     where
         A: IntoSlot<String, T, D>,
         B: IntoSlot<String, T, D>,
@@ -36,14 +37,16 @@ impl<T, D> Section<T, D> {
     }
 
     /// Sets the Section's one accessory, replacing any accessory already assigned.
-    pub fn set_accessory(mut self, accessory:impl Into<SectionAccessory<T, D>>) -> Self {
+    pub fn set_accessory(mut self, accessory: impl Into<SectionAccessory<T, D>>) -> Self {
         self.accessory = Some(accessory.into());
         self
     }
 }
-impl<T> From<Thumbnail<T, D>> for SectionAccessory<T, D> {
-    fn from(value:Thumbnail<T, D>)->Self { Self::Thumbnail(value) }
+
+impl<T, D> From<Thumbnail<T, D>> for SectionAccessory<T, D> {
+    fn from(value: Thumbnail<T, D>) -> Self { Self::Thumbnail(value) }
 }
-impl<T> From<Button<T, D>> for SectionAccessory<T, D> {
-    fn from(value:Button<T, D>)->Self { Self::Button(value) }
+
+impl<T, D> From<Button<T, D>> for SectionAccessory<T, D> {
+    fn from(value: Button<T, D>) -> Self { Self::Button(value) }
 }
