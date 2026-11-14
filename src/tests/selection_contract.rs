@@ -23,7 +23,7 @@ async fn dynamically_disabled_string_select_option_is_rejected_after_resolution(
         .add_selection_menu(StringSelect::new(
             "Choose", "choice",
             [SelectOption::new("Disabled", "disabled").set_disabled(
-                |_ctx: crate::app::RenderCtx, _data: std::sync::Arc<TestData>| async move { Ok(true) },
+                |_ctx, _data| async move { Ok(true) },
             )],
             |_ctx, _data: TestData, _values: Vec<String>| async move { Ok(()) },
         )).register(&app).unwrap();
@@ -46,8 +46,6 @@ async fn disabling_the_entire_select_menu_remains_supported() {
 async fn string_select_renders_placeholder_min_max_and_dynamic_option_properties() {
     // FIRST: message Select menus render resolved option labels/descriptions and
     // preserve their submitted values and selection bounds.
-    use std::sync::Arc;
-    use crate::app::RenderCtx;
 
     let app = app();
     let page = Page::<TestData>::new("string-select-bounds")
@@ -57,13 +55,13 @@ async fn string_select_renders_placeholder_min_max_and_dynamic_option_properties
                 "select-bounds",
                 [
                     SelectOption::new(
-                        |_ctx: RenderCtx, data: Arc<TestData>| async move {
+                        |_ctx, data| async move {
                             Ok(format!("{} role", data.label))
                         },
                         "member",
                     )
                     .set_description(
-                        |_ctx: RenderCtx, data: Arc<TestData>| async move {
+                        |_ctx, data| async move {
                             Ok(format!("Level {}", data.count))
                         },
                     ),
@@ -114,7 +112,7 @@ async fn message_string_select_rejects_dynamic_option_description_over_one_hundr
             "Choose",
             "choice",
             [SelectOption::new("Option", "option").set_description(
-                |_ctx: crate::app::RenderCtx, _data: std::sync::Arc<TestData>| async move {
+                |_ctx, _data| async move {
                     Ok("x".repeat(101))
                 },
             )],
