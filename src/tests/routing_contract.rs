@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use crate::app::store::{derive_custom_id, RoutingRecord, Store};
 use crate::page::{Button, ButtonStyle, Modal, ModalSubmission, Page};
 use super::support::{app, component_interaction, TestData};
