@@ -1,6 +1,9 @@
 // Runnable framework showcase and Discord Gateway startup.
 
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Arc,
+};
 
 use anyhow::Context as _;
 use serde::{Deserialize, Serialize};
@@ -14,15 +17,22 @@ use serenity::{
 };
 
 use robo_pope::{
-    app::{store::{FileStore, Store}, App, Database, RenderCtx},
+    app::{store::{SqliteStore, Store}, App, RenderCtx},
     page::{
-        Button, ButtonStyle, Container, Element, LinkButton,
-        MediaGallery, Section, SelectOption, Separator, StringSelect,
-        TextInputStyle, Thumbnail,
+        Button, ButtonStyle, Container, Element, LinkButton, MediaGallery, Modal,
+        Page, Section, SelectOption, Separator, StringSelect, TextInputStyle,
+        Thumbnail,
     },
 };
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Default)]
+struct DemoDatabase {
+    button_clicks: Arc<AtomicU64>,
+    selections: Arc<AtomicU64>,
+    modal_submissions: Arc<AtomicU64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct DemoData {
     username: String,
     visits: u64,
@@ -33,11 +43,18 @@ struct DemoForm {
     message: String,
 }
 
-fn register_demo_page(app: &App<Database>) -> anyhow::Result<()> {
-    let page = app.page::<DemoData>("framework-demo")
+fn register_demo_page(app: &App<DemoDatabase>) -> anyhow::Result<()> {
+    let page = Page::<DemoData, DemoDatabase>::new("framework-demo")
         .add_text("# Robo-Pope framework showcase")
-        .add_text(|_ctx: RenderCtx<Database>, data: Arc<DemoData>| async move {
-            Ok(format!("Welcome, {}. Visits: {}", data.username, data.visits))
+        .add_text(|ctx: RenderCtx<DemoDatabase>, data: Arc<DemoData>| async move {
+            let clicks = ctx.app.db.button_clicks.load(Ordering::Relaxed);
+            let selections = ctx.app.db.selections.load(Ordering::Relaxed);
+            let submissions = ctx.app.db.modal_submissions.load(Ordering::Relaxed);
+
+            Ok(format!(
+                "Welcome, {}. Visits: {}.\n\nButton clicks: {} · Selections: {} · Form submissions: {}",
+                data.username, data.visits, clicks, selections, submissions
+            ))
         })
         .add_section(
             Section::new()
@@ -47,8 +64,8 @@ fn register_demo_page(app: &App<Database>) -> anyhow::Result<()> {
                     None,
                 )
                 .set_accessory(
-                    Thumbnail::new("https://example.com/avatar.png")
-                        .set_description("Example thumbnail"),
+                    Thumbnail::new("https://cdn.discordapp.com/embed/avatars/0.png")
+                        .set_description("Discord default avatar"),
                 ),
         )
         .add_container(
@@ -60,17 +77,43 @@ fn register_demo_page(app: &App<Database>) -> anyhow::Result<()> {
         )
         .add_button_row((
             Button::new(
-                "Test button",
-                "demo-button",
+                "Refresh stats",
+                "demo-refresh",
                 ButtonStyle::Primary,
                 None,
                 false,
-                |_ctx, _data: DemoData| async move {
-                    println!("The demo button callback was invoked.");
+                |ctx, data: DemoData| async move {
+                    ctx.app.db.button_clicks.fetch_add(1, Ordering::Relaxed);
+
+                    let updated = ctx
+                        .app
+                        .pages
+                        .query::<DemoData>("framework-demo")?
+                        .render(&ctx.app, data)
+                        .await?;
+
+                    ctx.edit_message(updated).await?;
                     Ok(())
                 },
             ),
-            None,
+            Button::new(
+                "Open demo form",
+                "demo-open-form",
+                ButtonStyle::Secondary,
+                None,
+                false,
+                |ctx, data: DemoData| async move {
+                    let modal = ctx
+                        .app
+                        .modals
+                        .query::<DemoData>("framework-demo-modal")?
+                        .render(&ctx.app, data)
+                        .await?;
+
+                    ctx.open_modal(modal).await?;
+                    Ok(())
+                },
+            ),
             None,
             None,
             None,
@@ -89,23 +132,26 @@ fn register_demo_page(app: &App<Database>) -> anyhow::Result<()> {
                 SelectOption::new("Second option", "second"),
                 SelectOption::new("Third option", "third"),
             ],
-            |_ctx, _data: DemoData, selected: Vec<String>| async move {
-                println!("Selected values: {selected:?}");
+            |ctx, _data: DemoData, selected: Vec<String>| async move {
+                ctx.app.db.selections.fetch_add(1, Ordering::Relaxed);
+                ctx.reply(format!("Selected: {}", selected.join(", ")))
+                    .await?;
                 Ok(())
             },
         ))
         .add_gallery(
             MediaGallery::new()
-                .add_media("https://example.com/first-image.png")
-                .add_media("https://example.com/second-image.png"),
+                .add_media("https://cdn.discordapp.com/embed/avatars/0.png")
+                .add_media("https://cdn.discordapp.com/embed/avatars/1.png"),
         )
-        .add_frame(|_ctx, data| async move {
-            Ok(vec![
-                Element::text(format!(
-                    "Generated Frame content for {}.",
-                    data.username
-                )),
-            ])
+        .add_frame(|ctx, _data| async move {
+            let clicks = ctx.app.db.button_clicks.load(Ordering::Relaxed);
+            let selections = ctx.app.db.selections.load(Ordering::Relaxed);
+            let submissions = ctx.app.db.modal_submissions.load(Ordering::Relaxed);
+
+            Ok(vec![Element::text(format!(
+                "**Live application state**\nButton clicks: {clicks}\nSelection events: {selections}\nModal submissions: {submissions}"
+            ))])
         });
 
     page.register(app)?;
@@ -114,16 +160,21 @@ fn register_demo_page(app: &App<Database>) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn register_demo_modal(app: &App<Database>) -> anyhow::Result<()> {
-    let modal = app.modal::<DemoData>("framework-demo-modal")
+fn register_demo_modal(app: &App<DemoDatabase>) -> anyhow::Result<()> {
+    let modal = Modal::<DemoData, DemoDatabase>::new("framework-demo-modal")
         .set_title("Framework Demo Form")
         .add_text_input("message", "Your message", TextInputStyle::Short)
-        .on_submit_typed(
-            |_ctx, _data, form: DemoForm| async move {
-                println!("Modal submitted: {}", form.message);
-                Ok(())
-            },
-        );
+        .on_submit(|ctx, _data: DemoData, submission| async move {
+            let form = submission.deserialize::<DemoForm>()?;
+            ctx.app
+                .db
+                .modal_submissions
+                .fetch_add(1, Ordering::Relaxed);
+
+            ctx.reply(format!("Modal submitted: {}", form.message))
+                .await?;
+            Ok(())
+        });
 
     modal.register(app)?;
     println!("Registered demo Modal: framework-demo-modal");
@@ -132,11 +183,11 @@ fn register_demo_modal(app: &App<Database>) -> anyhow::Result<()> {
 }
 
 struct DemoHandler {
-    app: App<Database>,
+    app: App<DemoDatabase>,
 }
 
 impl DemoHandler {
-    fn new(app: App<Database>) -> Self {
+    fn new(app: App<DemoDatabase>) -> Self {
         Self { app }
     }
 }
@@ -151,11 +202,7 @@ impl EventHandler for DemoHandler {
             }
 
             FullEvent::Message { new_message, .. } => {
-                if new_message.author.bot() {
-                    return;
-                }
-
-                if new_message.content.trim() != "!test" {
+                if new_message.author.bot() || new_message.content.trim() != "!test" {
                     return;
                 }
 
@@ -164,8 +211,7 @@ impl EventHandler for DemoHandler {
                     visits: 1,
                 };
 
-                // Retrieve the immutable registered Page definition.
-                let page = match self.app.pages.query("framework-demo") {
+                let page = match self.app.pages.query::<DemoData>("framework-demo") {
                     Ok(page) => page,
                     Err(error) => {
                         eprintln!("Failed to query demo Page: {error:#}");
@@ -173,7 +219,6 @@ impl EventHandler for DemoHandler {
                     }
                 };
 
-                // Render the registered Page with this message's data.
                 let rendered = match page.render(&self.app, data).await {
                     Ok(rendered) => rendered,
                     Err(error) => {
@@ -182,12 +227,9 @@ impl EventHandler for DemoHandler {
                     }
                 };
 
-                let components = rendered.into_components();
-
-                // Send the rendered Components V2 message as a reply.
                 let response = CreateMessage::new()
-                    .components(components)
-                    .flags(MessageFlags::from_bits_retain(1 << 15))
+                    .components(rendered.into_components())
+                    .flags(MessageFlags::IS_COMPONENTS_V2)
                     .reference_message(new_message);
 
                 if let Err(error) = new_message
@@ -198,6 +240,12 @@ impl EventHandler for DemoHandler {
                     eprintln!("Failed to send demo Page: {error}");
                 } else {
                     println!("Demo Page sent successfully.");
+                }
+            }
+
+            FullEvent::InteractionCreate { interaction } => {
+                if let Err(error) = self.app.dispatch_interaction(interaction.clone()).await {
+                    eprintln!("Failed to dispatch demo interaction: {error:#}");
                 }
             }
 
@@ -214,9 +262,14 @@ async fn main() -> anyhow::Result<()> {
         .context("Could not load a valid DISCORD_TOKEN from .env")?;
 
     let http = Arc::new(Http::new(token.clone()));
-    // Persist interaction references so custom IDs remain routable after a restart.
-    let database = Database::new(());
-    let store: Arc<dyn Store> = Arc::new(FileStore::open(".robo-pope/store.json")?);
+
+    // The demo's host database remains a concrete App<D> type. The routing
+    // Store is separate and persists the four-field interaction records.
+    std::fs::create_dir_all(".robo-pope")
+        .context("Failed to create the framework data directory")?;
+    let database = DemoDatabase::default();
+    let store: Arc<dyn Store> =
+        Arc::new(SqliteStore::open(".robo-pope/routing.sqlite").await?);
     let app = App::new(http, database, store);
 
     register_demo_page(&app)?;
@@ -232,9 +285,11 @@ async fn main() -> anyhow::Result<()> {
         .context("Failed to create the Serenity client")?;
 
     println!("Connecting Robo-Pope to Discord...");
-    client.start().await.context("Discord Gateway connection failed")?;
+    println!("The Message Content privileged intent must be enabled for !test.");
+    client
+        .start()
+        .await
+        .context("Discord Gateway connection failed")?;
 
     Ok(())
 }
-
-
