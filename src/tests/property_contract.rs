@@ -151,6 +151,11 @@ async fn string_select_placeholder_option_label_and_description_resolve_dynamica
                         |_ctx: RenderCtx, data: Arc<TestData>| async move {
                             Ok(format!("Description {}", data.label))
                         },
+                    )
+                    .set_emoji(
+                        |_ctx: RenderCtx, _data: Arc<TestData>| async move {
+                            Ok(Some("✨".to_owned()))
+                        },
                     ),
                 ],
                 |_ctx, _data: TestData, _selected: Vec<String>| async move { Ok(()) },
@@ -167,6 +172,7 @@ async fn string_select_placeholder_option_label_and_description_resolve_dynamica
     assert!(json.contains("Choose for sample"));
     assert!(json.contains("Option 7"));
     assert!(json.contains("Description sample"));
+    assert!(json.contains("✨"));
     assert!(json.contains("option-value"));
     assert!(json.contains("\"min_values\":1"));
     assert!(json.contains("\"max_values\":1"));
