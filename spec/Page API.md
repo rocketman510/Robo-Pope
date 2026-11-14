@@ -218,19 +218,6 @@ impl From<Option<ButtonSlot>> for ButtonSlot {
     }
 }
 
-fn add_button_row<A, B, C, D, E>(
-    self,
-    slots: (A, B, C, D, E),
-) -> Self
-where
-    A: Into<ButtonSlot>,
-    B: Into<ButtonSlot>,
-    C: Into<ButtonSlot>,
-    D: Into<ButtonSlot>,
-    E: Into<ButtonSlot>,
-{
-    // Convert each slot and create the Discord Action Row.
-}
 ```
 
 The five tuple arguments are each accepted through Into<ButtonSlot>. The tuple therefore accepts Button, LinkButton, or None without requiring Some(...) around present values. This conversion is explicit in the public API contract and keeps the call site simple.
