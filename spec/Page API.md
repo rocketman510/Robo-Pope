@@ -193,17 +193,45 @@ A fully populated row is:
 
 Each row slot uses a small ButtonSlot conversion type. Button converts directly into ButtonSlot, LinkButton converts directly into ButtonSlot, and None converts into an empty slot. A conceptual definition is:
 
-~~~rust
-enum ButtonSlot {
+```rust
+pub enum ButtonSlot {
     Button(Button),
     Link(LinkButton),
     Empty,
 }
 
-impl From<Button> for ButtonSlot { /* Button variant */ }
-impl From<LinkButton> for ButtonSlot { /* Link variant */ }
-impl From<Option<ButtonSlot>> for ButtonSlot { /* None becomes Empty */ }
-~~~
+impl From<Button> for ButtonSlot {
+    fn from(button: Button) -> Self {
+        Self::Button(button)
+    }
+}
+
+impl From<LinkButton> for ButtonSlot {
+    fn from(button: LinkButton) -> Self {
+        Self::Link(button)
+    }
+}
+
+impl From<Option<ButtonSlot>> for ButtonSlot {
+    fn from(slot: Option<ButtonSlot>) -> Self {
+        slot.unwrap_or(Self::Empty)
+    }
+}
+
+fn add_button_row<A, B, C, D, E>(
+    self,
+    slots: (A, B, C, D, E),
+) -> Self
+where
+    A: Into<ButtonSlot>,
+    B: Into<ButtonSlot>,
+    C: Into<ButtonSlot>,
+    D: Into<ButtonSlot>,
+    E: Into<ButtonSlot>,
+{
+    // Convert each slot and create the Discord Action Row.
+}
+```
 
 The five tuple arguments are each accepted through Into<ButtonSlot>. The tuple therefore accepts Button, LinkButton, or None without requiring Some(...) around present values. This conversion is explicit in the public API contract and keeps the call site simple.
 
