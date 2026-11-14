@@ -239,7 +239,7 @@ fn extract_modal_submission(
                                 id: serenity::all::ChannelId::new(parse_u64(value, &id)?),
                                 resolved: {
                                     let channel_id = serenity::all::ChannelId::new(parse_u64(value, &id)?);
-                                    modal.data.resolved.channels.get(&channel_id).cloned().map(Arc::new)
+                                    modal.data.resolved.channels.get(&channel_id.widen()).cloned().map(Arc::new)
                                 },
                             })
                         }).collect::<anyhow::Result<Vec<_>>>()?;
@@ -340,7 +340,7 @@ fn extract_selection(
                 id: serenity::all::ChannelId::new(id.get()),
                 resolved: {
                     let channel_id = serenity::all::ChannelId::new(id.get());
-                    resolved.channels.get(&channel_id).cloned().map(Arc::new)
+                    resolved.channels.get(&channel_id.widen()).cloned().map(Arc::new)
                 },
             }).collect(),
         )),
