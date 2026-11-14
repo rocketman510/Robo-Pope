@@ -16,10 +16,14 @@ pub struct PageRegistry<D = Arc<()>> {
 impl<D> Clone for PageRegistry<D> {
     fn clone(&self) -> Self { Self { entries: self.entries.clone(), marker: std::marker::PhantomData } }
 }
-impl<D> Default for PageRegistry<D> {
-    fn default() -> Self {
+impl<D> PageRegistry<D> {
+    /// Creates an empty registry for the given App database type.
+    pub fn new() -> Self {
         Self { entries: Arc::new(RwLock::new(HashMap::new())), marker: std::marker::PhantomData }
     }
+}
+impl Default for PageRegistry<Arc<()>> {
+    fn default() -> Self { Self::new() }
 }
 impl<D: Send + Sync + 'static> PageRegistry<D> {
     /// Inserts an immutable Page definition, rejecting an already-registered ID.
@@ -62,10 +66,14 @@ pub struct ModalRegistry<D = Arc<()>> {
 impl<D> Clone for ModalRegistry<D> {
     fn clone(&self) -> Self { Self { entries: self.entries.clone(), marker: std::marker::PhantomData } }
 }
-impl<D> Default for ModalRegistry<D> {
-    fn default() -> Self {
+impl<D> ModalRegistry<D> {
+    /// Creates an empty registry for the given App database type.
+    pub fn new() -> Self {
         Self { entries: Arc::new(RwLock::new(HashMap::new())), marker: std::marker::PhantomData }
     }
+}
+impl Default for ModalRegistry<Arc<()>> {
+    fn default() -> Self { Self::new() }
 }
 impl<D: Send + Sync + 'static> ModalRegistry<D> {
     /// Inserts an immutable Modal definition, rejecting an already-registered ID.
