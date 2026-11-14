@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use serenity::all::Http;
-use crate::app::{App, Database};
+use crate::app::App;
 use crate::app::registry::{ModalRegistry, PageRegistry};
 use crate::app::store::{MemoryStore, Store};
 use crate::page::{PageDefinition, PageItem};
@@ -30,7 +30,7 @@ fn app_constructor_initializes_empty_registries_and_keeps_database() {
     // First-principles check: this exercises the public constructor rather than
     // bypassing its responsibility with a hand-built App.
     let store: Arc<dyn Store> = Arc::new(MemoryStore::default());
-    let db = Database::new(());
+    let db = Arc::new(());
     let app = App::new(Arc::new(serenity::http::HttpBuilder::without_token().build()), db, store);
     assert!(!app.pages.contains("missing-page"));
     assert!(!app.modals.contains("missing-modal"));
@@ -42,10 +42,10 @@ fn page_registry_holds_multiple_page_data_types() {
     // while each typed query recovers its own definition.
     let registry = PageRegistry::default();
     registry.insert(Arc::new(PageDefinition::<TestData> {
-        id: "users".into(), items: Vec::<PageItem<TestData>>::new(), paginate: false,
+        id: "users".into(), items: Vec::<PageItem<TestData>>::new(),
     })).unwrap();
     registry.insert(Arc::new(PageDefinition::<OtherData> {
-        id: "settings".into(), items: Vec::<PageItem<OtherData>>::new(), paginate: false,
+        id: "settings".into(), items: Vec::<PageItem<OtherData>>::new(),
     })).unwrap();
 
     assert_eq!(registry.query::<TestData>("users").unwrap().id(), "users");
@@ -58,7 +58,7 @@ fn page_registry_rejects_duplicate_definition_ids() {
     // existing ID could route old messages to the wrong callback.
     let registry = PageRegistry::default();
     let definition = Arc::new(PageDefinition::<TestData> {
-        id: "unique".into(), items: Vec::new(), paginate: false,
+        id: "unique".into(), items: Vec::new(),
     });
     registry.insert(definition.clone()).unwrap();
     assert!(registry.insert(definition).is_err());
@@ -70,7 +70,7 @@ fn page_registry_rejects_a_query_using_the_wrong_data_type() {
     // typed query must be an error rather than an invalid downcast or panic.
     let registry = PageRegistry::default();
     registry.insert(Arc::new(PageDefinition::<TestData> {
-        id: "users".into(), items: Vec::new(), paginate: false,
+        id: "users".into(), items: Vec::new(),
     })).unwrap();
     assert!(registry.query::<OtherData>("users").is_err());
 }
