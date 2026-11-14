@@ -313,21 +313,21 @@ fn modal_select_rejects_more_than_twenty_five_options() {
 }
 
 #[test]
-fn modal_radio_group_rejects_more_than_twenty_five_options() {
+fn modal_radio_group_rejects_more_than_ten_options() {
     // FIRST: Radio Group is limited to 25 options.
     let app = app();
     let modal = Modal::<TestData>::new("modal-too-many-radio").set_title("Options")
-        .add_radio_group("choice", "Choice", (0..26).map(|n| ModalOption::new(format!("R{n}"), format!("r{n}"))))
+        .add_radio_group("choice", "Choice", (0..11).map(|n| ModalOption::new(format!("R{n}"), format!("r{n}"))))
         .on_submit(|_ctx, _data, _submission: ModalSubmission| async move { Ok(()) });
     assert!(modal.register(&app).is_err());
 }
 
 #[test]
-fn modal_checkbox_group_rejects_more_than_twenty_five_options() {
+fn modal_checkbox_group_rejects_more_than_ten_options() {
     // FIRST: Checkbox Group is limited to 25 options.
     let app = app();
     let modal = Modal::<TestData>::new("modal-too-many-checkboxes").set_title("Options")
-        .add_checkbox_group("choice", "Choice", (0..26).map(|n| ModalOption::new(format!("C{n}"), format!("c{n}"))))
+        .add_checkbox_group("choice", "Choice", (0..11).map(|n| ModalOption::new(format!("C{n}"), format!("c{n}"))))
         .on_submit(|_ctx, _data, _submission: ModalSubmission| async move { Ok(()) });
     assert!(modal.register(&app).is_err());
 }
@@ -466,4 +466,64 @@ fn modal_rejects_static_select_option_description_over_one_hundred_characters() 
         .add_select("choice", "Choice", [ModalOption::new("A", "a").set_description("x".repeat(101))])
         .on_submit(|_ctx, _data, _submission: ModalSubmission| async move { Ok(()) });
     assert!(modal.register(&app).is_err());
+}
+
+
+#[test]
+fn modal_radio_group_rejects_fewer_than_two_options() {
+    // Page API §13: a Radio Group requires between two and ten options.
+    let app = app();
+    let modal = Modal::<TestData>::new("radio-too-few-options")
+        .set_title("Choose")
+        .add_radio_group("choice", "Choice", [ModalOption::new("Only", "only")])
+        .on_submit(|_ctx, _data, _submission: ModalSubmission| async move { Ok(()) });
+
+    assert!(modal.register(&app).is_err());
+}
+
+#[test]
+fn modal_checkbox_group_rejects_zero_options() {
+    // Page API §13: a Checkbox Group requires at least one option.
+    let app = app();
+    let modal = Modal::<TestData>::new("checkbox-no-options")
+        .set_title("Choose")
+        .add_checkbox_group("choice", "Choice", std::iter::empty())
+        .on_submit(|_ctx, _data, _submission: ModalSubmission| async move { Ok(()) });
+
+    assert!(modal.register(&app).is_err());
+}
+
+#[test]
+fn radio_group_submissions_deserialize_as_scalar_strings() {
+    // Page API §13: a Radio Group submits one selected value, not a list.
+    // This matches extract_modal_submission's current SubmittedValue::Strings
+    // output and tests the typed callback contract independently.
+    #[derive(Deserialize)]
+    struct Form {
+        level: String,
+    }
+
+    let mut submission = ModalSubmission::default();
+    submission.values.insert(
+        "level".into(),
+        SubmittedValue::Strings(vec!["medium".into()]),
+    );
+
+    let form: Form = submission.deserialize().unwrap();
+    assert_eq!(form.level, "medium");
+}
+
+#[test]
+fn optional_radio_group_submission_deserializes_as_none() {
+    // Page API §13: an optional Radio Group is represented as Option<String>.
+    #[derive(Deserialize)]
+    struct Form {
+        level: Option<String>,
+    }
+
+    let mut submission = ModalSubmission::default();
+    submission.values.insert("level".into(), SubmittedValue::Strings(vec![]));
+
+    let form: Form = submission.deserialize().unwrap();
+    assert_eq!(form.level, None);
 }
