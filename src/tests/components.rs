@@ -37,7 +37,7 @@ fn button_row_accepts_direct_buttons_and_none_slots() {
                 false,
                 |_ctx, _data: TestData| async move { Ok(()) },
             ),
-            None,
+            LinkButton::new("Docs", "https://example.test/docs", Some("🌐".into()), true),
             None,
             None,
             None,
@@ -45,7 +45,7 @@ fn button_row_accepts_direct_buttons_and_none_slots() {
 
     assert!(matches!(
         &page.items[0],
-        PageItem::Component(Component::ButtonRow(row)) if row.populated() == 1
+        PageItem::Component(Component::ButtonRow(row)) if row.populated() == 2
     ));
 }
 
@@ -101,6 +101,8 @@ fn button_callback_receives_page_data_and_app_linked_context() {
         },
     );
     assert_eq!(button.id, "open-user");
+    assert!(matches!(button.emoji, crate::page::Value::Static(Some(_))));
+    assert!(matches!(button.disabled, crate::page::Value::Static(true)));
 }
 
 #[test]
