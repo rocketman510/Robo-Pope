@@ -29,7 +29,7 @@ async fn dynamic_values_resolve_with_page_data_and_render_context() {
     // App access at render time.
     let app = app();
     let value: Value<String, TestData> = dynamic(
-        |ctx: crate::app::RenderCtx<Arc<()>>, data: Arc<TestData>| async move {
+        |ctx: crate::app::RenderCtx<std::sync::Arc<()>>, data: std::sync::Arc<TestData>| async move {
             assert_eq!(ctx.definition_id.as_ref(), "value-test");
             let _store = ctx.app.store();
             Ok(format!("{}:{}", data.label, data.count))
@@ -73,7 +73,7 @@ fn optional_slot_converts_static_and_dynamic_values() {
     // as ordinary properties.
     let static_slot: Slot<String, TestData> = "Title".into_slot();
     let dynamic_slot: Slot<String, TestData> = dynamic(
-        |_ctx: crate::app::RenderCtx<Arc<()>>, data: Arc<TestData>| async move { Ok(data.label.clone()) },
+        |_ctx: crate::app::RenderCtx<std::sync::Arc<()>>, data: std::sync::Arc<TestData>| async move { Ok(data.label.clone()) },
     ).into_slot();
     assert!(matches!(static_slot, Slot::Value(Value::Static(_))));
     assert!(matches!(dynamic_slot, Slot::Value(Value::Dynamic(_))));
@@ -104,7 +104,7 @@ async fn fixed_section_slots_accept_direct_async_closures() {
     let app = app();
     let page = Page::<TestData>::new("direct-section-slot")
         .add_section(Section::new().set_text(
-            |_ctx: crate::app::RenderCtx<Arc<()>>, data: Arc<TestData>| async move { Ok(format!("Dynamic {}", data.count)) },
+            |_ctx: crate::app::RenderCtx<std::sync::Arc<()>>, data: std::sync::Arc<TestData>| async move { Ok(format!("Dynamic {}", data.count)) },
             None, None,
         ).set_accessory(crate::page::Button::new(
             "Open", "section-open", crate::page::ButtonStyle::Primary,
@@ -124,7 +124,7 @@ async fn button_properties_accept_direct_async_closures() {
     let app = app();
     let page = Page::<TestData>::new("direct-button-properties")
         .add_button_row((Button::new(
-            |_ctx: crate::app::RenderCtx<Arc<()>>, data: Arc<TestData>| async move { Ok(format!("Hello {}", data.label)) },
+            |_ctx: crate::app::RenderCtx<std::sync::Arc<()>>, data: std::sync::Arc<TestData>| async move { Ok(format!("Hello {}", data.label)) },
             "dynamic-button",
             |_ctx, _data| async move { Ok(ButtonStyle::Success) },
             |_ctx, _data| async move { Ok(Some("✨".into())) },
