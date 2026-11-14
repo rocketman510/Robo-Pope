@@ -133,7 +133,7 @@ async fn string_select_placeholder_option_label_and_description_resolve_dynamica
     let page = Page::<TestData>::new("dynamic-select-properties")
         .add_selection_menu(
             StringSelect::new(
-                |_ctx, data| async move {
+                |_ctx: crate::app::RenderCtx<std::sync::Arc<()>>, data: std::sync::Arc<TestData>| async move {
                     Ok(format!("Choose for {}", data.label))
                 },
                 "choose",
