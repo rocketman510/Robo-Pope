@@ -28,7 +28,7 @@ pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
 /// App owns the host application's concrete database type and the framework's
 /// separate interaction Store.
-pub struct App<D = Database> {
+pub struct App<D = Arc<()>> {
     /// The concrete database or repository aggregate supplied by the host application.
     pub db: D,
     /// Framework persistence for custom-ID routing records.

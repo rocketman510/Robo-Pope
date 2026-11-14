@@ -11,7 +11,7 @@ use std::sync::{Arc, RwLock};
 use serde_json::Value as JsonValue;
 use serenity::all::Interaction;
 
-use crate::app::{App, BoxFuture, Ctx};
+use crate::app::{App, BoxFuture, Ctx, Database};
 use crate::page::{ModalSubmission, Selection};
 use crate::page::frame::pagination::PaginationRequest;
 
@@ -32,7 +32,7 @@ pub enum InteractionPayload {
 }
 
 pub(crate) type ErasedCallback = Arc<
-    dyn Fn(Ctx, JsonValue, InteractionPayload) -> BoxFuture<'static, anyhow::Result<()>>
+    dyn Fn(Ctx<Database>, JsonValue, InteractionPayload) -> BoxFuture<'static, anyhow::Result<()>>
         + Send
         + Sync,
 >;
@@ -91,9 +91,9 @@ impl ExecutionRegistry {
 
 /// Builds a Ctx for a routed interaction.
 pub fn make_ctx(
-    app: &App,
+    app: &App<Database>,
     interaction: Interaction,
     selection: Option<Selection>,
-) -> Ctx {
+) -> Ctx<Database> {
     Ctx::new(app.clone(), Arc::new(interaction), selection)
 }

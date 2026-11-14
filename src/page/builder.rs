@@ -13,7 +13,7 @@ use serenity::builder::{
 };
 use serenity::all::ButtonStyle as SerenityButtonStyle;
 use serde::{Serialize, de::DeserializeOwned};
-use crate::app::{App, RenderCtx};
+use crate::app::{App, Database, RenderCtx};
 use crate::app::store::{derive_custom_id_with_frame, DefinitionKind, StoreRecord};
 use super::component::*;
 use super::frame::Frame;
@@ -116,7 +116,7 @@ fn validate_component_ids<T>(
 
 fn register_component_executions<T>(
     component: &Component<T>,
-    app: &App,
+    app: &App<Database>,
     definition_id: &str,
     frame_identity: Option<&str>,
 ) -> anyhow::Result<()>
@@ -230,7 +230,7 @@ fn collect_paginated_frames<T>(_definition: &PageDefinition<T>) -> Vec<String> {
 }
 
 fn register_pagination_callbacks<T>(
-    app: &App,
+    app: &App<Database>,
     definition: Arc<PageDefinition<T>>,
     frame_ids: &[String],
 ) -> anyhow::Result<()>
@@ -466,7 +466,7 @@ fn validate_message_budget(budget: ComponentBudget) -> anyhow::Result<()> {
 }
 
 async fn persist_button_execution<T>(
-    app: &App,
+    app: &App<Database>,
     button: &Button<T>,
     definition_id: &str,
     serialized_data: &[u8],
@@ -495,7 +495,7 @@ async fn persist_button_execution<T>(
 }
 
 async fn persist_select_execution(
-    app: &App,
+    app: &App<Database>,
     execution_id: &str,
     definition_id: &str,
     serialized_data: &[u8],
@@ -544,7 +544,7 @@ where
 }
 
 async fn render_button<T>(
-    app: &App,
+    app: &App<Database>,
     button: &Button<T>,
     ctx: &RenderCtx,
     data: &Arc<T>,
@@ -586,7 +586,7 @@ where
 
 async fn render_select_menu<T>(
     menu: &SelectMenu<T>,
-    app: &App,
+    app: &App<Database>,
     ctx: &RenderCtx,
     data: &Arc<T>,
     serialized_data: &[u8],
@@ -768,7 +768,7 @@ where
 
 async fn render_container<T>(
     container: &super::component::Container<T>,
-    app: &App,
+    app: &App<Database>,
     ctx: &RenderCtx,
     data: &Arc<T>,
     serialized_data: &[u8],
@@ -788,7 +788,7 @@ where
         key: Option<&str>,
         children: &mut Vec<CreateContainerComponent<'static>>,
         budget: &mut ComponentBudget,
-        app: &App,
+        app: &App<Database>,
         ctx: &RenderCtx,
         data: &Arc<T>,
         serialized_data: &[u8],
@@ -885,7 +885,7 @@ where
 
 async fn render_component<T>(
     component: &Component<T>,
-    app: &App,
+    app: &App<Database>,
     ctx: &RenderCtx,
     data: &Arc<T>,
     serialized_data: &[u8],
@@ -1138,7 +1138,7 @@ where
 
 async fn render_component_list<T>(
     components: &[&Component<T>],
-    app: &App,
+    app: &App<Database>,
     ctx: &RenderCtx,
     data: &Arc<T>,
     serialized_data: &[u8],
@@ -1180,7 +1180,7 @@ struct RenderedFrameElement {
 
 async fn render_frame_elements<T>(
     elements: &[super::frame::Element<T>],
-    app: &App,
+    app: &App<Database>,
     ctx: &RenderCtx,
     data: &Arc<T>,
     serialized_data: &[u8],
@@ -1245,7 +1245,7 @@ fn plan_rendered_frame(
 }
 
 async fn create_pagination_navigation(
-    app: &App,
+    app: &App<Database>,
     definition_id: &str,
     frame_id: &str,
     serialized_data: &[u8],
@@ -1306,7 +1306,7 @@ fn as_container_child(part: RenderedComponent) -> anyhow::Result<CreateContainer
 
 async fn render_page_items<T>(
     items: &[PageItem<T>],
-    app: &App,
+    app: &App<Database>,
     ctx: &RenderCtx,
     data: &Arc<T>,
     serialized_data: &[u8],
@@ -1349,7 +1349,7 @@ where
 
 async fn render_container_items<T>(
     items: &[super::component::ContainerItem<T>],
-    app: &App,
+    app: &App<Database>,
     ctx: &RenderCtx,
     data: &Arc<T>,
     serialized_data: &[u8],
@@ -1461,7 +1461,7 @@ fn plan_container_frame_ranges(
 
 async fn render_paginated_container<T>(
     container: &super::component::Container<T>,
-    app: &App,
+    app: &App<Database>,
     ctx: &RenderCtx,
     data: &Arc<T>,
     serialized_data: &[u8],

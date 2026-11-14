@@ -33,7 +33,7 @@ struct DemoForm {
     message: String,
 }
 
-fn register_demo_page(app: &App) -> anyhow::Result<()> {
+fn register_demo_page(app: &App<Database>) -> anyhow::Result<()> {
     let page = Page::<DemoData>::new("framework-demo")
         .add_text("# Robo-Pope framework showcase")
         .add_text(dynamic::<String, DemoData, _, _>(|_ctx, data| async move {
@@ -114,7 +114,7 @@ fn register_demo_page(app: &App) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn register_demo_modal(app: &App) -> anyhow::Result<()> {
+fn register_demo_modal(app: &App<Database>) -> anyhow::Result<()> {
     let modal = Modal::<DemoData>::new("framework-demo-modal")
         .set_title("Framework Demo Form")
         .add_text_input("message", "Your message", TextInputStyle::Short)
@@ -132,11 +132,11 @@ fn register_demo_modal(app: &App) -> anyhow::Result<()> {
 }
 
 struct DemoHandler {
-    app: App,
+    app: App<Database>,
 }
 
 impl DemoHandler {
-    fn new(app: App) -> Self {
+    fn new(app: App<Database>) -> Self {
         Self { app }
     }
 }

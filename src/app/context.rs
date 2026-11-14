@@ -21,23 +21,19 @@ impl<D> RenderCtx<D> {
 }
 
 /// Interaction-specific view of the App with correctly scoped Discord response operations.
-pub struct Ctx {
-    pub app: App,
+pub struct Ctx<D = Arc<()>> {
+    pub app: App<D>,
     pub interaction: Arc<Interaction>,
     pub http: Arc<Http>,
     pub selection: Option<Selection>,
     acknowledged: Arc<AtomicBool>,
 }
-impl Ctx {
-    pub(crate) fn new<D>(
+impl<D> Ctx<D> {
+    pub(crate) fn new(
         app: App<D>,
         interaction: Arc<Interaction>,
         selection: Option<Selection>,
-    ) -> Self
-    where
-        D: Clone + std::any::Any + Send + Sync + 'static,
-    {
-        let app = app.erased();
+    ) -> Self {
         let http = app.http.clone();
         Self { app, interaction, http, selection, acknowledged: Arc::new(AtomicBool::new(false)) }
     }

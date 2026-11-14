@@ -3,7 +3,7 @@ use std::future::Future;
 use std::sync::Arc;
 use serde::de::DeserializeOwned;
 
-use crate::app::{App, BoxFuture, Ctx};
+use crate::app::{App, BoxFuture, Ctx, Database};
 use crate::app::executions::{ErasedCallback, ExecutionKey, InteractionPayload};
 use crate::page::ModalSubmission;
 use crate::page::frame::pagination::PaginationRequest;
@@ -11,7 +11,7 @@ use crate::page::frame::pagination::PaginationRequest;
 pub struct Execution<T, I = ()> {
     /// Stable ID within the containing Page or Modal definition.
     pub id: String,
-    pub(crate) callback: Arc<dyn Fn(Ctx, T, I)
+    pub(crate) callback: Arc<dyn Fn(Ctx<Database>, T, I)
         -> BoxFuture<'static, anyhow::Result<()>> + Send + Sync>,
 }
 
@@ -67,7 +67,7 @@ impl<T> Execution<T> {
     /// Creates an execution with no additional interaction payload.
     pub fn new<F, Fut>(id: impl Into<String>, callback: F) -> Self
     where
-        F: Fn(Ctx, T) -> Fut + Send + Sync + 'static,
+        F: Fn(Ctx<Database>, T) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = anyhow::Result<()>> + Send + 'static,
         T: Send + 'static,
     {
@@ -78,7 +78,7 @@ impl<T, I> Execution<T, I> {
     /// Creates an execution whose callback also receives a typed interaction payload.
     pub fn with_input<F, Fut>(id: impl Into<String>, callback: F) -> Self
     where
-        F: Fn(Ctx, T, I) -> Fut + Send + Sync + 'static,
+        F: Fn(Ctx<Database>, T, I) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = anyhow::Result<()>> + Send + 'static,
         T: Send + 'static,
         I: Send + 'static,
@@ -90,7 +90,7 @@ impl<T, I> Execution<T, I> {
     /// Frame identity is part of the process-local lookup key.
     pub(crate) fn register(
         &self,
-        app: &App,
+        app: &App<Database>,
         definition_id: &str,
         frame_identity: Option<&str>,
     ) -> anyhow::Result<()>
