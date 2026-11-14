@@ -1,73 +1,105 @@
-# Discord UI Framework
+# Discord UI Framework: Page API
 
-## Overview
+## 1. Purpose and terminology
 
-The framework provides a declarative API for building Discord messages and interactions using Components V2.
+The framework provides a declarative Rust API for building Discord messages and interactions with Components V2.
 
-A Page describes a message. It defines the component hierarchy, the values displayed by those components, and the executions associated with interactive components. `App<D>` manages registered Pages, the application's typed database value, framework routing persistence, rendering, and interaction routing.
+A **Page** is a reusable definition of a Discord message. It defines the component hierarchy, the properties displayed by those components, and the callbacks that handle interactions.
 
-The framework should make building a Discord interface feel like composing ordinary Rust values. Serenity's component builders, custom IDs, serialization, and interaction routing are implementation details.
+A **Modal** is a reusable definition of a form opened in response to an interaction.
 
-The framework has four main concepts:
+A **Frame** is a dynamic region inside a Page. It resolves to a collection of components when the Page is rendered.
 
-- `App<D>`: Owns the application database value of type `D`, registered Pages and Modals, framework persistence, and interaction routing.
-	
-- `Page<T>`: A blueprint for a Discord message, parameterized by its data.
-    
-- `Modal<T>`: A blueprint for a form submitted through a Discord interaction.
-    
-- `Frame<T>`: A dynamic region inside a Page that resolves its own component hierarchy at render time and can paginate its contents.
-	
+An **App** owns the registered Page and Modal definitions, the application's typed database value, the framework's persistent interaction Store, and interaction routing.
 
-## 1. Page
+The API should make building an interface feel like composing ordinary Rust values. Serenity builders, Discord custom IDs, serialization, persistence, and interaction dispatch are framework implementation details.
 
-A Page is a reusable blueprint. It defines the structure of a message, not a particular instance of that message.
+This specification describes the intended public API and behavior. Where an exact Rust trait signature depends on callback lifetimes or type inference, the required caller-facing behavior is normative even if the internal representation differs.
 
-Each Page has a globally unique ID and a single generic data type, `T`. This data is available to every dynamic component and interactive execution belonging to the Page.
+## 2. Static and dynamic values
+
+A component property may be supplied as either a static value or an asynchronous callback that resolves to that value. Both forms use the same public method or constructor argument. Developers should not need separate constructors or methods for static and dynamic values.
+
+For example, text may be static:
 
 ```rust
-use serde::{Serialize, Deserialize};
+Page::<Dataless>::new("Welcome")
+    .add_text("Welcome to the server.")
+```
+
+Or it may be resolved when the Page is rendered:
+
+```rust
+Page::<UserData>::new("Welcome")
+    .add_text(|ctx, data| async move {
+        Ok(format!("Welcome, {}.", data.username))
+    })
+```
+
+The same static-or-dynamic rule applies to component properties that can be resolved at render time, including labels, styles, optional emoji, disabled states, descriptions, URLs, placeholders, option display text, media properties, colors, and other display settings.
+
+A dynamic property callback receives the framework callback context and the Page's data. It is asynchronous and returns a Result containing the resolved property value. A callback passed directly to a property argument is treated as dynamic; an extra dynamic wrapper should not be required.
+
+Conceptually, a property uses one common value representation:
+
+```rust
+enum Value<T> {
+    Static(T),
+    Dynamic(/* asynchronous callback returning Result<T> */),
+}
+```
+
+The concrete callback type and its lifetime bounds are implementation details. The observable API behavior is not: an ordinary value and a callback returning that value must be accepted through the same property interface.
+
+A dynamic property callback runs while rendering. It receives access to the App through its context, but there is no active interaction to reply to. Interaction-response methods are available only to execution callbacks that were invoked because a Discord interaction occurred.
+
+A dynamic property controls what a component displays or how it is configured. It does not replace the component's execution callback. Interactive components always declare their execution separately.
+
+## 3. Page and Page data
+
+A Page is a reusable blueprint. It defines message structure, not an individual Discord message instance.
+
+Each Page has a globally unique developer-defined ID and one generic data type, T. That data is shared by all dynamic properties, Frames, and interactive executions belonging to the Page.
+
+```rust
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
 pub struct Dataless;
 
-let page = Page::<Dataless>::new("TheIdOfThePage")
-    .add_text("Hello, world!")
+let page = Page::<Dataless>::new("Welcome")
+    .add_text("Welcome to the server.")
     .register(app)?;
 ```
 
-`Dataless` is simply a zero-sized placeholder for Pages that have no application data. It has no special framework behavior.
+Dataless is a zero-sized placeholder type for a Page that has no application data. It does not represent a special framework feature.
 
-Pages are built before they are registered. Registration consumes the builder and produces a `RegisteredPage<T>`. The registered definition is immutable and does not retain an `App` reference. The App owns it after registration; rendering supplies the App and the Page data.
+Pages are built before registration. Registration consumes the builder and produces a RegisteredPage<T>. A regular Page<T> can be changed while it is being built. A RegisteredPage<T> is immutable: its component structure and callback definitions cannot be changed after registration.
+
+The registered definition does not hold an App reference. The App owns the definition, and the App is supplied when the Page is rendered.
 
 ```rust
 let page: RegisteredPage<Dataless> =
-    Page::<Dataless>::new("TheIdOfThePage")
-        .add_text("Hello, world!")
+    Page::<Dataless>::new("Welcome")
+        .add_text("Welcome to the server.")
         .register(app)?;
+
+let message = page.render(&app, Dataless).await?;
 ```
 
-A regular `Page<T>` can be modified. A `RegisteredPage<T>` cannot. This is a typestate distinction: once registered, the Page's definition is fixed.
-
-Rendering is only available on registered Pages.
-
-```rust
-let message = page.render(app, Dataless).await?;
-```
-
-Rendering requires the App because interactive components must be registered with the application's persistence layer before their message can be sent.
+Rendering requires the App because interactive components must have their routing records written to the framework Store before the message is sent.
 
 ### Page data
 
-The Page's generic type is the shared data scope for its components and executions.
+Page data is the shared, typed input to the Page's dynamic properties and executions.
 
 ```rust
 #[derive(Serialize, Deserialize)]
-pub struct UserLevelInfo {
-    user_id: String,
+pub struct UserLevelData {
+    pub user_id: String,
 }
 
-let page = Page::<UserLevelInfo>::new("UserLevel")
+let page = Page::<UserLevelData>::new("UserLevel")
     .add_text(|ctx, data| async move {
         let user = sqlx::query_as::<_, User>(
             "SELECT * FROM users WHERE id = ?"
@@ -75,104 +107,38 @@ let page = Page::<UserLevelInfo>::new("UserLevel")
         .bind(&data.user_id)
         .fetch_one(&ctx.app.db.pool)
         .await?;
+
         Ok(format!("Level: {}", user.level))
     })
     .register(app)?;
 ```
 
-The data passed to `render` is serialized and persisted alongside the Page's interactive execution references. When an interaction occurs, the framework reconstructs the original data and passes it to the corresponding execution.
+The data passed to render is serialized for persistent interaction routing. When an interaction arrives, the framework reconstructs the Page's data and passes an immutable view of it to the corresponding callback.
 
-The application database is separate from the framework's interaction Store. `App<D>` is generic over the application's database type, so callbacks access the concrete database API directly through `ctx.app.db`. The application chooses the structure of `D`; it may expose named repositories such as `db.messages` and `db.users`, a SQLx SQLite pool, or both. There is no type-erased `get::<T>()` lookup and no string-based table lookup.
+Page data is observed, not mutated, by callbacks. If an interaction needs to produce a different Page state, application code creates and renders a new Page data value. The framework does not silently mutate the original data.
 
-SQLite is the database backend. The framework should expose ordinary SQL access rather than inventing its own query language or ORM. SQLx is the preferred asynchronous Rust integration to investigate: it supports SQLite, raw SQL queries, and a query builder. Developers may use SQLx directly or layer an independent query builder/ORM over it. The framework should not require developers to use a particular higher-level abstraction.
+The Page data type must implement Serialize and DeserializeOwned. It must also satisfy the concurrency bounds required by the asynchronous callback implementation.
 
-The framework Store is responsible for interaction routing and is distinct from the application's `D` database value. Whether both responsibilities share the same underlying SQLite file or use separate connections/files is an implementation/configuration decision, not a public API requirement.
+## 4. Component property conversions and fixed slots
 
-The data type must implement `Serialize` and `DeserializeOwned`, and satisfy the concurrency requirements of the asynchronous application.
+### Static and dynamic conversions
 
-## 2. Static and dynamic values
-
-A component property should accept either a static value or a callback that resolves to that value.
-
-The public API should not require separate constructors or methods for static and dynamic values.
+Property arguments should accept their ordinary Rust value or a dynamic callback returning that value. Conversion should happen at the public API boundary.
 
 ```rust
-Page::<Dataless>::new("Example")
-    .add_text("This is static text.")
-    .add_text(|ctx, data| async move {
-        Ok("This is dynamically generated text.".to_string())
-    });
+.add_text("Static text")
+.add_text(|ctx, data| async move {
+    Ok(format!("Hello, {}.", data.username))
+})
 ```
 
-The same principle applies to component properties.
+Do not require callers to construct an internal Value<T> manually.
 
-```rust
-Button::new(
-    "Show Level",
-    "ButtonId",
-    ButtonStyle::Secondary,
-    |ctx, data| async move {
-        Ok(())
-    },
-);
-```
+### Optional text slots
 
-The button's label and style should both accept static values or callbacks. Its disabled state is a static or dynamic Boolean. Its emoji is optional and may be supplied statically or dynamically. Its developer-defined ID is always a static string. The execution remains an explicit callback.
+Some Discord components have a fixed number of child slots. The public API should make those slots explicit while still allowing each slot to be static, dynamic, or absent.
 
-### Into conversions
-
-The implementation should use a common internal representation for values that can be either static or dynamic.
-
-Conceptually:
-
-```rust
-enum Value<T> {
-    Static(T),
-    Dynamic(/* asynchronous callback returning T */),
-}
-```
-
-Component methods should accept values convertible into this representation.
-
-```rust
-.add_text("Hello")
-.add_text(dynamic_callback)
-```
-
-This should apply consistently to properties that can reasonably be resolved at render time:
-
-- Text content and descriptions.
-    
-- Button labels and styles.
-    
-- Select menu placeholders and options.
-    
-- Thumbnail URLs and descriptions.
-    
-- Container accent colors.
-    
-- Media URLs.
-    
-- Disabled states and other component settings.
-    
-
-The default rule is that a property accepts either its ordinary value or an asynchronous callback returning that value, unless there is a specific reason not to.
-
-A callback passed directly to a property method is treated as a dynamic value; developers must not need to wrap it in `dynamic(...)`. The `dynamic(...)` adapter is not required by the ordinary API.
-
-Both dynamic property callbacks and interactive execution callbacks are asynchronous and use the same general callback context and Page-data inputs. Dynamic callbacks resolve a property value; execution callbacks perform an interaction. Dynamic callbacks are evaluated during rendering and do not receive an interaction-specific Serenity context because no interaction has occurred. They receive the framework callback context, which exposes the App and the services available during rendering.
-
-A dynamic value determines what a component looks like. An execution determines what happens when someone interacts with a component.
-
-The latter remains an explicit callback.
-
-### Fixed slots and compile-time component counts
-
-Some Discord components have a fixed maximum number of children. Rather than accepting an arbitrary array and discovering invalid configurations at runtime, the API should expose a fixed number of slots.
-
-Each slot can contain a static value, a dynamic callback, or no value. The API should accept ordinary values through `Into` conversions where Rust permits it, so callers can pass a string directly instead of manually writing `Some("...")`. Explicit `None` remains available when a slot is absent.
-
-For example, a Section supports up to three Text Displays:
+A Section has three text slots. The first slot is required; the second and third may be omitted.
 
 ```rust
 Section::new()
@@ -183,226 +149,24 @@ Section::new()
     )
 ```
 
-A Section with three text blocks:
+All three slots may be populated:
 
 ```rust
 Section::new()
     .set_text(
         "User information",
-        dynamic_description,
+        |ctx, data| async move {
+            Ok(format!("Account level: {}", data.level))
+        },
         "Additional information",
     )
 ```
 
-The same idea applies to button rows:
+The Section text-slot argument type should be a framework conversion type that accepts a string, an owned string, a dynamic text callback, or None. That is how a caller can pass ordinary strings directly while still expressing an absent slot. The API must not require Some("text") around each present string.
 
-```rust
-.add_button_row((
-    Some(button1),
-    Some(button2),
-    None,
-    None,
-    None,
-))
-```
+### Button-row slots
 
-A fully populated row:
-
-```rust
-.add_button_row((
-    Some(button1),
-    Some(button2),
-    Some(button3),
-    Some(button4),
-    Some(button5),
-))
-```
-
-This makes the maximum number of slots explicit in the API. An omitted slot is represented by `None`, rather than relying on runtime validation to discover an invalid number of children.
-
-The implementation should use a fixed-size representation, such as a tuple or fixed-size array, and convert it into the appropriate Serenity component structure.
-
-The exact conversion types should be tested for Rust inference and ergonomic `Into` behavior before the signatures are finalized. In particular, `None` must not require awkward type annotations.
-
-## 3. Components V2
-
-The framework should expose Discord's Components V2 functionality through a composable API.
-
-The API should model how developers build interfaces, rather than mechanically exposing every Serenity builder method.
-
-### Text Display
-
-A Text Display presents Markdown-formatted text.
-
-```rust
-Page::<Dataless>::new("Example")
-    .add_text("# Welcome")
-    .add_text("This is another text block.");
-```
-
-Each call adds a separate Text Display. Text should not be silently concatenated with an existing component.
-
-Dynamic content uses the same method:
-
-```rust
-.add_text(|ctx, data| async move {
-    Ok(format!("Welcome, {}!", data.username))
-})
-```
-
-### Section
-
-A Section places text alongside an accessory. Discord supports one to three Text Displays and an accessory.
-
-The public API should expose three explicit text slots.
-
-```rust
-Section::new()
-    .set_text(
-        "User information",
-        "Account details",
-        None,
-    )
-    .set_accessory(
-        Thumbnail::new("https://example.com/avatar.png")
-    )
-```
-
-Each text slot can independently be static, dynamic, or absent. The API should accept a string directly through an `Into`-style conversion as well as an explicit absence value, without forcing callers to wrap every present string in `Some`.
-
-The accessory can be a Thumbnail or a Button.
-
-```rust
-Section::new()
-    .set_text(
-        "View additional information.",
-        None,
-        None,
-    )
-    .set_accessory(
-        Button::new(
-            "View",
-            "ViewButton",
-            ButtonStyle::Secondary,
-            |ctx, data| async move {
-                Ok(())
-            },
-        )
-    )
-```
-
-The framework should ensure that the resulting Section satisfies Discord's required structure.
-
-### Container
-
-A Container groups components into a visually distinct block. It can have an accent color and spoiler behavior.
-
-```rust
-Container::new()
-    .set_accent_color(0x5865F2)
-    .add_text("Account information")
-    .add_separator()
-    .add_text("Additional details")
-```
-
-A Container should support the same general component-building capabilities as a Page, limited by the component types Discord permits inside a Container. Containers are independent component groups, not alternate Pages. A Page may contain multiple Containers, and each Container may contain its own supported components and compositions.
-
-### Separator
-
-A Separator provides visual spacing and can optionally display a divider.
-
-```rust
-Separator::new()
-    .set_spacing(SeparatorSpacing::Large)
-    .set_divider(true)
-```
-
-### Thumbnail
-
-A Thumbnail displays a small image, usually as a Section accessory.
-
-```rust
-Thumbnail::new("https://example.com/avatar.png")
-    .set_description("User avatar")
-```
-
-The image source and description should support static or dynamic values.
-
-### Media Gallery
-
-A Media Gallery displays a collection of images or videos.
-
-```rust
-MediaGallery::new()
-    .add_media("https://example.com/image1.png")
-    .add_media("https://example.com/image2.png")
-```
-
-Individual media items may have descriptions.
-
-### File
-
-A File component displays an uploaded attachment within a Components V2 message.
-
-```rust
-File::new("document.pdf")
-```
-
-The framework should associate the component with the corresponding uploaded attachment. Uploading a file and displaying it are related operations, but they are not the same operation.
-
-## 4. Interactive components
-
-Interactive components create executions. Each execution has an ID unique within its Page.
-
-### Button
-
-```rust
-Button::new(
-    "Show Level",
-    "ButtonId",
-    ButtonStyle::Secondary,
-    |ctx, data: UserLevelInfo| async move {
-        let level_info = sqlx::query_as::<_, UserLevel>("SELECT * FROM user_level WHERE user_id = ?")
-            .bind(&data.user_id)
-            .fetch_one(&ctx.app.db.pool)
-            .await?;
-
-        let render = ctx
-            .app
-            .pages
-            .query("ShowUserLevel")?
-            .render(ctx.app, ShowUserLevelData {
-                level: level_info.level,
-            })
-            .await?;
-
-        ctx.edit_message(render).await?;
-
-        Ok(())
-    },
-)
-```
-
-The Button has a required, developer-defined static ID. Its label, style, disabled state, and optional emoji can each be static or dynamic. The disabled state is a Boolean. Emoji is optional and may be absent. The execution is always an explicit asynchronous callback. The ID is not a dynamic property.
-
-### Link Button
-
-A Link Button opens a URL rather than invoking an application execution.
-
-It should be a separate component because it does not produce an interaction.
-
-```rust
-LinkButton::new(
-    "Visit Website",
-    "https://example.com",
-)
-```
-
-Its label and URL should support static or dynamic values. A Link Button should also support a static or dynamic disabled state. It does not have an execution callback.
-
-### Button rows
-
-Developers should not have to manually create Action Rows.
+A button Action Row has exactly five available positions in this API. Each position accepts a Button directly or None if the position is empty.
 
 ```rust
 Page::<Dataless>::new("Example")
@@ -415,38 +179,300 @@ Page::<Dataless>::new("Example")
     ))
 ```
 
-The framework creates the underlying Action Row.
+A fully populated row is:
 
-Discord supports up to five buttons in an Action Row. Each slot accepts a Button directly or `None` when absent; callers should not have to wrap present buttons in `Some`. The fixed-size tuple or array makes the five-slot maximum explicit. Static and dynamic Button properties remain supported regardless of which slot contains the Button.
+```rust
+.add_button_row((
+    button1,
+    button2,
+    button3,
+    button4,
+    button5,
+))
+```
+
+The API should implement each slot as a value convertible into Option<Button>. Rust provides the conversion from T to Option<T>, so a Button can be passed directly and becomes Some(button) internally. Callers therefore write button1, not Some(button1). They write None only for an empty position.
+
+This is deliberate. The public examples and method signatures must consistently use direct Button values and None; they must not alternate between direct values and explicit Some(...) wrappers.
+
+The fixed-size tuple makes the five-position limit visible in the type-level API. The framework creates the Discord Action Row and validates that at least one button is present.
+
+## 5. Components V2 layout and content
+
+The Page API should expose Discord's Components V2 building blocks through composable framework types. It should hide low-level Serenity component serialization.
+
+### Text Display
+
+A Text Display presents Markdown-formatted text. Each call to add_text adds a distinct Text Display; separate calls must not be silently concatenated.
+
+```rust
+Page::<Dataless>::new("Example")
+    .add_text("# Welcome")
+    .add_text("This is a separate text block.")
+```
+
+Text may be static or dynamic.
+
+### Section
+
+A Section places one to three Text Displays beside an accessory. The accessory is either a Thumbnail or a Button. The three text positions are explicit slots and each may be static, dynamic, or absent, subject to Discord requiring at least one text child.
+
+```rust
+Section::new()
+    .set_text(
+        "Account information",
+        "Additional details",
+        None,
+    )
+    .set_accessory(
+        Thumbnail::new("https://example.com/avatar.png")
+            .set_description("User avatar")
+    )
+```
+
+A Button is also a valid Section accessory. Its constructor must use the same complete Button argument list described in the Button section:
+
+```rust
+Section::new()
+    .set_text("Open the user's profile.", None, None)
+    .set_accessory(
+        Button::new(
+            "View profile",
+            "ViewProfile",
+            ButtonStyle::Secondary,
+            Some("👤"),
+            false,
+            |ctx, data| async move {
+                Ok(())
+            },
+        )
+    )
+```
+
+The accessory Button has a static execution ID, an explicit optional emoji value, an explicit disabled Boolean, and an execution callback. The properties that support dynamic values must also accept callbacks in place of their static values.
+
+### Container
+
+A Container groups components into a visually distinct block. It supports an optional accent color and spoiler behavior.
+
+```rust
+Container::new()
+    .set_accent_color(0x5865F2)
+    .set_spoiler(false)
+    .add_text("Account information")
+    .add_separator()
+    .add_text("Additional details")
+```
+
+A Page may contain multiple independent Containers. A Container is not a nested Page and does not have its own Page data type or registration lifecycle. It should expose the same general composition style as a Page for the component types Discord permits inside a Container.
+
+The supported Container children are Action Rows, Text Displays, Sections, Media Galleries, Separators, and File components. A Container cannot contain another Container. The framework validates the child structure against Discord's rules.
+
+### Separator
+
+A Separator adds vertical spacing and can optionally display a divider.
+
+```rust
+Separator::new()
+    .set_spacing(SeparatorSpacing::Large)
+    .set_divider(true)
+```
+
+Spacing and divider settings may be static or dynamic.
+
+### Thumbnail
+
+A Thumbnail displays an image, usually as a Section accessory.
+
+```rust
+Thumbnail::new("https://example.com/avatar.png")
+    .set_description("User avatar")
+    .set_spoiler(false)
+```
+
+The media URL, description, and spoiler setting follow the static-or-dynamic property rule. Thumbnails support images, not video, and are used as Section accessories.
+
+### Media Gallery
+
+A Media Gallery displays between one and ten media items. Each item may include a description and spoiler setting.
+
+Both replacement and incremental composition should be available. set_media explicitly replaces the gallery's current media collection. add_media appends one item.
+
+```rust
+MediaGallery::new()
+    .set_media([
+        MediaItem::new("https://example.com/image1.png")
+            .set_description("First image"),
+        MediaItem::new("https://example.com/image2.png")
+            .set_description("Second image"),
+    ])
+```
+
+An item can also be appended:
+
+```rust
+.add_media(
+    MediaItem::new("https://example.com/image3.png")
+        .set_description("Third image")
+        .set_spoiler(false)
+)
+```
+
+The gallery and item properties that can be resolved at render time should support static or dynamic values. The framework validates the final collection and rejects an empty gallery or a gallery containing more than ten items.
+
+### File
+
+A File component exposes an attachment inside a Components V2 message.
+
+```rust
+File::new("attachment://document.pdf")
+    .set_spoiler(false)
+```
+
+The file must correspond to an attachment included with the message. The File component references the attachment; it does not upload the file itself. File components use Discord's attachment:// reference form.
+
+## 6. Interactive components
+
+Interactive components have a developer-defined execution ID and an explicit asynchronous callback. The execution ID is static and unique within its Page. It identifies the callback in the Page definition; it is not the Discord custom_id sent to Discord. The framework generates that custom_id from the persistent routing identity.
+
+### Button
+
+A Button constructor explicitly defines its label, execution ID, style, optional emoji, disabled state, and execution callback, in that order.
+
+```rust
+Button::new(
+    "Show Level",
+    "ShowLevel",
+    ButtonStyle::Secondary,
+    Some("📊"),
+    false,
+    |ctx, data: UserLevelData| async move {
+        let user = sqlx::query_as::<_, User>(
+            "SELECT * FROM users WHERE id = ?"
+        )
+        .bind(&data.user_id)
+        .fetch_one(&ctx.app.db.pool)
+        .await?;
+
+        ctx.reply(format!("Level: {}", user.level)).await?;
+
+        Ok(())
+    },
+)
+```
+
+The emoji argument is an Option value. Some("📊") supplies an emoji; None means the Button has no emoji. The disabled argument is a Boolean, where true disables the Button and false leaves it enabled.
+
+A Button with no emoji is written explicitly:
+
+```rust
+Button::new(
+    "Refresh",
+    "Refresh",
+    ButtonStyle::Secondary,
+    None,
+    false,
+    |ctx, data| async move {
+        Ok(())
+    },
+)
+```
+
+The label, style, emoji, and disabled state each accept either a static value or an asynchronous callback that resolves to that value. In particular, a dynamic emoji callback returns Option<Emoji> so it can resolve to either Some(emoji) or None. The execution ID is always a static string, and the execution callback is always explicit.
+
+A dynamic-property example is:
+
+```rust
+Button::new(
+    |ctx, data| async move {
+        Ok(format!("Level {}", data.level))
+    },
+    "ShowLevel",
+    |ctx, data| async move {
+        Ok(ButtonStyle::Secondary)
+    },
+    |ctx, data| async move {
+        Ok(Some("📊"))
+    },
+    |ctx, data| async move {
+        Ok(false)
+    },
+    |ctx, data| async move {
+        ctx.reply("Showing your level.").await?;
+        Ok(())
+    },
+)
+```
+
+### Link Button
+
+A Link Button opens a URL. It is a separate type because clicking it navigates to the URL and does not produce an interaction callback.
+
+```rust
+LinkButton::new(
+    "Visit Website",
+    "https://example.com",
+    Some("🌐"),
+    false,
+)
+```
+
+The Link Button's style is always Discord's Link style. Its label, URL, optional emoji, and disabled Boolean each accept a static value or a dynamic callback. Some("🌐") supplies an emoji and None omits it.
+
+Discord's current Button component schema includes disabled for Link-style Buttons as well as callback Buttons. Therefore LinkButton must expose a disabled property. A disabled Link Button remains a link-style component but cannot be activated.
+
+A Link Button has no execution ID and must not create a callback-routing record.
+
+### Button rows
+
+Developers add Buttons to a Page through a fixed five-slot tuple. The framework creates the Action Row.
+
+```rust
+Page::<Dataless>::new("Actions")
+    .add_button_row((
+        Button::new(
+            "Confirm",
+            "Confirm",
+            ButtonStyle::Success,
+            Some("✅"),
+            false,
+            |ctx, data| async move { Ok(()) },
+        ),
+        Button::new(
+            "Cancel",
+            "Cancel",
+            ButtonStyle::Secondary,
+            None,
+            false,
+            |ctx, data| async move { Ok(()) },
+        ),
+        None,
+        None,
+        None,
+    ))
+```
+
+Each slot accepts Button or None; callers do not wrap a present Button in Some. A row supports up to five Buttons. Link Buttons are also Buttons in Discord's component model and may be included in a Button row, but they do not have callback IDs or executions.
 
 ### Selection menus
 
-A Page should expose one method for adding a selection menu.
+A Page exposes one method for adding a selection menu:
 
 ```rust
 .add_selection_menu(selection_menu)
 ```
 
-The selection menu itself determines its type.
+The menu's concrete type determines which Discord selection menu is created. The framework supports:
 
-The framework should support:
+- String Select
+- User Select
+- Role Select
+- Mentionable Select
+- Channel Select
 
-- String Select.
-    
-- User Select.
-    
-- Role Select.
-    
-- Mentionable Select.
-    
-- Channel Select.
-    
+These types should implement a common selection-menu abstraction so the Page does not need a separate add method for each kind.
 
-These can be represented by distinct selection-menu types implementing a shared trait, or by an enum that unites the supported types.
-
-The important point is that the Page API accepts one selection-menu abstraction rather than requiring separate Page methods for every Discord select type.
-
-A String Select might look like this:
+A String Select has developer-defined option values and a callback that receives the selected values:
 
 ```rust
 StringSelect::new(
@@ -457,108 +483,79 @@ StringSelect::new(
         SelectOption::new("Mage", "mage"),
         SelectOption::new("Rogue", "rogue"),
     ],
-    |ctx, data, selection| async move {
-        // Handle the selected value or values.
+    |ctx, data, selected: Vec<String>| async move {
+        // Handle the selected values.
         Ok(())
     },
 )
 ```
 
-The option labels, descriptions, and other display properties should support static and dynamic values.
+The placeholder, option labels, option descriptions, option emoji, and other display properties should support static or dynamic values where appropriate. Developer-defined option values remain the values returned to the callback.
 
-The selected values are interaction data. They are not part of the Page's serialized data.
+Message selection menus support a disabled Boolean. Modal selection inputs do not support disabled; the framework must reject or prevent that property when building a Modal.
 
-Entity select menus return Discord entities rather than arbitrary strings. Their callbacks should expose the appropriate selected users, roles, channels, or mentionables.
+String Select options do not have an independent disabled field in Discord's component schema. The framework must not expose a fake per-option disabled setting or silently discard it. The complete select menu may be disabled in a message.
 
-## 5. Frame
+The selected values are interaction data supplied by Discord. They are not part of the serialized Page data.
 
-A Frame is a dynamic content region inside a Page. It is intended for collections whose complete contents are not known when the Page is defined, such as a settings list, directory, or catalogue.
+Entity select menus expose selected entities in typed form. User, Role, and Channel selections expose their corresponding Discord IDs and resolved entities. Mentionable selections expose a tagged value identifying whether each selected item is a User or Role.
 
-The developer supplies a callback that produces a collection of heterogeneous framework elements. The framework resolves that collection during rendering and lays it out within Discord's message limits. The developer should not have to calculate page boundaries or manually split the collection.
+## 7. Frame
+
+A Frame is a dynamic region inside a Page. It is intended for content whose complete component collection is not known when the Page definition is built, such as a settings list, user directory, or catalogue.
+
+The developer supplies a callback that returns a collection of framework elements. The collection may contain heterogeneous supported components.
 
 ```rust
 Page::<UserListData>::new("UserList")
     .add_text("# Users")
     .add_frame(|ctx, data| async move {
-        let users = sqlx::query_as::<_, User>("SELECT * FROM users")
-            .fetch_all(&ctx.app.db.pool)
-            .await?;
+        let users = sqlx::query_as::<_, User>(
+            "SELECT * FROM users ORDER BY username"
+        )
+        .fetch_all(&ctx.app.db.pool)
+        .await?;
 
-        Ok(users.into_iter()
+        let elements = users
+            .into_iter()
             .map(|user| {
-                Element::text(format!("{} - Level {}", user.name, user.level))
+                Element::text(format!(
+                    "{} - Level {}",
+                    user.username,
+                    user.level
+                ))
             })
-            .collect())
+            .collect();
+
+        Ok(elements)
     })
     .register(app)?;
 ```
 
-A Frame resolves to a collection of complete elements. Elements may be Text Displays, Sections, Containers, Separators, media, buttons, selection menus, or supported compositions of those components. The public API should let developers compose these elements naturally; a common internal element representation is an implementation detail.
+A Frame resolves to a collection of complete elements. Elements may be Text Displays, Sections, Containers, Separators, Media Galleries, Files, Buttons, selection menus, or supported compositions of those components. A common internal Element representation may be used to hold different component types, but developers should compose the elements using the same public component types used elsewhere.
 
-### Frame position and pagination
+A Frame occupies one declared position in the Page's component hierarchy. Its resolved elements appear at that position in the order returned by the callback. Static Page components before and after it retain their order.
 
-Pagination is a layout operation over the Frame's resolved elements. It is not a user session and does not create per-user or per-message state.
+A Frame uses the same Page data type as the rest of its Page. It does not have independent data, registration, or execution state. Interactive elements returned by a Frame still require developer-defined execution IDs that are unique within the Page and stable for the meaning of the action they identify.
 
-The developer should be able to opt a Frame into automatic pagination through a simple configuration method, conceptually:
+A Frame is not an automatic pagination system. The Frame API in this specification does not define page indexes, offsets, ranges, cursors, automatic splitting, Previous or Next buttons, or pagination state. The developer controls which elements the Frame callback returns. The framework resolves and renders that collection as part of the Page and validates it against Discord's message limits. If the resolved Page exceeds those limits, rendering returns an error rather than silently truncating content or inventing pagination behavior.
 
-```rust
-.add_frame(frame_callback)
-.paginate()
-```
+## 8. Modals
 
-The exact builder placement may be adjusted to fit the final Frame API, but pagination belongs to the Frame because it paginates that Frame's collection, not the entire Page definition.
+A Modal is a reusable form definition displayed in response to an interaction. It is not a message component or a Page. Submitting it creates a new interaction.
 
-At render time, the framework:
-
-1. Resolves the Frame callback once for that render.
-2. Resolves all dynamic properties in the returned elements.
-3. Measures the resulting complete component tree against Discord's limits.
-4. Splits the Frame collection between complete elements into as many valid pages as required.
-5. Repeats the Page's static components on every generated page.
-6. Adds framework-generated Previous and Next controls when more than one page exists.
-
-The resolved element tree used for measurement must also be the tree used for rendering. A dynamic callback must not be evaluated twice and produce different values for pagination planning and the actual message.
-
-The layout algorithm must account for the full Discord payload, including nested component counts, message-wide text budgets, Container child limits, Section limits, media limits, and the static Page components repeated on every generated page. Pagination controls also consume component and text budget. If navigation controls are needed, their cost must be reserved before the final page boundaries are calculated.
-
-Pagination splits only between complete elements. It must not silently truncate a component or split an interactive component into invalid pieces. If one indivisible element cannot fit on an otherwise empty page, rendering returns a descriptive error. Any future support for splitting an oversized text element must be explicit and documented.
-
-### Navigation API and behavior
-
-Navigation is generated by the framework; developers should not need to write Previous and Next callbacks themselves. The default navigation consists of a button row appended after the Page's content. Previous and Next are disabled at the first and last page respectively. A Frame that fits on one page has no navigation row.
-
-The current page index is represented as part of the navigation interaction's identity. It is not mutable session state stored for a Discord user or message. Conceptually, a navigation identity is derived from the Page ID, Frame ID, navigation direction, serialized Page data, and the page index from which the navigation is being performed.
-
-When Previous or Next is clicked, the framework derives the target index, reruns the Frame callback using the same serialized Page data, resolves the current collection, recalculates its page boundaries, and renders the target page. It then edits the message containing the interaction. Pagination is therefore a stateless view of the collection as it exists at the time of that interaction, not a snapshot of the collection from the first render. If the collection changes, page boundaries and the contents at a given index may change. If the requested target index no longer exists, the framework returns a clear out-of-range pagination error rather than silently clamping the index or selecting an unrelated page.
-
-No per-user identity, message-instance identity, mutable page counter, or pagination session is introduced. The same Page definition, serialized Page data, Frame definition, and page index produce the same pagination identity. Because the Frame callback may read changing external data, the rendered collection at that identity may change between interactions. Different users viewing identical data at the same position are intentionally indistinguishable to the framework.
-
-The navigation custom IDs are backed by the ordinary interaction-routing Store so the framework can resolve them after process restarts. The Frame ID, navigation operation, and source page index are encoded into the generated execution ID. The Page data remains the serialized Page data. These values are part of the deterministic routing identity, not additional Store columns or mutable session state.
-
-### Frame and interactive element identity
-
-Interactive components generated inside a Frame need stable developer-defined keys. Their identities must not depend on their temporary array position, because inserting or removing an earlier element must not redirect an existing component's callback.
-
-Every Frame element containing an interactive component must have a non-empty, developer-defined key. The key identifies that element within its Frame and applies to its interactive descendants. Keys must be unique within the Frame's resolved collection. Missing or duplicate keys are rendering errors. The Frame ID and element key are incorporated into the generated execution ID, together with the component's execution ID. They are not extra routing-record fields. Keys must remain stable when the collection is reordered or when other elements are inserted or removed.
-
-### Frame placement
-
-A Frame occupies one declared position in the Page's component hierarchy. Static components before and after it remain in that order and are repeated on every generated page. The Frame may be composed inside a Container only if the resulting expanded Container remains valid on every page; the layout algorithm must account for the Container's direct-child limit. Unsupported nesting or combinations must produce a clear validation error rather than silently changing the hierarchy.
-
-The initial pagination implementation may require one paginated Frame per Page. Supporting multiple independently paginated Frames in one Page would require defining how their page counts and navigation combine, so that behavior must not be implied until it is specified.
-
-## 6. Modals
-
-A Modal describes a form that Discord displays after an interaction.
-
-A Modal is not a message component. It is opened in response to an interaction and produces a separate interaction when submitted.
-
-A Modal should be its own blueprint type.
+A Modal has a globally unique ID and one generic data type, T, just like a Page.
 
 ```rust
 #[derive(Serialize, Deserialize)]
 pub struct EditUserData {
-    user_id: String,
+    pub user_id: String,
+}
+
+#[derive(Deserialize)]
+pub struct EditUserForm {
+    pub username: String,
+    pub description: String,
 }
 
 let modal = Modal::<EditUserData>::new("EditUser")
@@ -573,15 +570,15 @@ let modal = Modal::<EditUserData>::new("EditUser")
         "Description",
         TextInputStyle::Paragraph,
     )
-    .on_submit(|ctx, data, submission| async move {
-        let username = submission.text("username")?;
-        let description = submission.text("description")?;
-
-        sqlx::query("UPDATE users SET username = ?, description = ? WHERE id = ?")
-            data.user_id,
-            username,
-            description,
-        ).await?;
+    .on_submit(|ctx, data, form: EditUserForm| async move {
+        sqlx::query(
+            "UPDATE users SET username = ?, description = ? WHERE id = ?"
+        )
+        .bind(&form.username)
+        .bind(&form.description)
+        .bind(&data.user_id)
+        .execute(&ctx.app.db.pool)
+        .await?;
 
         ctx.reply("User updated successfully.").await?;
 
@@ -590,26 +587,24 @@ let modal = Modal::<EditUserData>::new("EditUser")
     .register(app)?;
 ```
 
-The Modal's generic data works like a Page's data. It is serialized when the Modal is opened and reconstructed when the form is submitted.
-
-Modal rendering is transactional with respect to framework persistence. The framework resolves all dynamic input properties, validates the complete Modal payload, and builds the rendered Modal before inserting its submit-execution record into the Store. If resolution, validation, or payload construction fails, no submit record is persisted. A successful render persists the record before the Modal is sent as an interaction response.
-
-The submitted form values are separate. They come from Discord and are provided to the submission callback through a `ModalSubmission` object.
+Modal registration consumes the builder and produces an immutable registered definition. The Modal's generic data is serialized when it is opened and reconstructed when the submission interaction arrives. Submitted form values are separate from the Modal's generic data.
 
 ### Opening a Modal
 
-A Modal is opened by an existing interaction, usually a button execution.
+A Modal must be opened as the initial response to an interaction. It is not sent through an ordinary message reply or follow-up.
 
 ```rust
 Button::new(
     "Edit User",
-    "EditUserButton",
+    "EditUser",
     ButtonStyle::Primary,
-    |ctx, data: UserLevelInfo| async move {
+    Some("✏️"),
+    false,
+    |ctx, data: EditUserData| async move {
         let modal = ctx.app.modals
             .query("EditUser")?
-            .render(ctx.app, EditUserData {
-                user_id: data.user_id,
+            .render(&ctx.app, EditUserData {
+                user_id: data.user_id.clone(),
             })
             .await?;
 
@@ -620,36 +615,38 @@ Button::new(
 )
 ```
 
-Opening a Modal is an interaction response. It is not an ordinary message edit or follow-up.
+### Modal input components
 
-### Modal components
+The Modal builder should expose the input components Discord supports:
 
-The Modal API should support the input components Discord permits:
+- Text Input
+- String Select
+- User Select
+- Role Select
+- Mentionable Select
+- Channel Select
+- File Upload
+- Radio Group
+- Checkbox Group
+- Checkbox
 
-- Text Input.
-    
-- String Select.
-    
-- User Select.
-    
-- Role Select.
-    
-- Mentionable Select.
-    
-- Channel Select.
-    
-- File Upload.
-    
-- Radio Group.
-    
-- Checkbox Group.
-    
-- Checkbox.
-    
+Modal inputs are placed inside Discord Label components. The framework should create the required Label structure from the simple input-building methods. Developers should not need to manually construct the Discord Label wrapper for each input.
 
-The API should use simple input definitions and handle Discord's required Label structures internally.
+Each input has a developer-defined ID. The ID is used to retrieve the submitted value or map it to a field in a typed form struct. Input labels, descriptions, placeholders, option display properties, and other supported properties follow the static-or-dynamic value rule.
+
+### Typed submission data
+
+The framework should deserialize submitted values into a developer-defined Rust struct through Serde. This is the preferred API; manually extracting strings by component ID should not be required for ordinary use.
 
 ```rust
+#[derive(Deserialize)]
+pub struct TicketForm {
+    pub subject: String,
+    pub details: String,
+    pub category: String,
+    pub urgent: bool,
+}
+
 Modal::<Dataless>::new("CreateTicket")
     .set_title("Create a Ticket")
     .add_text_input(
@@ -662,7 +659,7 @@ Modal::<Dataless>::new("CreateTicket")
         "Describe your issue",
         TextInputStyle::Paragraph,
     )
-    .add_select(
+    .add_string_select(
         "category",
         "Category",
         categories,
@@ -671,128 +668,110 @@ Modal::<Dataless>::new("CreateTicket")
         "urgent",
         "This issue is urgent",
     )
-    .on_submit(|ctx, data, submission| async move {
+    .on_submit(|ctx, data, form: TicketForm| async move {
+        // Use the typed form values.
         Ok(())
     })
+    .register(app)?;
 ```
 
-Modal inputs should have stable developer-defined IDs. Those IDs are used to retrieve their submitted values.
+The mapping from Modal input IDs to form fields is based on the input ID matching the Rust field name. The framework uses Serde to deserialize the values and returns an error for missing required values, invalid values, or incompatible Rust field types.
 
-### Typed submission data
+The value types are:
 
-The long-term goal should be to support deserializing Modal submissions into a developer-defined Rust struct.
+- Text Input: String (or Option<String> when the input is optional).
+- String Select: Vec<String> for submitted option values.
+- User Select: Vec<UserId>.
+- Role Select: Vec<RoleId>.
+- Channel Select: Vec<ChannelId>.
+- Mentionable Select: a vector of tagged values identifying UserId or RoleId.
+- Radio Group: String for the selected option value, or Option<String> when no selection is required.
+- Checkbox Group: Vec<String> containing selected option values.
+- Checkbox: bool.
+- File Upload: a vector of attachment metadata containing the attachment ID, filename, URL, size, and optional content type.
 
-```rust
-#[derive(Deserialize)]
-struct EditUserForm {
-    username: String,
-    description: String,
-}
+The raw ModalSubmission accessors remain available when application code needs direct access to the underlying submission or resolved Discord entities. The framework does not download uploaded file bytes as part of typed deserialization.
 
-.on_submit(|ctx, data, form: EditUserForm| async move {
-    sqlx::query("UPDATE users SET username = ?, description = ? WHERE id = ?")
-        data.user_id,
-        form.username,
-        form.description,
-    ).await?;
+Modal rendering must resolve dynamic properties and validate the complete Modal before persisting its submit-execution routing record. The record must be persisted before the Modal is sent as the interaction response. A failure before successful validation must not leave a usable routing record for a Modal that was never built.
 
-    Ok(())
-})
-```
+## 9. Interaction context and callbacks
 
-This avoids requiring developers to manually retrieve strings by component ID and then parse them.
+Every dynamic property callback and interactive execution receives the framework context and the Page or Modal data.
 
-The framework should map component IDs to struct fields and convert submitted values into the appropriate Rust types. Missing or invalid values should return errors.
-
-The field-name mapping is normative:
-
-- Text Input values deserialize as `String`.
-- String Select, Radio Group, and Checkbox Group values deserialize as `Vec<String>`, containing submitted option values.
-- Checkbox values deserialize as `bool`.
-- User, Role, and Channel Select values deserialize as arrays of their Discord ID types (`Vec<UserId>`, `Vec<RoleId>`, and `Vec<ChannelId>`).
-- Mentionable Select values deserialize as arrays of tagged values containing the selected kind (`user` or `role`) and its Discord ID.
-- File Upload values deserialize as arrays of attachment metadata containing the attachment ID, filename, URL, size, and optional content type. The framework does not download file bytes as part of deserialization.
-
-The raw `ModalSubmission` accessors remain available when application code needs complete typed Serenity entities or attachment objects. A Serde type mismatch, missing required field, or malformed ID is an error; typed values must not be silently discarded or coerced to strings.
-The exact mechanism for this should be designed around Serde rather than inventing a second serialization system.
-
-## 7. Interaction Context
-
-Every interactive execution receives `ctx` and the Page's typed `data`.
-
-`ctx` is the framework's context wrapper around the relevant Serenity interaction context. It exposes Serenity's interaction API as needed and also exposes the application through `ctx.app`. The wrapper must provide the operations needed to respond to the interaction; merely exposing a raw Serenity context is not sufficient if Serenity's API does not directly support the framework's required routing and response behavior.
-
-Dynamic property callbacks also receive the framework context and Page data, but they run during rendering rather than in response to a Discord interaction. They therefore cannot use interaction-response operations that require an active interaction.
-
-Callbacks are asynchronous and return `Result`. The intended ergonomic form is an asynchronous closure such as `|ctx, data| async move { ... }`, allowing application code to use `.await` naturally.
-
-The exact ownership and lifetime representation of `ctx` is an implementation decision. The public contract does not prescribe `Arc`, `&mut`, or a particular Serenity context type.
-
-Page data is supplied as an immutable view to callbacks. Callbacks observe the data; they do not mutate the original Page data. The concrete reference, lifetime, and any sharing required for thread safety are implementation decisions.
+An interactive callback has the general form:
 
 ```rust
 |ctx, data| async move {
-    let user = sqlx::query_as::<_, User>("SELECT * FROM users WHERE id = ?")
-        .bind(&data.user_id)
-        .fetch_one(&ctx.app.db.pool)
-        .await?;
-
-    ctx.reply("Hello!").await?;
-
+    // Application logic.
     Ok(())
 }
 ```
 
-The context should expose operations relevant to the interaction type:
+An execution callback returns Result. It can perform asynchronous work with await, use the App's database, and respond to the Discord interaction.
 
-- Reply to an interaction.
-    
-- Defer an interaction response.
-    
-- Edit the message containing the component.
-    
-- Edit the original interaction response.
-    
-- Send a follow-up message.
-    
-- Delete an interaction response.
-    
-- Open a Modal.
-    
+ctx is a framework context wrapping the relevant Serenity context. It exposes the App through ctx.app and provides the Serenity interaction information and API needed by the callback. The framework context must also provide convenient response methods; exposing a raw Serenity context alone is not sufficient if Serenity does not provide the response operation required by the framework.
 
-Response operations have distinct Discord semantics. `reply`, `defer`, `edit_message`, and `open_modal` are initial interaction responses and may be used only while the interaction has not already been acknowledged. They map respectively to a message response, deferred response, message update, and Modal response. `edit_original_response`, `followup`, and `delete_response` operate on the original interaction webhook response; `followup` creates a separate webhook message. Each method sends its documented payload through the App's configured HTTP client and returns Discord/API errors to the callback. Calling an initial-response method after the interaction has already been acknowledged returns an error. The framework does not silently substitute one response kind for another.
+Dynamic property callbacks receive a rendering context and Page or Modal data. They do not have an active interaction and cannot call response methods that require one.
 
-These response operations must be testable through an injected or local HTTP test double. Unit tests must not require a live Discord connection or a real bot token.
+Page and Modal data are exposed immutably. The exact Rust reference, lifetime, and ownership representation is an implementation decision. The API must not allow a callback to mutate the original serialized data through the reference it receives.
 
+The context should expose the interaction information relevant to the current callback, including the interacting user, guild, channel, selected values, and Modal submission data where applicable.
 
-The context also exposes interaction information, such as the user who interacted, the guild and channel, selected values, and submitted Modal data.
+The context is temporary. It belongs to the current render or interaction and is never stored inside a Page definition or persisted in the routing Store.
 
-The context is temporary. It belongs to the current interaction and is never stored inside a Page or persisted in the database.
+### Interaction response operations
 
-## 8. App and registration
+The context should provide operations for the distinct Discord response actions:
 
-`App` is generic over the application's database type:
+- reply: create the initial message response.
+- defer: acknowledge the interaction and defer the response.
+- edit_message: update the message containing the component interaction.
+- edit_original_response: edit the original interaction webhook response.
+- followup: create a separate follow-up message.
+- delete_response: delete the original interaction webhook response.
+- open_modal: open a Modal as the initial interaction response.
+
+Initial response operations are mutually exclusive. Once the interaction has been acknowledged, another initial-response operation must return an error. The framework must not silently substitute one response type for another.
+
+reply, defer, edit_message, and open_modal have distinct Discord semantics and must map to their corresponding response types. edit_original_response, followup, and delete_response operate on the interaction webhook response. Errors from Discord or the HTTP client are returned to the callback.
+
+Response behavior must be testable through an injected or local HTTP test double. Unit tests for response routing must not require a live Discord connection or real bot token.
+
+## 10. App, database, and registration
+
+App is generic over the application's database type:
 
 ```rust
 pub struct App<D> {
     pub db: D,
-    // Registered definitions, framework Store, and interaction routing.
+    // Registered Page and Modal definitions, the framework Store,
+    // and interaction routing.
 }
 ```
 
-The application supplies its own concrete database type. This allows strongly typed, named access such as `ctx.app.db.messages`, `ctx.app.db.users`, or `ctx.app.db.settings`, without string lookups or a type-erased `get::<T>()` method. The application may expose repositories, a SQLx SQLite pool, or a combination of both.
+The application defines D. This provides strongly typed, named access to its own database API, for example ctx.app.db.messages, ctx.app.db.users, or ctx.app.db.settings. The framework must not require a type-erased get::<T>() lookup or string-based table lookup.
 
-SQLite is the required database backend. SQL is the underlying query interface. The framework should not invent a proprietary query API or require a custom ORM. SQLx is the preferred asynchronous Rust integration to evaluate for SQLite connections, raw SQL queries, and query-builder support. Higher-level SQL abstractions may be used independently on top of the SQL interface.
+For example, an application may define:
 
-The framework interaction Store is a separate responsibility from the application's database API. It stores the custom-ID routing records described below. Whether the Store and application data use the same SQLite file or separate SQLite files/connections is not prescribed by the public API.
+```rust
+pub struct BotDatabase {
+    pub pool: SqlitePool,
+    pub messages: MessageRepository,
+    pub users: UserRepository,
+}
+```
 
-The App owns the registered Pages and Modals, the framework Store, and the interaction router. Its registries must hold Pages and Modals with different generic data types while preserving the concrete application database type used by their callbacks. Type erasure needed to hold heterogeneous Page and Modal definitions is an internal implementation detail.
+The application may use repositories, a SQLx SQLite pool, or both. SQL is the underlying query interface. The framework should not invent a proprietary query language or require its own ORM. SQLx is the preferred asynchronous Rust integration to evaluate for SQLite connections, raw SQL, and query-builder support. Developers may use SQLx directly or layer another SQL abstraction over it; the framework should not impose a higher-level ORM.
 
-A registered Page or Modal is immutable. Registration consumes the builder and places its definition in the App's registry. Registration is not restricted to application startup; it may occur whenever the API's ownership and synchronization rules permit it. The specification does not impose a startup-only lifecycle.
+The framework's interaction Store is separate in responsibility from the application's D value. The Store uses SQLite for persistent interaction routing. The application database and the framework Store may share a SQLite file or use separate files/connections; that is a configuration decision.
 
-Page IDs and Modal IDs share one application-wide identifier namespace. Registering a duplicate ID is an error.
+The App owns the registered Pages and Modals, the framework Store, and the interaction router. Its registries must be able to hold definitions with different generic Page or Modal data types while preserving the concrete D type used by their callbacks. Any type erasure needed for heterogeneous registries is an internal implementation detail. It must not erase the public type of ctx.app.db.
 
-Rendering a Page uses its registered definition and the App:
+Registration consumes a Page or Modal builder and stores its immutable registered definition in the App. Page IDs and Modal IDs share one application-wide identifier namespace. Registering a duplicate definition ID is an error.
+
+Registration is not restricted to application startup. It may occur whenever the App's ownership and synchronization rules permit it. The specification does not impose a startup-only lifecycle.
+
+Rendering uses the registered definition and the App:
 
 ```rust
 let message = app.pages
@@ -801,202 +780,216 @@ let message = app.pages
     .await?;
 ```
 
-The App is supplied to rendering and callbacks; it is not stored inside the Page definition.
+The Page definition does not store the App. The App is supplied to rendering and is available to callbacks through ctx.app.
 
-## 9. Persistence and interaction routing
+## 11. Persistent interaction routing
 
-Discord returns a component's `custom_id` when a user interacts with it. The framework Store maps that ID to the definition and data needed to route the interaction.
+Discord returns a component's custom_id when a user interacts with a Button or selection menu. The framework Store maps that custom ID to the registered callback definition and serialized data needed to route the interaction.
 
-The framework Store is distinct in responsibility from the application's typed database API. It is SQLite-backed and persists routing records so that an interaction can be resolved after a process restart, provided the same Page and Modal definitions have been registered again. Its connection arrangement is an implementation detail.
+The Store is SQLite-backed. Its purpose is to preserve callback routing across process restarts, provided the same Page and Modal definitions are registered again. It is not a user-session database and is not the application's general-purpose database API.
 
-Each routing record has exactly four fields: the deterministic hash, the Page ID (or Modal ID for a Modal execution), the execution ID, and the serialized Page or Modal data. There are no additional per-user, per-message, Frame, pagination, timestamp, or expiration fields. Frame identity, stable element keys, and pagination operation/position are encoded into the execution ID where needed.
+### Routing record
 
-The custom ID is the deterministic hash stored in the routing record. It is computed programmatically from the Page or Modal ID, execution ID, and serialized data using a stable serialization format and deterministic hash algorithm. The same three inputs must always produce the same hash, including across process restarts. The hash must fit Discord's custom-ID limit. The implementation may choose the concrete hash algorithm, but it must not use random IDs, process-specific salts, or time-dependent values. On an existing hash, the Store must verify that the other three fields match; a hash collision must be reported rather than overwriting or misrouting the record.
+A routing record contains exactly four fields:
 
-This deliberately means identical definitions and identical data share interaction identities. The framework does not distinguish users or message instances, and it does not maintain per-user or per-message sessions. The framework's Store is a routing lookup, not a session store.
+```rust
+struct RoutingRecord {
+    hash: String,
+    definition_id: String,
+    execution_id: String,
+    serialized_data: Vec<u8>,
+}
+```
 
-Closures are never serialized. The registered Page or Modal definition owns the executable callback. Persisted records contain only enough information to identify that callback and reconstruct its typed data.
+definition_id identifies the registered Page or Modal. execution_id identifies the callback within that definition. serialized_data is the serialized Page or Modal data. hash is the deterministic value used as the Discord component's custom_id and the record's lookup key.
 
-### Routing
+There are no additional per-user, per-message, Frame, pagination, timestamp, or expiration fields in a routing record.
+
+### Deterministic custom IDs
+
+The framework computes the hash programmatically from the definition ID, execution ID, and serialized data. It uses a stable serialization format and deterministic hash algorithm. The same three inputs must always produce the same hash, including after a process restart.
+
+The hash must fit Discord's custom_id limit. The implementation may choose the hash algorithm, but it must not use randomness, process-specific salts, timestamps, or message-instance identity as inputs.
+
+When an identical routing identity is rendered again, the Store reuses the same logical record. If a hash already exists, the Store verifies that the other three fields match. If they do not match, the framework reports a hash collision. It must never overwrite a different callback record or route an interaction arbitrarily.
+
+The developer-defined execution ID is the stable callback identity. A component's execution ID must be unique within its Page or Modal. Link Buttons do not have executions and therefore do not have callback-routing records.
+
+### Interaction routing
 
 When an interaction arrives:
 
-1. App receives the Discord interaction.
-2. App reads the component's `custom_id`.
-3. The Store resolves the custom ID to its routing record.
-4. App locates the registered Page or Modal definition.
-5. The definition locates the requested execution.
-6. The definition deserializes the stored data into its own generic type.
-7. The callback runs with `ctx` and an immutable reference to the reconstructed data.
+1. The App receives the Discord interaction.
+2. The App reads the component's custom_id.
+3. The Store looks up the corresponding routing record by hash.
+4. The App locates the registered Page or Modal using definition_id.
+5. The registered definition locates the callback using execution_id.
+6. The definition deserializes serialized_data into its own generic data type.
+7. The callback runs with the framework context and an immutable reference to the reconstructed data.
 
 The App does not need to know the Page or Modal's generic data type. The registered definition knows its own type and performs deserialization and callback dispatch.
 
-A valid custom ID does not grant permission to perform an operation. Application callbacks remain responsible for authorization.
+Closures are never serialized. The registered Page or Modal definition owns the executable callback. The routing record contains only the information required to locate that callback and reconstruct its data.
 
-### Determinism and record reuse
+### Statelessness
 
-Repeated renders of the same Page definition and identical serialized data reuse the same routing identity for the same execution. Different users rendering those same circumstances are intentionally not distinguished.
+The framework does not store user identity or message identity in routing records. It does not maintain per-user sessions, per-message sessions, view ownership, login/logout state, or mutable state tracking who is viewing a Page.
 
-The Store must handle an identical identity consistently. It must not create user-specific variants or overwrite a record with semantically different callback data. If two different definitions or execution identities produce the same digest, the framework must detect and report the collision rather than route to an arbitrary callback. Routing records do not expire and are not removed merely because time has passed. The framework does not implement TTLs, automatic expiration, or session cleanup.
+Two users rendering the same registered definition with identical serialized data receive the same routing identities. The framework intentionally does not distinguish those renders.
 
-## 10. Errors
+The Store is persistent routing data, not session state. Routing records do not expire and are not removed merely because time has passed. The framework does not implement TTLs, automatic expiration, or session cleanup.
 
-The framework should use ordinary Rust `Result` values for operations that can fail.
+A custom ID is not authorization. Application callbacks remain responsible for checking whether the interacting user is permitted to perform the requested operation.
 
-Examples include:
+## 12. Errors and validation
 
-- Registering duplicate Page or Modal IDs.
-    
-- Registering duplicate execution IDs within a Page.
-    
-- Rendering a component with invalid configuration.
-    
-- Resolving an unknown Page or Modal.
-    
-- Resolving an unknown execution.
-    
-- Deserializing persisted data.
-    
-- Retrieving a missing or invalid Modal submission value.
-    
-- Resolving an invalid Frame.
-    
-- Encountering a component that cannot fit within Discord's limits.
-    
-- Sending an invalid Discord component structure.
-    
+The framework uses ordinary Rust Result values for operations that may fail. It must return useful errors instead of panicking or silently changing the requested component structure.
 
-Errors should preserve useful context, especially the Page or Modal ID and execution ID involved.
+Errors include:
 
-Fixed-size component slots should prevent invalid child counts from being expressible through the ordinary public API wherever possible. Runtime validation is still necessary for constraints that depend on resolved dynamic values.
+- Duplicate Page or Modal IDs.
+- Duplicate execution IDs within a Page or Modal.
+- Unknown Page, Modal, or execution IDs.
+- Failed dynamic property resolution.
+- Invalid static or resolved component properties.
+- Invalid Section, Action Row, Container, or Modal structure.
+- Invalid or missing Modal submission values.
+- Serialization or deserialization failures.
+- Missing routing records.
+- Hash collisions.
+- Discord API or HTTP errors.
+- A resolved Page or Frame that exceeds Discord's component limits.
 
-## 11. Design principles
+Errors should retain useful context, particularly the definition ID and execution ID involved.
 
-**One public interface for static and dynamic values.** A property accepts either its ordinary value or a callback that resolves to that value.
+Static structural violations should be rejected during registration when they can be determined then. Violations that depend on dynamic values must be checked after those values resolve and before the message or Modal is sent.
 
-**Executions are explicit.** A button click, selection, or Modal submission always has an explicit callback.
+Fixed-slot APIs should make invalid child counts unrepresentable where practical. Runtime validation remains necessary for constraints that depend on dynamic values or Discord's message-wide limits.
 
-**Page data is shared.** Components and executions belonging to a Page use the same generic data type.
+## 13. Discord component constraints
 
-**Structure is declarative.** The Page defines its fixed structure. Frames provide dynamic regions.
+The framework validates the final resolved component tree against Discord's current Components V2 rules. The following constraints are part of the public contract:
 
-**Frames own dynamic collections.** A Frame resolves components at render time and handles pagination without forcing the developer to implement navigation.
+### Messages and Components V2
 
-**Component limits should be represented in the API.** Fixed-size slots should make Discord's structural constraints explicit rather than relying on avoidable runtime errors.
+- Components V2 messages must use the IS_COMPONENTS_V2 message flag.
+- A Components V2 message may contain up to 40 total components.
+- A Button Action Row contains one to five Buttons.
+- An Action Row used for a selection menu contains one selection menu.
+- A Section contains one to three Text Displays and one accessory.
+- A Section accessory is a Button or Thumbnail.
+- A Media Gallery contains one to ten media items.
+- A component custom_id is one to 100 characters.
+- A Button label is at most 80 characters.
+- A Link Button URL is at most 512 characters.
+- A select placeholder is at most 150 characters.
+- A String Select contains at most 25 options.
+- A String Select option label, value, and description are each at most 100 characters.
+- A Thumbnail description is at most 1024 characters.
+- A Media Gallery item description is at most 1024 characters.
+- A Container may contain Action Rows, Text Displays, Sections, Media Galleries, Separators, and Files. A Container cannot contain another Container.
 
-**Discord implementation details stay hidden.** The framework handles component nesting, custom IDs, serialization, and interaction routing.
+A Components V2 message does not use traditional message content or embeds in the usual way. Text is represented with Text Display components and grouped content may use Containers.
 
-**Registered definitions are immutable.** Build first, register once, then render.
+Discord's Button schema includes disabled for both callback Buttons and Link-style Buttons. Link Buttons require a URL and do not use a custom_id or invoke an application callback.
 
-**Routing is persistent, sessions are absent.** The framework Store preserves deterministic callback routing across restarts when the same definitions are registered again. It does not track users or message instances.
+### Modals
 
-**Errors are explicit.** Invalid persisted references, missing values, and failed executions return errors instead of panicking.
+- Modal inputs are wrapped in Label components.
+- A Label's text is at most 45 characters.
+- A Label description is at most 100 characters.
+- A Text Input's placeholder is at most 100 characters.
+- Text Input values and configured maximum length are at most 4000 characters.
+- A select menu supports at most 25 options.
+- Radio Groups support between two and ten options.
+- Checkbox Groups support between one and ten options.
+- File Upload supports up to ten files.
 
-A String Select option has no independent disabled state in Discord's component payload. The framework must reject an option configured with `SelectOption::set_disabled(true)` rather than silently omit the setting or render an invalid component. A dynamic option-disabled value is checked after it is resolved. Disabling the complete select menu remains supported.
+Disabled selection menus are supported in messages, not in Modals. The framework must not send a disabled Modal input because Discord rejects disabled components in Modals.
 
+These values are Discord constraints, not arbitrary framework preferences. They must be kept aligned with Discord's current component reference.
 
-## 12. Discord constraints
+## 14. Implementation order
 
-The implementation must respect Discord's actual component limits.
+The framework should be implemented in an order that establishes the Page and callback model before adding more complex component types:
 
-For Components V2 messages:
+1. App<D>, Page builders, registration, and immutable registered definitions.
+2. Static and dynamic property conversion and resolution.
+3. Page composition, Sections, Containers, Separators, Thumbnails, Media Galleries, and Files.
+4. Buttons, Link Buttons, fixed five-slot button rows, and routing persistence.
+5. Selection menu abstractions and interaction dispatch.
+6. Modal definitions, submission handling, and typed Serde deserialization.
+7. Frame resolution and rendering.
 
-- A message can contain up to 40 total components, including nested components.
-    
-- Text Display content shares a 4,000-character message-wide budget.
-    
-- A Section supports one to three Text Displays and one accessory.
-    
-- A button Action Row supports one to five buttons.
-    
-- A select menu occupies its own Action Row.
-    
-- A String Select supports up to 25 options.
-    
-- A Media Gallery supports up to 10 media items.
-    
-- A Container supports up to 10 direct child components.
-    
-- A component's custom ID is limited to 100 characters.
-    
+Pagination is deliberately not part of the Frame API defined here. It should be designed separately if and when it is needed.
 
-Components V2 messages require the `IS_COMPONENTS_V2` flag. Traditional message content and embeds cannot be used in the normal way with Components V2.
+## 15. Complete composition example
 
-For Modals:
-
-- A Modal title is limited to 45 characters.
-    
-- A Modal supports up to five top-level components.
-    
-- Input labels are limited to 45 characters.
-    
-- Label descriptions are limited to 100 characters.
-    
-- Text Inputs support up to 4,000 characters.
-    
-- Select menus support up to 25 options.
-    
-
-These constraints should be validated by the framework, including after dynamic values and Frame contents have been resolved.
-
-The framework should not assume that a Page is valid merely because its static definition is valid. Dynamic content can exceed the limits at render time.
-
-A Text Input's configured `max_length` cannot exceed 4,000, and its `min_length` cannot exceed its `max_length`. Each Modal Select, Radio Group, and Checkbox Group supports no more than 25 options. Static violations are rejected during registration; dynamic label, placeholder, description, and option values are validated after resolution during rendering.
-
-
-## 13. Implementation priorities
-
-The framework should be implemented in stages.
-
-1. Page builder and registration.
-    
-2. Static and dynamic property resolution.
-    
-3. Component composition and fixed-size slots.
-    
-4. Button executions and persistence.
-    
-5. Selection menus and interaction routing.
-    
-6. Modal registration and submission handling.
-    
-7. Frame component generation.
-    
-8. Frame pagination and automatic navigation.
-    
-9. Typed Modal submission deserialization.
-    
-10. More advanced Frame data sources and pagination optimizations.
-    
-
-This order establishes the core execution and rendering model before adding the more complex dynamic collection and pagination behavior.
-
-The end result should make building a Discord interface mostly ordinary composition:
+The following example shows the intended composition style. Button arguments are complete: label, static execution ID, style, optional emoji, disabled Boolean, and callback. Button-row slots use direct Button values and None, without wrapping Buttons in Some.
 
 ```rust
+#[derive(Serialize, Deserialize)]
+pub struct UserListData {
+    pub guild_id: String,
+}
+
 let page = Page::<UserListData>::new("UserList")
     .add_container(
         Container::new()
+            .set_accent_color(0x5865F2)
             .add_text("# User Directory")
             .add_separator()
             .add_frame(|ctx, data| async move {
-                let users = sqlx::query_as::<_, User>("SELECT * FROM users")
-            .fetch_all(&ctx.app.db.pool)
-            .await?;
+                let users = sqlx::query_as::<_, User>(
+                    "SELECT * FROM users WHERE guild_id = ? ORDER BY username"
+                )
+                .bind(&data.guild_id)
+                .fetch_all(&ctx.app.db.pool)
+                .await?;
 
                 Ok(users.into_iter()
                     .map(|user| {
                         Element::text(format!(
                             "{} - Level {}",
-                            user.name,
+                            user.username,
                             user.level
                         ))
                     })
                     .collect())
             })
-            .paginate()
     )
+    .add_button_row((
+        Button::new(
+            "Refresh",
+            "RefreshUsers",
+            ButtonStyle::Secondary,
+            Some("🔄"),
+            false,
+            |ctx, data: UserListData| async move {
+                ctx.reply("Refreshing the user directory.").await?;
+                Ok(())
+            },
+        ),
+        Button::new(
+            "Close",
+            "CloseUsers",
+            ButtonStyle::Danger,
+            None,
+            false,
+            |ctx, data: UserListData| async move {
+                ctx.delete_response().await?;
+                Ok(())
+            },
+        ),
+        None,
+        None,
+        None,
+    ))
     .register(app)?;
+
+let message = page.render(&app, UserListData {
+    guild_id: guild_id.to_string(),
+}).await?;
 ```
 
-The framework handles turning this definition into valid Discord messages, splitting dynamic content into pages, persisting interactive executions, and routing future interactions back to the correct Rust callbacks.
+The framework resolves dynamic properties and Frames, validates the completed component tree, persists the routing records for interactive components, and renders the corresponding Discord Components V2 message.
