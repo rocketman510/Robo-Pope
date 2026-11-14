@@ -3,7 +3,7 @@ use std::sync::{
     atomic::{AtomicUsize, Ordering},
 };
 
-use crate::app::{RenderCtx, store::{CustomId, derive_custom_id}};
+use crate::app::store::{CustomId, derive_custom_id};
 use crate::page::{Button, ButtonStyle, Element, Page};
 use super::support::{app, TestData};
 
@@ -119,9 +119,9 @@ async fn frame_can_resolve_dynamic_component_properties_in_its_elements() {
     // as components declared directly on the Page.
     let app = app();
     let page = Page::<TestData>::new("frame-dynamic-property")
-        .add_frame(|_ctx: RenderCtx, data: Arc<TestData>| async move {
+        .add_frame(|_ctx, data| async move {
             Ok(vec![Element::text(
-                move |_ctx: RenderCtx, data: Arc<TestData>| async move {
+                move |_ctx, data| async move {
                     Ok(format!("{}:{}", data.label, data.count))
                 },
             )])
