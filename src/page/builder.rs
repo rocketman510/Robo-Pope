@@ -538,7 +538,7 @@ where
 
     let mut rendered = CreateButton::new_link(url).label(label).disabled(disabled);
     if let Some(emoji) = emoji {
-        rendered = rendered.emoji(emoji);
+        rendered = rendered.emoji(serenity::all::ReactionType::try_from(emoji.as_str())?);
     }
     Ok(rendered.into_owned())
 }
@@ -579,7 +579,7 @@ where
         .style(serenity_style)
         .disabled(disabled);
     if let Some(emoji) = emoji {
-        rendered = rendered.emoji(emoji);
+        rendered = rendered.emoji(serenity::all::ReactionType::try_from(emoji.as_str())?);
     }
     Ok(rendered.into_owned())
 }
@@ -621,7 +621,7 @@ where
                 if let Some(emoji) = &option.emoji {
                     if let Some(emoji) = super::value::resolve(emoji, ctx.clone(), data.clone())
                         .await.context("Resolving String Select option emoji")? {
-                        rendered = rendered.emoji(emoji);
+                        rendered = rendered.emoji(serenity::all::ReactionType::try_from(emoji.as_str())?);
                     }
                 }
                 options.push(rendered);

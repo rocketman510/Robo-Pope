@@ -2,7 +2,7 @@
 use crate::page::frame::Frame;
 use crate::page::select::SelectMenu;
 use crate::page::value::{IntoValue,Value};
-use super::{Button,ButtonRow,ButtonSlot,ButtonSlots,Component,File,LinkButton,MediaGallery,
+use super::{Button,ButtonRow,ButtonSlot,Component,File,LinkButton,MediaGallery,
     Section,Separator,Text};
 
 /// An ordered Container child, either a component or a dynamically expanded Frame.
