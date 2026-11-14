@@ -117,7 +117,7 @@ impl<D: Clone + Send + Sync + 'static> Ctx<D> {
             let (id, token) = self.credentials()?;
             anyhow::ensure!(matches!(self.interaction.as_ref(), Interaction::Component(_)),
                 "edit_message requires a Component interaction");
-            let (components, attachments, _) = message.into_parts();
+            let (components, attachments) = message.into_parts();
             let mut payload = CreateInteractionResponseMessage::new()
                 .components(components)
                 .flags(serenity::all::MessageFlags::IS_COMPONENTS_V2);
@@ -131,7 +131,7 @@ impl<D: Clone + Send + Sync + 'static> Ctx<D> {
     pub fn edit_original_response(&self, message: RenderedMessage) -> BoxFuture<'_, anyhow::Result<()>> {
         Box::pin(async move {
             let (_, token) = self.credentials()?;
-            let (components, attachments, _) = message.into_parts();
+            let (components, attachments) = message.into_parts();
             let edit_attachments = Self::outgoing_attachments(attachments)
                 .into_iter().fold(EditAttachments::new(), |acc, file| acc.add(file));
             let payload = EditInteractionResponse::new()
@@ -147,7 +147,7 @@ impl<D: Clone + Send + Sync + 'static> Ctx<D> {
     pub fn followup(&self, message: RenderedMessage) -> BoxFuture<'_, anyhow::Result<()>> {
         Box::pin(async move {
             let (_, token) = self.credentials()?;
-            let (components, attachments, _) = message.into_parts();
+            let (components, attachments) = message.into_parts();
             let mut payload = CreateInteractionResponseFollowup::new()
                 .components(components)
                 .flags(serenity::all::MessageFlags::IS_COMPONENTS_V2);
