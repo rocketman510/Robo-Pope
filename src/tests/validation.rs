@@ -1,6 +1,5 @@
 use crate::page::component::Component;
 use crate::page::render::validate_component;
-use crate::app::RenderCtx;
 use crate::page::{Container, MediaGallery, Page, Section, Text};
 use super::support::app;
 
@@ -18,11 +17,10 @@ fn static_text_over_the_limit_is_rejected_during_registration() {
 async fn dynamic_text_over_the_limit_is_rejected_after_resolution() {
     // FIRST: the definition can register when its value is not yet known, but
     // the resolved value must be validated before a message is returned.
-    use std::sync::Arc;
     let app = app();
     let page = Page::<()>::new("dynamic-text-too-long")
         .add_text(
-            |_ctx: RenderCtx, _data: Arc<()>| async move {
+            |_ctx, _data| async move {
                 Ok("x".repeat(4_001))
             },
         )
