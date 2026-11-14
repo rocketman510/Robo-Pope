@@ -1,6 +1,6 @@
 //! String Select options and their typed execution payload.
 use std::future::Future;
-use crate::app::{Ctx, Result};
+use crate::app::{Ctx, Database, Result};
 use crate::page::execution::Execution;
 use crate::page::value::{IntoValue,Value};
 
@@ -68,7 +68,7 @@ impl<T> StringSelect<T> {
         callback:F,
     )->Self
     where
-        F:Fn(Ctx,T,Vec<String>)->Fut+Send+Sync+'static,
+        F:Fn(Ctx<Database>,T,Vec<String>)->Fut+Send+Sync+'static,
         Fut:Future<Output=Result<()>>+Send+'static,
         T:Send+'static,{
         let id = id.into();

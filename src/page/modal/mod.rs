@@ -19,7 +19,7 @@ use serenity::builder::{
 use serenity::all::InputTextStyle as SerenityInputTextStyle;
 use crate::app::store::{derive_custom_id, DefinitionKind, StoreRecord};
 use serde::{Serialize, de::DeserializeOwned};
-use crate::app::{App, Ctx, Result};
+use crate::app::{App, Ctx, Database, Result};
 use crate::page::execution::Execution;
 use crate::page::value::{IntoValue, Value};
 
@@ -236,7 +236,7 @@ impl<T> Modal<T> {
     /// Sets the raw submission callback.
     pub fn on_submit<F, Fut>(mut self, callback: F) -> Self
     where
-        F: Fn(Ctx, T, ModalSubmission) -> Fut + Send + Sync + 'static,
+        F: Fn(Ctx<Database>, T, ModalSubmission) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,
         T: Send + 'static,
     {
@@ -248,7 +248,7 @@ impl<T> Modal<T> {
     pub fn on_submit_typed<S, F, Fut>(mut self, callback: F) -> Self
     where
         S: DeserializeOwned + Send + 'static,
-        F: Fn(Ctx, T, S) -> Fut + Send + Sync + 'static,
+        F: Fn(Ctx<Database>, T, S) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,
         T: Send + 'static,
     {

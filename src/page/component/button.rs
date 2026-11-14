@@ -1,6 +1,6 @@
 //! Interactive Button with display properties and an explicit execution.
 use std::future::Future;
-use crate::app::{Ctx, Result};
+use crate::app::{Ctx, Database, Result};
 use crate::page::execution::Execution;
 use crate::page::value::{IntoValue, Value};
 
@@ -48,7 +48,7 @@ impl<T> Button<T> {
         S: IntoValue<ButtonStyle, T>,
         E: IntoValue<Option<String>, T>,
         B: IntoValue<bool, T>,
-        F: Fn(Ctx, T) -> Fut + Send + Sync + 'static,
+        F: Fn(Ctx<Database>, T) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,
         T: Send + 'static,
     {

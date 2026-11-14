@@ -28,7 +28,7 @@ pub struct Ctx<D = Arc<()>> {
     pub selection: Option<Selection>,
     acknowledged: Arc<AtomicBool>,
 }
-impl<D> Ctx<D> {
+impl<D: Sync> Ctx<D> {
     pub(crate) fn new(
         app: App<D>,
         interaction: Arc<Interaction>,

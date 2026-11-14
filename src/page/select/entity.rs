@@ -1,6 +1,6 @@
 //! Typed User, Role, Mentionable, and Channel select menu definitions.
 use std::future::Future;
-use crate::app::{Ctx,Result};
+use crate::app::{Ctx,Database,Result};
 use crate::page::execution::{Execution,SelectedChannel,SelectedMentionable,SelectedRole,SelectedUser};
 use crate::page::value::{IntoValue,Value};
 
@@ -28,7 +28,7 @@ impl<T,S> EntitySelect<T,S> {
     /// Creates an entity-select menu with a callback receiving selected entities.
     pub fn new<F,Fut>(id:impl Into<String>,callback:F)->Self
     where
-        F:Fn(Ctx,T,Vec<S>)->Fut+Send+Sync+'static,
+        F:Fn(Ctx<Database>,T,Vec<S>)->Fut+Send+Sync+'static,
         Fut:Future<Output=Result<()>>+Send+'static,
         T:Send+'static,S:Send+'static
     {
