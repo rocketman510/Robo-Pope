@@ -129,7 +129,7 @@ async fn failed_modal_render_does_not_leave_a_persisted_submit_record() {
         .register(&app).unwrap();
     assert!(modal.render(&app, TestData::default()).await.is_err());
     let data = serde_json::to_vec(&TestData::default()).unwrap();
-    let id = derive_custom_id("modal-no-orphan", "submit", &data, None).unwrap();
+    let id = derive_custom_id("modal-no-orphan", "submit", &data).unwrap();
     assert!(app.store().resolve(&id).await.unwrap().is_none());
 }
 
