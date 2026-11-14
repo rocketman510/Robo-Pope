@@ -11,29 +11,30 @@ pub mod separator;
 pub mod text;
 pub mod thumbnail;
 
-pub use button::{Button,ButtonStyle};
-pub use button_row::{ButtonRow,ButtonSlot,ButtonSlots};
-pub use container::{Container,ContainerItem};
+pub use button::{Button, ButtonStyle};
+pub use button_row::{ButtonRow, ButtonSlot, ButtonSlots};
+pub use container::{Container, ContainerItem};
 pub use file::File;
 pub use link_button::LinkButton;
-pub use media_gallery::{IntoMediaItem,MediaGallery,MediaItem};
-pub use section::{Section,SectionAccessory};
-pub use separator::{Separator,SeparatorSpacing};
+pub use media_gallery::{IntoMediaItem, MediaGallery, MediaItem};
+pub use section::{Section, SectionAccessory};
+pub use separator::{Separator, SeparatorSpacing};
 pub use text::Text;
 pub use thumbnail::Thumbnail;
 
 use crate::page::select::SelectMenu;
+
 /// Internal heterogeneous component tree shared by Page and Frame definitions.
 /// Thumbnail is deliberately excluded because it can only appear as a Section accessory.
-pub enum Component<T> {
-    Text(Text<T>),
-    Section(Section<T>),
-    Container(Container<T>),
-    Separator(Separator<T>),
-    MediaGallery(MediaGallery<T>),
+pub enum Component<T, D = std::sync::Arc<()>> {
+    Text(Text<T, D>),
+    Section(Section<T, D>),
+    Container(Container<T, D>),
+    Separator(Separator<T, D>),
+    MediaGallery(MediaGallery<T, D>),
     File(File),
-    Button(Button<T>),
-    LinkButton(LinkButton<T>),
-    Select(SelectMenu<T>),
-    ButtonRow(ButtonRow<T>),
+    Button(Button<T, D>),
+    LinkButton(LinkButton<T, D>),
+    Select(SelectMenu<T, D>),
+    ButtonRow(ButtonRow<T, D>),
 }
