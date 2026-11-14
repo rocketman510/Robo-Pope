@@ -12,7 +12,7 @@ async fn link_button_label_url_emoji_and_disabled_state_resolve_dynamically() {
     let page = Page::<TestData>::new("dynamic-link-properties")
         .add_button_row((
             LinkButton::new(
-                |_ctx, data| async move {
+                |_ctx: crate::app::RenderCtx<Arc<()>>, data: Arc<TestData>| async move {
                     Ok(format!("{} docs", data.label))
                 },
                 |_ctx, _data| async move {
@@ -80,7 +80,7 @@ async fn dynamic_container_color_separator_thumbnail_and_gallery_properties_reso
                         },
                     )
                     .set_description(
-                        |_ctx, data| async move {
+                        |_ctx: crate::app::RenderCtx<Arc<()>>, data: Arc<TestData>| async move {
                             Ok(format!("{} thumbnail", data.label))
                         },
                     )
@@ -99,7 +99,7 @@ async fn dynamic_container_color_separator_thumbnail_and_gallery_properties_reso
                     },
                 )
                 .set_description(
-                    |_ctx, data| async move {
+                    |_ctx: crate::app::RenderCtx<Arc<()>>, data: Arc<TestData>| async move {
                         Ok(format!("{} gallery image", data.label))
                     },
                 )
