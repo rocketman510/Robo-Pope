@@ -236,6 +236,7 @@ impl<T, D> Modal<T, D> {
     /// Sets the raw submission callback.
     pub fn on_submit<F, Fut>(mut self, callback: F) -> Self
     where
+        D: Send + Sync + 'static,
         F: Fn(Ctx<D>, T, ModalSubmission) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,
         T: Send + 'static,
@@ -247,6 +248,7 @@ impl<T, D> Modal<T, D> {
     /// Sets a typed submission callback, deserializing submitted fields through Serde.
     pub fn on_submit_typed<S, F, Fut>(mut self, callback: F) -> Self
     where
+        D: Send + Sync + 'static,
         S: DeserializeOwned + Send + 'static,
         F: Fn(Ctx<D>, T, S) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,
