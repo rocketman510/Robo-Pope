@@ -1,7 +1,60 @@
 use crate::page::component::Component;
 use crate::page::render::validate_component;
+use crate::app::RenderCtx;
 use crate::page::{Container, MediaGallery, Page, Section, Text};
 use super::support::app;
+
+#[test]
+fn static_text_over_the_limit_is_rejected_during_registration() {
+    // FIRST: a static violation is known before rendering and should be rejected
+    // while the Page definition is registered.
+    let app = app();
+    let page = Page::<()>::new("static-text-too-long")
+        .add_text("x".repeat(4_001));
+    assert!(page.register(&app).is_err());
+}
+
+#[tokio::test]
+async fn dynamic_text_over_the_limit_is_rejected_after_resolution() {
+    // FIRST: the definition can register when its value is not yet known, but
+    // the resolved value must be validated before a message is returned.
+    use std::sync::Arc;
+    let app = app();
+    let page = Page::<()>::new("dynamic-text-too-long")
+        .add_text(
+            |_ctx: RenderCtx, _data: Arc<()>| async move {
+                Ok("x".repeat(4_001))
+            },
+        )
+        .register(&app)
+        .unwrap();
+
+    assert!(page.render(&app, ()).await.is_err());
+}
+
+#[tokio::test]
+async fn forty_message_components_are_allowed() {
+    // FIRST: the exact Discord message component limit is valid.
+    let app = app();
+    let mut page = Page::<()>::new("forty-components");
+    for _ in 0..40 {
+        page = page.add_text("x");
+    }
+    let registered = page.register(&app).unwrap();
+    let rendered = registered.render(&app, ()).await.unwrap();
+    assert_eq!(rendered.components().len(), 40);
+}
+
+#[test]
+fn forty_one_static_message_components_are_rejected_at_registration() {
+    // FIRST: the message-wide component limit is a static structural violation.
+    let app = app();
+    let mut page = Page::<()>::new("forty-one-components");
+    for _ in 0..41 {
+        page = page.add_text("x");
+    }
+    assert!(page.register(&app).is_err());
+}
 
 #[test]
 fn validator_accepts_a_text_display_at_the_character_limit() {
