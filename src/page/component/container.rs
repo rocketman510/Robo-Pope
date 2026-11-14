@@ -1,5 +1,4 @@
 //! Container with ordered children, optional dynamic accent, spoiler, and Frames.
-use crate::page::frame::Frame;
 use crate::page::select::SelectMenu;
 use crate::page::value::{IntoValue, Value};
 use super::{Button, ButtonRow, ButtonSlot, Component, File, LinkButton, MediaGallery,
@@ -8,7 +7,6 @@ use super::{Button, ButtonRow, ButtonSlot, Component, File, LinkButton, MediaGal
 /// An ordered Container child, either a component or a dynamically expanded Frame.
 pub enum ContainerItem<T, D = std::sync::Arc<()>> {
     Component(Component<T, D>),
-    Frame(Frame<T, D>),
 }
 
 /// Discord Container. Children remain in insertion order, including Frame entries.
@@ -101,9 +99,4 @@ impl<T, D> Container<T, D> {
         self
     }
 
-    /// Appends a Frame that expands in place while preserving child order.
-    pub fn add_frame(mut self, value: Frame<T, D>) -> Self {
-        self.children.push(ContainerItem::Frame(value));
-        self
-    }
 }
