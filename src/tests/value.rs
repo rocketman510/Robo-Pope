@@ -109,6 +109,7 @@ async fn fixed_section_slots_accept_direct_async_closures() {
             None, None,
         ).set_accessory(crate::page::Button::new(
             "Open", "section-open", crate::page::ButtonStyle::Primary,
+            Some("🔍".into()), false,
             |_ctx, _data: TestData| async move { Ok(()) },
         ))).register(&app).unwrap();
     let rendered = page.render(&app, TestData::default()).await.unwrap();
@@ -123,12 +124,14 @@ async fn button_labels_and_styles_accept_direct_async_closures() {
     use std::sync::Arc;
     let app = app();
     let page = Page::<TestData>::new("direct-button-properties")
-        .add_button(Button::new(
+        .add_button_row((Button::new(
             |_ctx: RenderCtx, data: Arc<TestData>| async move { Ok(format!("Hello {}", data.label)) },
             "dynamic-button",
             |_ctx: RenderCtx, _data: Arc<TestData>| async move { Ok(ButtonStyle::Success) },
+            |_ctx: RenderCtx, _data: Arc<TestData>| async move { Ok(Some("✨".into())) },
+            |_ctx: RenderCtx, _data: Arc<TestData>| async move { Ok(false) },
             |_ctx, _data: TestData| async move { Ok(()) },
-        )).register(&app).unwrap();
+        ), None, None, None, None)).register(&app).unwrap();
     let rendered = page.render(&app, TestData::default()).await.unwrap();
     let json = serde_json::to_value(rendered.into_components()).unwrap();
     assert!(json.to_string().contains("Hello sample"));
