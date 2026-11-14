@@ -1,6 +1,3 @@
-use std::sync::Arc;
-
-use crate::app::RenderCtx;
 use crate::page::{
     Button, ButtonStyle, Container, LinkButton, MediaGallery, MediaItem, Page,
     Section, SelectOption, Separator, SeparatorSpacing, StringSelect, Thumbnail,
@@ -15,16 +12,16 @@ async fn link_button_label_url_emoji_and_disabled_state_resolve_dynamically() {
     let page = Page::<TestData>::new("dynamic-link-properties")
         .add_button_row((
             LinkButton::new(
-                |_ctx: RenderCtx, data: Arc<TestData>| async move {
+                |_ctx, data| async move {
                     Ok(format!("{} docs", data.label))
                 },
-                |_ctx: RenderCtx, _data: Arc<TestData>| async move {
+                |_ctx, _data| async move {
                     Ok("https://example.test/dynamic".to_owned())
                 },
-                |_ctx: RenderCtx, _data: Arc<TestData>| async move {
+                |_ctx, _data| async move {
                     Ok(Some("🌐".to_owned()))
                 },
-                |_ctx: RenderCtx, _data: Arc<TestData>| async move {
+                |_ctx, _data| async move {
                     Ok(true)
                 },
             ),
@@ -54,7 +51,7 @@ async fn dynamic_container_color_separator_thumbnail_and_gallery_properties_reso
         .add_container(
             Container::new()
                 .set_accent_color(
-                    |_ctx: RenderCtx, _data: Arc<TestData>| async move {
+                    |_ctx, _data| async move {
                         Ok(0x345678_u32)
                     },
                 )
@@ -63,12 +60,12 @@ async fn dynamic_container_color_separator_thumbnail_and_gallery_properties_reso
         .add_separator(
             Separator::new()
                 .set_spacing(
-                    |_ctx: RenderCtx, _data: Arc<TestData>| async move {
+                    |_ctx, _data| async move {
                         Ok(SeparatorSpacing::Large)
                     },
                 )
                 .set_divider(
-                    |_ctx: RenderCtx, _data: Arc<TestData>| async move {
+                    |_ctx, _data| async move {
                         Ok(false)
                     },
                 )
@@ -78,17 +75,17 @@ async fn dynamic_container_color_separator_thumbnail_and_gallery_properties_reso
                 .set_text("Preview", None, None)
                 .set_accessory(
                     Thumbnail::new(
-                        |_ctx: RenderCtx, _data: Arc<TestData>| async move {
+                        |_ctx, _data| async move {
                             Ok("https://example.test/dynamic-thumbnail.png".to_owned())
                         },
                     )
                     .set_description(
-                        |_ctx: RenderCtx, data: Arc<TestData>| async move {
+                        |_ctx, data| async move {
                             Ok(format!("{} thumbnail", data.label))
                         },
                     )
                     .set_spoiler(
-                        |_ctx: RenderCtx, _data: Arc<TestData>| async move {
+                        |_ctx, _data| async move {
                             Ok(true)
                         },
                     )
@@ -97,17 +94,17 @@ async fn dynamic_container_color_separator_thumbnail_and_gallery_properties_reso
         .add_gallery(
             MediaGallery::new().set_media([
                 MediaItem::new(
-                    |_ctx: RenderCtx, _data: Arc<TestData>| async move {
+                    |_ctx, _data| async move {
                         Ok("https://example.test/dynamic-gallery.png".to_owned())
                     },
                 )
                 .set_description(
-                    |_ctx: RenderCtx, data: Arc<TestData>| async move {
+                    |_ctx, data| async move {
                         Ok(format!("{} gallery image", data.label))
                     },
                 )
                 .set_spoiler(
-                    |_ctx: RenderCtx, _data: Arc<TestData>| async move {
+                    |_ctx, _data| async move {
                         Ok(true)
                     },
                 ),
@@ -136,24 +133,24 @@ async fn string_select_placeholder_option_label_and_description_resolve_dynamica
     let page = Page::<TestData>::new("dynamic-select-properties")
         .add_selection_menu(
             StringSelect::new(
-                |_ctx: RenderCtx, data: Arc<TestData>| async move {
+                |_ctx, data| async move {
                     Ok(format!("Choose for {}", data.label))
                 },
                 "choose",
                 [
                     SelectOption::new(
-                        |_ctx: RenderCtx, data: Arc<TestData>| async move {
+                        |_ctx, data| async move {
                             Ok(format!("Option {}", data.count))
                         },
                         "option-value",
                     )
                     .set_description(
-                        |_ctx: RenderCtx, data: Arc<TestData>| async move {
+                        |_ctx, data| async move {
                             Ok(format!("Description {}", data.label))
                         },
                     )
                     .set_emoji(
-                        |_ctx: RenderCtx, _data: Arc<TestData>| async move {
+                        |_ctx, _data| async move {
                             Ok(Some("✨".to_owned()))
                         },
                     ),
