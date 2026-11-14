@@ -19,27 +19,27 @@ use serenity::builder::{
 use serenity::all::InputTextStyle as SerenityInputTextStyle;
 use crate::app::store::{derive_custom_id, DefinitionKind, StoreRecord};
 use serde::{Serialize, de::DeserializeOwned};
-use crate::app::{App, Ctx, Database, Result};
+use crate::app::{App, Ctx, Result};
 use crate::page::execution::Execution;
 use crate::page::value::{IntoValue, Value};
 
 /// Mutable builder for a Discord Modal form.
-pub struct Modal<T> {
+pub struct Modal<T, D = Arc<()>> {
     pub(crate) id: String,
     pub(crate) title: String,
-    pub(crate) inputs: Vec<ModalInput<T>>,
-    pub(crate) submit: Option<Execution<T, ModalSubmission>>,
+    pub(crate) inputs: Vec<ModalInput<T, D>>,
+    pub(crate) submit: Option<Execution<T, ModalSubmission, D>>,
 }
 /// Immutable Modal definition retained by the App after registration.
-pub struct ModalDefinition<T> {
+pub struct ModalDefinition<T, D = Arc<()>> {
     pub(crate) id: String,
     pub(crate) title: String,
-    pub(crate) inputs: Vec<ModalInput<T>>,
-    pub(crate) submit: Execution<T, ModalSubmission>,
+    pub(crate) inputs: Vec<ModalInput<T, D>>,
+    pub(crate) submit: Execution<T, ModalSubmission, D>,
 }
 /// Registered immutable Modal handle.
-pub struct RegisteredModal<T> {
-    pub(crate) definition: Arc<ModalDefinition<T>>,
+pub struct RegisteredModal<T, D = Arc<()>> {
+    pub(crate) definition: Arc<ModalDefinition<T, D>>,
 }
 /// Modal response payload ready to be sent as an interaction response.
 pub struct ModalRender {
@@ -76,8 +76,8 @@ fn validate_description(value: &str, definition_id: &str, input_id: &str) -> any
     Ok(())
 }
 
-fn validate_static_options<T>(
-    options: &[ModalOption<T>],
+fn validate_static_options<T, D>(
+    options: &[ModalOption<T, D>],
     definition_id: &str,
     input_id: &str,
 ) -> anyhow::Result<()> {
@@ -114,14 +114,14 @@ fn validate_static_options<T>(
     Ok(())
 }
 
-fn static_label<T>(label: &Value<String, T>, definition_id: &str, input_id: &str) -> anyhow::Result<()> {
+fn static_label<T, D>(label: &Value<String, T, D>, definition_id: &str, input_id: &str) -> anyhow::Result<()> {
     if let Value::Static(label) = label {
         validate_label(label, definition_id, input_id)?;
     }
     Ok(())
 }
 
-impl<T> Modal<T> {
+impl<T, D> Modal<T, D> {
     /// Starts a Modal definition with a globally unique ID.
     pub fn new(id: impl Into<String>) -> Self {
         Self { id: id.into(), title: String::new(), inputs: Vec::new(), submit: None }
@@ -134,7 +134,7 @@ impl<T> Modal<T> {
     }
 
     /// Appends one supported input definition.
-    pub fn add_input(mut self, value: ModalInput<T>) -> Self {
+    pub fn add_input(mut self, value: ModalInput<T, D>) -> Self {
         self.inputs.push(value);
         self
     }
@@ -143,7 +143,7 @@ impl<T> Modal<T> {
     pub fn add_text_input(
         self,
         id: impl Into<String>,
-        label: impl IntoValue<String, T>,
+        label: impl IntoValue<String, T, D>,
         style: TextInputStyle,
     ) -> Self {
         let mut modal = self;
@@ -163,8 +163,8 @@ impl<T> Modal<T> {
     pub fn add_select(
         self,
         id: impl Into<String>,
-        label: impl IntoValue<String, T>,
-        options: impl IntoIterator<Item = ModalOption<T>>,
+        label: impl IntoValue<String, T, D>,
+        options: impl IntoIterator<Item = ModalOption<T, D>>,
     ) -> Self {
         let mut modal = self;
         modal.inputs.push(ModalInput::StringSelect(ModalSelectInput {
@@ -176,7 +176,7 @@ impl<T> Modal<T> {
     }
 
     /// Appends a single Checkbox input.
-    pub fn add_checkbox(self, id: impl Into<String>, label: impl IntoValue<String, T>) -> Self {
+    pub fn add_checkbox(self, id: impl Into<String>, label: impl IntoValue<String, T, D>) -> Self {
         let mut modal = self;
         modal.inputs.push(ModalInput::Checkbox(CheckboxInput {
             id: id.into(),
@@ -190,8 +190,8 @@ impl<T> Modal<T> {
     pub fn add_checkbox_group(
         self,
         id: impl Into<String>,
-        label: impl IntoValue<String, T>,
-        options: impl IntoIterator<Item = ModalOption<T>>,
+        label: impl IntoValue<String, T, D>,
+        options: impl IntoIterator<Item = ModalOption<T, D>>,
     ) -> Self {
         let mut modal = self;
         modal.inputs.push(ModalInput::CheckboxGroup(CheckboxGroupInput {
@@ -206,8 +206,8 @@ impl<T> Modal<T> {
     pub fn add_radio_group(
         self,
         id: impl Into<String>,
-        label: impl IntoValue<String, T>,
-        options: impl IntoIterator<Item = ModalOption<T>>,
+        label: impl IntoValue<String, T, D>,
+        options: impl IntoIterator<Item = ModalOption<T, D>>,
     ) -> Self {
         let mut modal = self;
         modal.inputs.push(ModalInput::RadioGroup(RadioGroupInput {
@@ -222,7 +222,7 @@ impl<T> Modal<T> {
     pub fn add_file_upload(
         self,
         id: impl Into<String>,
-        label: impl IntoValue<String, T>,
+        label: impl IntoValue<String, T, D>,
     ) -> Self {
         let mut modal = self;
         modal.inputs.push(ModalInput::FileUpload(FileUploadInput {
@@ -236,11 +236,11 @@ impl<T> Modal<T> {
     /// Sets the raw submission callback.
     pub fn on_submit<F, Fut>(mut self, callback: F) -> Self
     where
-        F: Fn(Ctx<Database>, T, ModalSubmission) -> Fut + Send + Sync + 'static,
+        F: Fn(Ctx<D>, T, ModalSubmission) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,
         T: Send + 'static,
     {
-        self.submit = Some(Execution::with_input("submit", callback));
+        self.submit = Some(Execution::<T, ModalSubmission, D>::with_input("submit", callback));
         self
     }
 
@@ -248,12 +248,12 @@ impl<T> Modal<T> {
     pub fn on_submit_typed<S, F, Fut>(mut self, callback: F) -> Self
     where
         S: DeserializeOwned + Send + 'static,
-        F: Fn(Ctx<Database>, T, S) -> Fut + Send + Sync + 'static,
+        F: Fn(Ctx<D>, T, S) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,
         T: Send + 'static,
     {
         let callback = Arc::new(callback);
-        self.submit = Some(Execution::with_input(
+        self.submit = Some(Execution::<T, ModalSubmission, D>::with_input(
             "submit",
             move |ctx, data, submission: ModalSubmission| {
                 let callback = Arc::clone(&callback);
@@ -267,12 +267,11 @@ impl<T> Modal<T> {
     }
 
     /// Validates and registers this Modal definition.
-    pub fn register<D>(self, app: &App<D>) -> Result<RegisteredModal<T>>
+    pub fn register(self, app: &App<D>) -> Result<RegisteredModal<T, D>>
     where
-        D: Clone + std::any::Any + Send + Sync + 'static,
+        D: Clone + Send + Sync + 'static,
         T: Serialize + DeserializeOwned + Send + Sync + 'static,
     {
-        let app = app.erased();
         anyhow::ensure!(!self.id.trim().is_empty(), "Modal ID must not be empty");
         anyhow::ensure!(!self.title.trim().is_empty(), "Modal title must not be empty");
         anyhow::ensure!(
@@ -352,7 +351,7 @@ impl<T> Modal<T> {
     }
 }
 
-impl<T> RegisteredModal<T>
+impl<T, D> RegisteredModal<T, D>
 where
     T: Serialize + DeserializeOwned + Send + Sync + 'static,
 {
@@ -360,11 +359,10 @@ where
     ///
     /// Store insertion is intentionally the final step. A failed dynamic value or
     /// invalid resolved component cannot leave an orphaned custom-ID record.
-    pub async fn render<D>(&self, app: &App<D>, data: T) -> Result<ModalRender>
+    pub async fn render(&self, app: &App<D>, data: T) -> Result<ModalRender>
     where
         D: Clone + std::any::Any + Send + Sync + 'static,
     {
-        let app = app.erased();
         use self::input::ModalInput as I;
 
         let serialized_data = serde_json::to_vec(&data)
