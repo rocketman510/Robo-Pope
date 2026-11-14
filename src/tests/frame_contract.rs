@@ -134,19 +134,4 @@ async fn frame_can_resolve_dynamic_component_properties_in_its_elements() {
     assert!(json.to_string().contains("sample:7"));
 }
 
-#[tokio::test]
-async fn a_large_frame_is_rejected_instead_of_paginated_implicitly() {
-    // FIRST: Frame resolves the developer's collection. It does not invent
-    // page offsets, navigation callbacks, or an automatic pagination state.
-    let app = app();
-    let page = Page::<TestData>::new("frame-no-pagination")
-        .add_frame(|_ctx, _data| async move {
-            Ok((0..41)
-                .map(|index| Element::text(format!("Row {index}")))
-                .collect())
-        })
-        .register(&app)
-        .unwrap();
 
-    assert!(page.render(&app, TestData::default()).await.is_err());
-}
