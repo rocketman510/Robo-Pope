@@ -74,7 +74,7 @@ async fn string_select_renders_placeholder_min_max_and_dynamic_option_properties
                         "member",
                     )
                     .set_description(
-                        |_ctx, data| async move {
+                        |_ctx: crate::app::RenderCtx<std::sync::Arc<()>>, data: std::sync::Arc<TestData>| async move {
                             Ok(format!("Level {}", data.count))
                         },
                     ),
