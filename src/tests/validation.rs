@@ -1,6 +1,6 @@
 use crate::page::component::Component;
 use crate::page::render::validate_component;
-use crate::page::{Button, ButtonStyle, Container, MediaGallery, Page, Section, Text};
+use crate::page::{Container, MediaGallery, Page, Section, Text};
 use super::support::app;
 
 #[test]
