@@ -191,7 +191,21 @@ A fully populated row is:
 ))
 ```
 
-Each row slot uses a small ButtonSlot conversion type. Button converts directly into ButtonSlot, and LinkButton converts directly into ButtonSlot. None is also accepted and represents an empty position. The fixed tuple therefore accepts Button, LinkButton, or None without requiring Some(...) around present values. This conversion is explicit in the public API contract and keeps the call site simple.
+Each row slot uses a small ButtonSlot conversion type. Button converts directly into ButtonSlot, LinkButton converts directly into ButtonSlot, and None converts into an empty slot. A conceptual definition is:
+
+~~~rust
+enum ButtonSlot {
+    Button(Button),
+    Link(LinkButton),
+    Empty,
+}
+
+impl From<Button> for ButtonSlot { /* Button variant */ }
+impl From<LinkButton> for ButtonSlot { /* Link variant */ }
+impl From<Option<ButtonSlot>> for ButtonSlot { /* None becomes Empty */ }
+~~~
+
+The five tuple arguments are each accepted through Into<ButtonSlot>. The tuple therefore accepts Button, LinkButton, or None without requiring Some(...) around present values. This conversion is explicit in the public API contract and keeps the call site simple.
 
 This is deliberate. The public examples and method signatures must consistently use direct Button values and None; they must not alternate between direct values and explicit Some(...) wrappers.
 
@@ -385,7 +399,7 @@ A dynamic-property example is:
 ```rust
 Button::new(
     |ctx, data| async move {
-        Ok(format!("Level {}", data.level))
+        Ok(format!("User {}", data.user_id))
     },
     "ShowLevel",
     |ctx, data| async move {
@@ -928,7 +942,7 @@ Pagination is deliberately not part of the Frame API defined here. It should be 
 The following example shows the intended composition style. Button arguments are complete: label, static execution ID, style, optional emoji, disabled Boolean, and callback. Button-row slots use direct Button values and None, without wrapping Buttons in Some.
 
 ```rust
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct UserListData {
     pub guild_id: String,
 }
@@ -967,18 +981,23 @@ let page = Page::<UserListData>::new("UserList")
             Some("🔄".into()),
             false,
             |ctx, data: UserListData| async move {
-                ctx.reply("Refreshing the user directory.").await?;
+                let updated = ctx.app.pages
+                    .query("UserList")?
+                    .render(&ctx.app, (*data).clone())
+                    .await?;
+
+                ctx.edit_message(updated).await?;
                 Ok(())
             },
         ),
         Button::new(
-            "Close",
-            "CloseUsers",
-            ButtonStyle::Danger,
+            "More Info",
+            "MoreInfo",
+            ButtonStyle::Secondary,
             None,
             false,
             |ctx, data: UserListData| async move {
-                ctx.delete_response().await?;
+                ctx.reply("This is the user directory.").await?;
                 Ok(())
             },
         ),
