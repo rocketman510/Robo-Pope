@@ -6,14 +6,14 @@ use crate::page::value::{IntoValue,Value};
 pub enum TextInputStyle { Short,Paragraph }
 
 /// One Modal select/group option, with a display label and submitted value.
-pub struct ModalOption<T> {
-    pub label:Value<String,T>,
+pub struct ModalOption<T, D = std::sync::Arc<()>> {
+    pub label:Value<String,T,D>,
     pub value:String,
-    pub description:Option<Value<String,T>>,
+    pub description:Option<Value<String,T,D>>,
 }
-impl<T> ModalOption<T> {
+impl<T, D> ModalOption<T, D> {
     /// Creates an option whose submitted value is independent of its display label.
-    pub fn new<L:IntoValue<String,T>>(label:L,value:impl Into<String>)->Self {
+    pub fn new<L:IntoValue<String,T,D>>(label:L,value:impl Into<String>)->Self {
         Self {
             label: label.into_value(),
             value: value.into(),
@@ -21,40 +21,40 @@ impl<T> ModalOption<T> {
         }
     }
     /// Sets an optional static or dynamic description.
-    pub fn set_description<V:IntoValue<String,T>>(mut self,value:V)->Self {
+    pub fn set_description<V:IntoValue<String,T,D>>(mut self,value:V)->Self {
         self.description=Some(value.into_value()); self
     }
 }
 
 /// Text Input definition with a stable field ID and Discord length constraints.
-pub struct TextInput<T> {
-    pub id:String,pub label:Value<String,T>,pub style:TextInputStyle,
-    pub required:bool,pub placeholder:Option<Value<String,T>>,
+pub struct TextInput<T, D = std::sync::Arc<()>> {
+    pub id:String,pub label:Value<String,T,D>,pub style:TextInputStyle,
+    pub required:bool,pub placeholder:Option<Value<String,T,D>>,
     pub min_length:Option<u16>,pub max_length:Option<u16>,
 }
 /// Select-style Modal input and its available options.
-pub struct ModalSelectInput<T> {
-    pub id:String,pub label:Value<String,T>,pub options:Vec<ModalOption<T>>,
+pub struct ModalSelectInput<T, D = std::sync::Arc<()>> {
+    pub id:String,pub label:Value<String,T,D>,pub options:Vec<ModalOption<T,D>>,
 }
 /// Single Checkbox input definition.
-pub struct CheckboxInput<T> { pub id:String,pub label:Value<String,T>,pub default:bool }
+pub struct CheckboxInput<T, D = std::sync::Arc<()>> { pub id:String,pub label:Value<String,T,D>,pub default:bool }
 /// Checkbox Group input definition.
-pub struct CheckboxGroupInput<T> { pub id:String,pub label:Value<String,T>,pub options:Vec<ModalOption<T>> }
+pub struct CheckboxGroupInput<T, D = std::sync::Arc<()>> { pub id:String,pub label:Value<String,T,D>,pub options:Vec<ModalOption<T,D>> }
 /// Radio Group input definition.
-pub struct RadioGroupInput<T> { pub id:String,pub label:Value<String,T>,pub options:Vec<ModalOption<T>> }
+pub struct RadioGroupInput<T, D = std::sync::Arc<()>> { pub id:String,pub label:Value<String,T,D>,pub options:Vec<ModalOption<T,D>> }
 /// File Upload input definition. Submitted values are attachment references.
-pub struct FileUploadInput<T> { pub id:String,pub label:Value<String,T>,pub required:bool }
+pub struct FileUploadInput<T, D = std::sync::Arc<()>> { pub id:String,pub label:Value<String,T,D>,pub required:bool }
 
 /// Supported Modal input definitions. Discord Label wrappers are added by rendering.
-pub enum ModalInput<T> {
-    Text(TextInput<T>),
-    StringSelect(ModalSelectInput<T>),
-    UserSelect(ModalSelectInput<T>),
-    RoleSelect(ModalSelectInput<T>),
-    MentionableSelect(ModalSelectInput<T>),
-    ChannelSelect(ModalSelectInput<T>),
-    FileUpload(FileUploadInput<T>),
-    RadioGroup(RadioGroupInput<T>),
-    CheckboxGroup(CheckboxGroupInput<T>),
-    Checkbox(CheckboxInput<T>),
+pub enum ModalInput<T, D = std::sync::Arc<()>> {
+    Text(TextInput<T,D>),
+    StringSelect(ModalSelectInput<T,D>),
+    UserSelect(ModalSelectInput<T,D>),
+    RoleSelect(ModalSelectInput<T,D>),
+    MentionableSelect(ModalSelectInput<T,D>),
+    ChannelSelect(ModalSelectInput<T,D>),
+    FileUpload(FileUploadInput<T,D>),
+    RadioGroup(RadioGroupInput<T,D>),
+    CheckboxGroup(CheckboxGroupInput<T,D>),
+    Checkbox(CheckboxInput<T,D>),
 }
