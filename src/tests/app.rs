@@ -83,6 +83,37 @@ fn registry_reports_unknown_ids_as_errors() {
     assert!(registry.query::<TestData>("missing").is_err());
 }
 
+#[tokio::test]
+async fn registered_page_and_modal_can_be_queried_then_rendered_through_app() {
+    // FIRST: the documented App registry query path works as a complete flow,
+    // not only as an isolated registry lookup.
+    use crate::page::{Modal, ModalSubmission, Page, TextInputStyle};
+
+    let app = app();
+
+    Page::<TestData>::new("query-page")
+        .add_text("Queried Page")
+        .register(&app)
+        .unwrap();
+
+    let page = app.pages.query::<TestData>("query-page").unwrap();
+    let rendered_page = page.render(&app, TestData::default()).await.unwrap();
+    let page_json = serde_json::to_value(rendered_page.into_components()).unwrap().to_string();
+    assert!(page_json.contains("Queried Page"));
+
+    Modal::<TestData>::new("query-modal")
+        .set_title("Queried Modal")
+        .add_text_input("username", "Username", TextInputStyle::Short)
+        .on_submit(|_ctx, _data, _submission: ModalSubmission| async move { Ok(()) })
+        .register(&app)
+        .unwrap();
+
+    let modal = app.modals.query::<TestData>("query-modal").unwrap();
+    let rendered_modal = modal.render(&app, TestData::default()).await.unwrap();
+    assert_eq!(rendered_modal.title, "Queried Modal");
+    assert_eq!(rendered_modal.components.len(), 1);
+}
+
 #[test]
 fn modal_registry_reports_unknown_definition_ids_as_errors() {
     // First-principles check: a missing Modal definition must be reported as a
