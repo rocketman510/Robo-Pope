@@ -1,78 +1,47 @@
 //! Rendered output is the framework/Serenity boundary.
 use std::sync::Arc;
 use serenity::builder::CreateComponent;
-use super::frame::pagination::PaginationState;
 
-/// One Serenity component produced by the render layer.
 #[derive(Clone)]
 pub struct RenderedComponent {
-    pub(crate) component:CreateComponent<'static>,
+    pub(crate) component: CreateComponent<'static>,
 }
-/// File bytes to attach to the outgoing Discord message.
-/// File components refer to attachments by filename; they do not contain the bytes.
+
 pub struct OutgoingAttachment {
-    pub filename:String,
-    pub bytes:Arc<Vec<u8>>,
+    pub filename: String,
+    pub bytes: Arc<Vec<u8>>,
 }
-/// Complete Components V2 message payload plus its attachments and pagination metadata.
+
+/// One complete Components V2 message and its outgoing attachments.
 pub struct RenderedMessage {
-    pub(crate) components:Vec<RenderedComponent>,
-    pub(crate) attachments:Vec<OutgoingAttachment>,
-    pub(crate) pagination:Option<PaginationState>,
-}
-/// All rendered message pages for one Page instance and its current position.
-pub struct RenderedPage {
-    pub pages:Vec<RenderedMessage>,
-    pub current_index:usize,
+    pub(crate) components: Vec<RenderedComponent>,
+    pub(crate) attachments: Vec<OutgoingAttachment>,
 }
 impl std::fmt::Debug for RenderedMessage {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter
-            .debug_struct("RenderedMessage")
+        formatter.debug_struct("RenderedMessage")
             .field("component_count", &self.components.len())
             .field("attachment_count", &self.attachments.len())
-            .field("pagination", &self.pagination)
             .finish()
     }
 }
-
 impl RenderedMessage {
-    /// Borrows the rendered component tree.
-    pub fn components(&self)->&[RenderedComponent] { &self.components }
-    /// Borrows outgoing attachment bytes and filenames.
-    pub fn attachments(&self)->&[OutgoingAttachment] { &self.attachments }
-    /// Returns pagination metadata when this message represents a paginated Frame.
-    pub fn pagination(&self)->Option<&PaginationState> { self.pagination.as_ref() }
-    /// Adds outgoing file bytes. A File component can reference the same filename.
-    pub fn add_attachment(mut self,filename:impl Into<String>,bytes:Vec<u8>)->Self {
-        self.attachments.push(OutgoingAttachment { filename:filename.into(),bytes:Arc::new(bytes) });
+    pub fn components(&self) -> &[RenderedComponent] { &self.components }
+    pub fn attachments(&self) -> &[OutgoingAttachment] { &self.attachments }
+    pub fn add_attachment(mut self, filename: impl Into<String>, bytes: Vec<u8>) -> Self {
+        self.attachments.push(OutgoingAttachment {
+            filename: filename.into(), bytes: Arc::new(bytes),
+        });
         self
     }
-    /// Consumes the rendered message without losing attachment or pagination data.
-    ///
-    /// The returned tuple contains Serenity components, the outgoing file
-    /// attachments, and the optional pagination metadata, in that order.
-    pub fn into_parts(
-        self,
-    ) -> (
-        Vec<CreateComponent<'static>>,
-        Vec<OutgoingAttachment>,
-        Option<PaginationState>,
-    ) {
-        let components = self.components
-            .into_iter()
-            .map(|component| component.component)
-            .collect();
-
-        (components, self.attachments, self.pagination)
+    /// Consumes the rendered message into Serenity components and attachments.
+    /// The empty trailing unit preserves compatibility with existing tuple destructuring.
+    pub fn into_parts(self) -> (Vec<CreateComponent<'static>>, Vec<OutgoingAttachment>, ()) {
+        let components = self.components.into_iter().map(|part| part.component).collect();
+        (components, self.attachments, ())
     }
-
-    /// Extracts only the Serenity components.
-    ///
-    /// This intentionally discards attachments and pagination metadata. Use
-    /// `into_parts` when the complete rendered payload must be sent or retained.
     pub fn into_components(self) -> Vec<CreateComponent<'static>> {
-        self.into_parts().0
+        self.components.into_iter().map(|part| part.component).collect()
     }
 }
 

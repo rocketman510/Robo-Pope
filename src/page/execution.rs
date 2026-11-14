@@ -6,7 +6,6 @@ use serde::de::DeserializeOwned;
 use crate::app::{App, BoxFuture, Ctx};
 use crate::app::executions::{ErasedCallback, ExecutionKey, InteractionPayload};
 use crate::page::ModalSubmission;
-use crate::page::frame::pagination::PaginationRequest;
 
 pub struct Execution<T, I = (), D = Arc<()>> {
     /// Stable ID within the containing Page or Modal definition.
@@ -54,15 +53,6 @@ impl FromInteractionPayload for ModalSubmission {
         match payload { InteractionPayload::Modal(v) => Ok(v), _ => anyhow::bail!("Expected Modal submission payload") }
     }
 }
-impl FromInteractionPayload for PaginationRequest {
-    fn from_payload(payload: InteractionPayload) -> anyhow::Result<Self> {
-        match payload {
-            InteractionPayload::Pagination(value) => Ok(value),
-            _ => anyhow::bail!("Expected framework pagination payload"),
-        }
-    }
-}
-
 impl<T, D> Execution<T, (), D> {
     /// Creates an execution with no additional interaction payload.
     pub fn new<F, Fut>(id: impl Into<String>, callback: F) -> Self
@@ -86,24 +76,21 @@ impl<T, I, D> Execution<T, I, D> {
         Self { id: id.into(), callback: Arc::new(move |ctx, data, input| Box::pin(callback(ctx, data, input))) }
     }
 
-    /// Registers a type-erased adapter for this callback in the App.
-    /// Frame identity is part of the process-local lookup key.
+    /// Registers a type-erased adapter under the definition and execution IDs.
     pub(crate) fn register(
         &self,
         app: &App<D>,
         definition_id: &str,
-        frame_identity: Option<&str>,
     ) -> anyhow::Result<()>
     where
         T: DeserializeOwned + Send + 'static,
         I: FromInteractionPayload,
         D: Clone + Send + Sync + 'static,
     {
-        let execution_id = match frame_identity {
-            Some(identity) => format!("{identity}::{}", self.id),
-            None => self.id.clone(),
+        let key = ExecutionKey {
+            definition_id: definition_id.to_owned(),
+            execution_id: self.id.clone(),
         };
-        let key = ExecutionKey { definition_id: definition_id.to_owned(), execution_id };
         let callback = self.callback.clone();
         let erased: ErasedCallback<D> = Arc::new(move |ctx, json, payload| {
             let callback = callback.clone();

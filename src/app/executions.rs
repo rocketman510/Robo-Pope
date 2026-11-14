@@ -13,7 +13,6 @@ use serenity::all::Interaction;
 
 use crate::app::{App, BoxFuture, Ctx};
 use crate::page::{ModalSubmission, Selection};
-use crate::page::frame::pagination::PaginationRequest;
 
 /// Key that uniquely identifies a registered execution within the process.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -28,7 +27,6 @@ pub enum InteractionPayload {
     None,
     Selection(Selection),
     Modal(ModalSubmission),
-    Pagination(PaginationRequest),
 }
 
 pub(crate) type ErasedCallback<D = Arc<()>> = Arc<
