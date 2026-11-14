@@ -121,7 +121,7 @@ async fn frame_can_resolve_dynamic_component_properties_in_its_elements() {
     let page = Page::<TestData>::new("frame-dynamic-property")
         .add_frame(|_ctx, data| async move {
             Ok(vec![Element::text(
-                move |_ctx, data| async move {
+                move |_ctx: crate::app::RenderCtx<Arc<()>>, data: Arc<TestData>| async move {
                     Ok(format!("{}:{}", data.label, data.count))
                 },
             )])
