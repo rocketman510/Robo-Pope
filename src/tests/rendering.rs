@@ -6,7 +6,7 @@ use std::sync::{
 use crate::{
     app::{RenderCtx, store::{CustomId, derive_custom_id}},
     page::{
-        Button, ButtonStyle, Container, Element, LinkButton, Modal, Page, Separator, TextInputStyle,
+        Button, ButtonStyle, Container, Element, File, LinkButton, Modal, Page, Separator, TextInputStyle,
     },
 };
 use super::support::{app, TestData};
@@ -40,6 +40,21 @@ async fn page_render_renders_container_children_in_order() {
 }
 
 fn separator_type() -> u64 { 14 }
+
+#[tokio::test]
+async fn file_component_renders_the_complete_attachment_uri() {
+    // FIRST: File consumes and renders the complete attachment:// reference
+    // documented by the Page API, rather than adding a hidden filename prefix.
+    let app = app();
+    let page = Page::<TestData>::new("file-attachment-uri")
+        .add_file(File::new("attachment://report.pdf"))
+        .register(&app)
+        .unwrap();
+
+    let rendered = page.render(&app, TestData::default()).await.unwrap();
+    let json = serde_json::to_value(rendered.into_components()).unwrap().to_string();
+    assert!(json.contains("attachment://report.pdf"));
+}
 
 #[tokio::test]
 async fn page_render_resolves_dynamic_values_with_page_data_and_app_context() {
