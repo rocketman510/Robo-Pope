@@ -35,10 +35,9 @@ impl RenderedMessage {
         self
     }
     /// Consumes the rendered message into Serenity components and attachments.
-    /// The empty trailing unit preserves compatibility with existing tuple destructuring.
-    pub fn into_parts(self) -> (Vec<CreateComponent<'static>>, Vec<OutgoingAttachment>, ()) {
+    pub fn into_parts(self) -> (Vec<CreateComponent<'static>>, Vec<OutgoingAttachment>) {
         let components = self.components.into_iter().map(|part| part.component).collect();
-        (components, self.attachments, ())
+        (components, self.attachments)
     }
     pub fn into_components(self) -> Vec<CreateComponent<'static>> {
         self.components.into_iter().map(|part| part.component).collect()
