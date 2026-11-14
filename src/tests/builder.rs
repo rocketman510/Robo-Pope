@@ -1,6 +1,4 @@
-use std::sync::Arc;
 use crate::page::{Component, Page, PageItem, Separator};
-use crate::app::RenderCtx;
 use super::support::{app, TestData};
 
 #[test]
@@ -22,10 +20,10 @@ fn page_builder_preserves_top_level_component_order() {
 #[test]
 fn page_data_type_is_shared_by_static_and_dynamic_components() {
     // First-principles check: both properties belong to the same Page data scope.
-    // The closure reads T and the App-linked RenderCtx without an extra generic.
+    // The closure reads T and the App-linked context without an extra generic.
     let page = Page::<TestData>::new("shared-data")
         .add_text("Static")
-        .add_text(|ctx: RenderCtx, data: Arc<TestData>| async move {
+        .add_text(|ctx, data| async move {
             let _db = ctx.app.db.clone();
             Ok(format!("{} {}", data.label, data.count))
         });
