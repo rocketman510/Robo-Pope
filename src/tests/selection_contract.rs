@@ -225,3 +225,64 @@ async fn page_user_select_renders_with_placeholder() {
         "rendered User Select must use Discord component type 5"
     );
 }
+
+
+#[test]
+fn static_string_select_placeholder_over_150_characters_is_rejected_at_registration() {
+    // Page API §§12-13: a static placeholder violation is known at registration.
+    let app = app();
+    let page = Page::<TestData>::new("long-static-placeholder")
+        .add_selection_menu(StringSelect::new(
+            "x".repeat(151),
+            "choose",
+            [SelectOption::new("One", "one")],
+            |_ctx, _data: TestData, _values: Vec<String>| async move { Ok(()) },
+        ));
+
+    assert!(page.register(&app).is_err());
+}
+
+#[test]
+fn static_string_select_option_label_over_100_characters_is_rejected_at_registration() {
+    // Page API §§12-13: static option labels are validated before registration.
+    let app = app();
+    let page = Page::<TestData>::new("long-static-option-label")
+        .add_selection_menu(StringSelect::new(
+            "Choose",
+            "choose",
+            [SelectOption::new("x".repeat(101), "one")],
+            |_ctx, _data: TestData, _values: Vec<String>| async move { Ok(()) },
+        ));
+
+    assert!(page.register(&app).is_err());
+}
+
+#[test]
+fn static_string_select_option_value_over_100_characters_is_rejected_at_registration() {
+    // Page API §§12-13: static option values have the same 100-character limit.
+    let app = app();
+    let page = Page::<TestData>::new("long-static-option-value")
+        .add_selection_menu(StringSelect::new(
+            "Choose",
+            "choose",
+            [SelectOption::new("One", "x".repeat(101))],
+            |_ctx, _data: TestData, _values: Vec<String>| async move { Ok(()) },
+        ));
+
+    assert!(page.register(&app).is_err());
+}
+
+#[test]
+fn static_string_select_option_description_over_100_characters_is_rejected_at_registration() {
+    // Page API §§12-13: static option descriptions are validated at registration.
+    let app = app();
+    let page = Page::<TestData>::new("long-static-option-description")
+        .add_selection_menu(StringSelect::new(
+            "Choose",
+            "choose",
+            [SelectOption::new("One", "one").set_description("x".repeat(101))],
+            |_ctx, _data: TestData, _values: Vec<String>| async move { Ok(()) },
+        ));
+
+    assert!(page.register(&app).is_err());
+}
