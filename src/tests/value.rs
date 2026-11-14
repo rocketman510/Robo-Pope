@@ -1,5 +1,4 @@
 use std::sync::Arc;
-use crate::app::RenderCtx;
 use crate::page::{dynamic, resolve, IntoSlot, IntoValue, Slot, Value, ButtonStyle, SeparatorSpacing};
 use super::support::{app, TestData};
 
@@ -30,7 +29,7 @@ async fn dynamic_values_resolve_with_page_data_and_render_context() {
     // App access at render time.
     let app = app();
     let value: Value<String, TestData> = dynamic(
-        |ctx: RenderCtx, data: Arc<TestData>| async move {
+        |ctx, data| async move {
             assert_eq!(ctx.definition_id.as_ref(), "value-test");
             let _store = ctx.app.store();
             Ok(format!("{}:{}", data.label, data.count))
@@ -49,7 +48,7 @@ async fn dynamic_value_errors_are_returned_without_being_replaced() {
     // fabricated value or an error whose source has been discarded.
     let app = app();
     let value: Value<String, TestData> = dynamic(
-        |_ctx: RenderCtx, _data: Arc<TestData>| async move {
+        |_ctx, _data| async move {
             Err(anyhow::anyhow!("dynamic lookup failed"))
         },
     ).into_value();
@@ -74,7 +73,7 @@ fn optional_slot_converts_static_and_dynamic_values() {
     // as ordinary properties.
     let static_slot: Slot<String, TestData> = "Title".into_slot();
     let dynamic_slot: Slot<String, TestData> = dynamic(
-        |_ctx: RenderCtx, data: Arc<TestData>| async move { Ok(data.label.clone()) },
+        |_ctx, data| async move { Ok(data.label.clone()) },
     ).into_slot();
     assert!(matches!(static_slot, Slot::Value(Value::Static(_))));
     assert!(matches!(dynamic_slot, Slot::Value(Value::Dynamic(_))));
@@ -88,7 +87,7 @@ async fn direct_async_closure_is_accepted_without_dynamic_adapter() {
     use std::sync::Arc;
     let app = app();
     let page = Page::<TestData>::new("direct-closure")
-        .add_text(|ctx: RenderCtx, data: Arc<TestData>| async move {
+        .add_text(|ctx, data| async move {
             assert_eq!(ctx.definition_id.as_ref(), "direct-closure");
             Ok(format!("{}:{}", data.label, data.count))
         }).register(&app).unwrap();
@@ -105,7 +104,7 @@ async fn fixed_section_slots_accept_direct_async_closures() {
     let app = app();
     let page = Page::<TestData>::new("direct-section-slot")
         .add_section(Section::new().set_text(
-            |_ctx: RenderCtx, data: Arc<TestData>| async move { Ok(format!("Dynamic {}", data.count)) },
+            |_ctx, data| async move { Ok(format!("Dynamic {}", data.count)) },
             None, None,
         ).set_accessory(crate::page::Button::new(
             "Open", "section-open", crate::page::ButtonStyle::Primary,
@@ -125,11 +124,11 @@ async fn button_properties_accept_direct_async_closures() {
     let app = app();
     let page = Page::<TestData>::new("direct-button-properties")
         .add_button_row((Button::new(
-            |_ctx: RenderCtx, data: Arc<TestData>| async move { Ok(format!("Hello {}", data.label)) },
+            |_ctx, data| async move { Ok(format!("Hello {}", data.label)) },
             "dynamic-button",
-            |_ctx: RenderCtx, _data: Arc<TestData>| async move { Ok(ButtonStyle::Success) },
-            |_ctx: RenderCtx, _data: Arc<TestData>| async move { Ok(Some("✨".into())) },
-            |_ctx: RenderCtx, _data: Arc<TestData>| async move { Ok(true) },
+            |_ctx, _data| async move { Ok(ButtonStyle::Success) },
+            |_ctx, _data| async move { Ok(Some("✨".into())) },
+            |_ctx, _data| async move { Ok(true) },
             |_ctx, _data: TestData| async move { Ok(()) },
         ), None, None, None, None)).register(&app).unwrap();
     let rendered = page.render(&app, TestData::default()).await.unwrap();
