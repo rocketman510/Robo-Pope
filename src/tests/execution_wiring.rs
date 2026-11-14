@@ -11,8 +11,9 @@ async fn page_registration_indexes_each_developer_callback() {
     // FIRST: registration makes every callback available to process-local routing.
     let app = app();
     let _page = Page::<TestData>::new("execution-page")
-        .add_button(Button::new("Open", "open-profile", ButtonStyle::Primary,
-            |_ctx, _data: TestData| async move { Ok(()) }))
+        .add_button_row((Button::new("Open", "open-profile", ButtonStyle::Primary,
+            None, false, |_ctx, _data: TestData| async move { Ok(()) }),
+            None, None, None, None))
         .register(&app).unwrap();
     assert!(app.executions.contains(&ExecutionKey {
         definition_id: "execution-page".into(), execution_id: "open-profile".into(),
@@ -29,8 +30,8 @@ async fn component_dispatch_restores_page_data_and_invokes_the_registered_callba
     let serialized = serde_json::to_vec(&data).unwrap();
     let custom_id = derive_custom_id("execution-dispatch", "go", &serialized, None).unwrap();
     let page = Page::<TestData>::new("execution-dispatch")
-        .add_button(Button::new("Go", "go", ButtonStyle::Primary,
-            move |_ctx, received: TestData| {
+        .add_button_row((Button::new("Go", "go", ButtonStyle::Primary,
+            Some("➡️".into()), false, move |_ctx, received: TestData| {
                 let flag = flag.clone();
                 async move {
                     assert_eq!(received.label, "restored");
@@ -38,7 +39,7 @@ async fn component_dispatch_restores_page_data_and_invokes_the_registered_callba
                     flag.store(true, Ordering::SeqCst);
                     Ok(())
                 }
-            }))
+            }), None, None, None, None))
         .register(&app).unwrap();
     page.render(&app, data).await.unwrap();
     app.dispatch_interaction(component_interaction(&custom_id.0)).await.unwrap();
@@ -89,11 +90,11 @@ async fn gateway_handler_forwards_interaction_create_to_app_dispatch() {
     let serialized = serde_json::to_vec(&data).unwrap();
     let custom_id = derive_custom_id("handler-dispatch", "click", &serialized, None).unwrap();
     let page = Page::<TestData>::new("handler-dispatch")
-        .add_button(Button::new("Click", "click", ButtonStyle::Secondary,
-            move |_ctx, _data: TestData| {
+        .add_button_row((Button::new("Click", "click", ButtonStyle::Secondary,
+            None, false, move |_ctx, _data: TestData| {
                 let flag = flag.clone();
                 async move { flag.store(true, Ordering::SeqCst); Ok(()) }
-            }))
+            }), None, None, None, None))
         .register(&app).unwrap();
     page.render(&app, data).await.unwrap();
     AppHandler::new(app).dispatch_interaction(component_interaction(&custom_id.0)).await.unwrap();
