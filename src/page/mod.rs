@@ -17,8 +17,8 @@ pub use component::{Button,ButtonRow,ButtonSlot,ButtonSlots,ButtonStyle,Componen
     ContainerItem,File,IntoMediaItem,LinkButton,MediaGallery,MediaItem,Section,SectionAccessory,
     Separator,SeparatorSpacing,Text,Thumbnail};
 pub use execution::{Execution,Selection,SelectedUser,SelectedRole,SelectedMentionable,SelectedChannel};
-pub use frame::{Element,Frame,FrameIdentity};
+pub use frame::{Element,Frame};
 pub use modal::{Modal,ModalInput,ModalOption,ModalRender,ModalSubmission,RegisteredModal,SubmittedValue,TextInputStyle};
-pub use render::{OutgoingAttachment,RenderedComponent,RenderedMessage,RenderedPage};
+pub use render::{OutgoingAttachment,RenderedComponent,RenderedMessage};
 pub use select::{ChannelSelect,MentionableSelect,RoleSelect,SelectMenu,SelectOption,StringSelect,UserSelect};
 pub use value::{dynamic, dynamic_for, resolve, Dynamic, IntoSlot, IntoValue, Slot, Value};

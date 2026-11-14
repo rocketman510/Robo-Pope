@@ -17,7 +17,7 @@ use serenity::builder::{
     CreateRadioGroupOption, CreateSelectMenu, CreateSelectMenuKind, CreateSelectMenuOption,
 };
 use serenity::all::InputTextStyle as SerenityInputTextStyle;
-use crate::app::store::{derive_custom_id, DefinitionKind, StoreRecord};
+use crate::app::store::{derive_custom_id, RoutingRecord};
 use serde::{Serialize, de::DeserializeOwned};
 use crate::app::{App, Ctx, Result};
 use crate::page::execution::Execution;
@@ -343,7 +343,7 @@ impl<T, D> Modal<T, D> {
 
         let submit = self.submit.ok_or_else(|| anyhow::anyhow!("Modal requires an on_submit callback"))?;
         app.reserve_definition_id(&self.id)?;
-        if let Err(error) = submit.register(&app, &self.id, None) {
+        if let Err(error) = submit.register(&app, &self.id) {
             app.executions.remove_definition(&self.id);
             app.release_definition_id(&self.id);
             return Err(error);
@@ -516,17 +516,13 @@ where
             components.push(rendered);
         }
 
-        let record = StoreRecord {
-            custom_id: custom_id.0.clone(),
-            definition_kind: DefinitionKind::Modal,
+        let record = RoutingRecord {
+            hash: custom_id.0.clone(),
             definition_id: self.definition.id.clone(),
             execution_id: self.definition.submit.id.clone(),
             serialized_data: serialized_data.clone(),
-            frame_identity: None,
-            pagination_state: None,
-            schema_version: 1,
         };
-        app.store().insert_record(record).await.with_context(|| format!(
+        app.store().insert(record).await.with_context(|| format!(
             "Persisting submit execution for Modal '{}'", self.definition.id
         ))?;
 
