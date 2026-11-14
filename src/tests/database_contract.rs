@@ -56,6 +56,76 @@ fn cloned_app_preserves_the_same_typed_database_value() {
 }
 
 #[tokio::test]
+async fn dynamic_property_and_execution_callbacks_read_named_host_database_fields() {
+    // FIRST: App<D> keeps its concrete host database type all the way into both
+    // render-time and interaction-time callbacks.
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use crate::app::RenderCtx;
+    use crate::app::store::derive_custom_id;
+    use crate::page::{Button, ButtonStyle, Page};
+    use crate::tests::support::{component_interaction, TestData};
+
+    let database = Arc::new(HostDatabase {
+        messages: Arc::from("message repository"),
+        users: Arc::from("user repository"),
+    });
+    let store: Arc<dyn Store> = Arc::new(MemoryStore::default());
+    let app: App<Arc<HostDatabase>> = App::new(http(), database, store);
+
+    let render_observed = Arc::new(AtomicBool::new(false));
+    let execution_observed = Arc::new(AtomicBool::new(false));
+    let render_flag = render_observed.clone();
+    let execution_flag = execution_observed.clone();
+
+    let data = TestData::default();
+    let serialized = serde_json::to_vec(&data).unwrap();
+    let custom_id = derive_custom_id("typed-database-callback", "open-users", &serialized).unwrap();
+
+    let page = Page::<TestData>::new("typed-database-callback")
+        .add_text(move |ctx: crate::app::RenderCtx, _data: Arc<TestData>| {
+            let observed = render_flag.clone();
+            async move {
+                observed.store(
+                    ctx.app.db.users.as_ref() == "user repository",
+                    Ordering::SeqCst,
+                );
+                Ok("Users".to_owned())
+            }
+        })
+        .add_button_row((
+            Button::new(
+                "Open users",
+                "open-users",
+                ButtonStyle::Primary,
+                None,
+                false,
+                move |ctx, _data: TestData| {
+                    let observed = execution_flag.clone();
+                    async move {
+                        observed.store(
+                            ctx.app.db.messages.as_ref() == "message repository",
+                            Ordering::SeqCst,
+                        );
+                        Ok(())
+                    }
+                },
+            ),
+            None,
+            None,
+            None,
+            None,
+        ))
+        .register(&app)
+        .unwrap();
+
+    page.render(&app, data).await.unwrap();
+    assert!(render_observed.load(Ordering::SeqCst));
+
+    app.dispatch_interaction(component_interaction(&custom_id.0)).await.unwrap();
+    assert!(execution_observed.load(Ordering::SeqCst));
+}
+
+#[tokio::test]
 async fn sqlite_store_recovers_the_four_field_routing_record_after_reopen() {
     // FIRST: the framework Store is SQLite-backed and its routing records
     // survive closing and reopening the Store.
