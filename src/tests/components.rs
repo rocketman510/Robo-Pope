@@ -63,6 +63,30 @@ fn container_preserves_the_declared_order_of_mixed_children() {
 }
 
 #[test]
+fn container_composes_button_rows_with_direct_slots() {
+    // FIRST: Container exposes the same Button-row composition style as Page.
+    let container = Container::<TestData>::new().add_button_row((
+        Button::new(
+            "Open",
+            "container-open",
+            ButtonStyle::Primary,
+            None,
+            false,
+            |_ctx, _data: TestData| async move { Ok(()) },
+        ),
+        None,
+        None,
+        None,
+        None,
+    ));
+
+    assert!(matches!(
+        &container.children[0],
+        ContainerItem::Component(Component::ButtonRow(row)) if row.populated() == 1
+    ));
+}
+
+#[test]
 fn media_gallery_supports_replacement_and_incremental_addition() {
     // FIRST: set_media replaces the configured collection and add_media appends.
     let gallery = MediaGallery::<TestData>::new()
