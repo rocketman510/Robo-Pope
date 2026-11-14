@@ -1,6 +1,5 @@
 //! Heterogeneous registries; concrete T is retained by typed query handles.
 use std::any::Any;
-use std::sync::Arc;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use crate::page::{PageDefinition, RegisteredPage};
