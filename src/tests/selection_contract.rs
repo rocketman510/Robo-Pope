@@ -93,8 +93,8 @@ async fn string_select_renders_placeholder_min_max_and_dynamic_option_properties
     assert!(json.contains("sample role"));
     assert!(json.contains("Level 7"));
     assert!(json.contains("member"));
-    assert!(json.contains("\\"min_values\\":1"));
-    assert!(json.contains("\\"max_values\\":2"));
+    assert!(json.contains(r#""min_values":1"#));
+    assert!(json.contains(r#""max_values":2"#));
 }
 
 #[tokio::test]
