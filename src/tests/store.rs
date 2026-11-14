@@ -1,101 +1,78 @@
 use crate::app::store::{
-    derive_custom_id, CustomId, DefinitionKind, MemoryStore, Store, StoreRecord,
+    derive_custom_id, CustomId, MemoryStore, RoutingRecord, Store,
 };
 
-fn record(custom_id: &str) -> StoreRecord {
-    StoreRecord {
-        custom_id: custom_id.into(),
-        definition_kind: DefinitionKind::Page,
+fn record(hash: &str) -> RoutingRecord {
+    RoutingRecord {
+        hash: hash.into(),
         definition_id: "user-level".into(),
         execution_id: "open-profile".into(),
         serialized_data: br#"{"user_id":"42"}"#.to_vec(),
-        frame_identity: None,
-        pagination_state: None,
-        schema_version: 1,
     }
 }
 
 #[test]
 fn custom_id_derivation_is_deterministic_for_the_same_execution_identity() {
-    // First-principles check: repeated render of the same definition, execution,
-    // data, and Frame key must produce the same Discord custom ID.
-    let first = derive_custom_id("page", "open", br#"{"id":1}"#, None).unwrap();
-    let second = derive_custom_id("page", "open", br#"{"id":1}"#, None).unwrap();
+    // FIRST: the same definition ID, execution ID, and serialized data produce
+    // the same Discord custom ID on every render and after process restarts.
+    let first = derive_custom_id("page", "open", br#"{"id":1}"#).unwrap();
+    let second = derive_custom_id("page", "open", br#"{"id":1}"#).unwrap();
     assert_eq!(first, second);
     assert!(first.0.len() <= crate::page::limits::CUSTOM_ID_MAX_CHARS);
 }
 
 #[test]
-fn custom_id_changes_when_any_identity_input_changes() {
-    // First-principles check: changing definition, execution, data, or Frame key
-    // must not route the interaction to another instance's callback data.
-    let base = derive_custom_id("page", "open", b"data", None).unwrap();
-    assert_ne!(base, derive_custom_id("other-page", "open", b"data", None).unwrap());
-    assert_ne!(base, derive_custom_id("page", "other-execution", b"data", None).unwrap());
-    assert_ne!(base, derive_custom_id("page", "open", b"other-data", None).unwrap());
-    assert_ne!(base, derive_custom_id("page", "open", b"data", Some("element-2")).unwrap());
+fn custom_id_changes_when_any_routing_identity_input_changes() {
+    // FIRST: the hash is derived from exactly the definition ID, execution ID,
+    // and serialized data. No Frame path, user ID, message ID, or timestamp is
+    // an extra input to custom-ID derivation.
+    let base = derive_custom_id("page", "open", b"data").unwrap();
+    assert_ne!(base, derive_custom_id("other-page", "open", b"data").unwrap());
+    assert_ne!(base, derive_custom_id("page", "other-execution", b"data").unwrap());
+    assert_ne!(base, derive_custom_id("page", "open", b"other-data").unwrap());
 }
 
 #[tokio::test]
-async fn memory_store_round_trips_a_record_by_custom_id() {
-    // First-principles check: after a restart-safe identifier is persisted, routing
-    // must be able to recover the data needed to invoke its registered execution.
+async fn memory_store_round_trips_a_four_field_routing_record_by_hash() {
+    // FIRST: a resolved hash returns exactly the definition, execution, and
+    // serialized data needed by the registered definition to dispatch.
     let store = MemoryStore::default();
-    let record = record("abc");
-    store.insert(record.clone()).await.unwrap();
+    store.insert(record("rp:abc")).await.unwrap();
 
-    let resolved = store.resolve(&CustomId("abc".into())).await.unwrap().unwrap();
+    let resolved = store.resolve(&CustomId("rp:abc".into())).await.unwrap().unwrap();
+    assert_eq!(resolved.hash, "rp:abc");
     assert_eq!(resolved.definition_id, "user-level");
     assert_eq!(resolved.execution_id, "open-profile");
     assert_eq!(resolved.serialized_data.as_slice(), br#"{"user_id":"42"}"#);
 }
 
 #[tokio::test]
-async fn inserting_the_same_record_twice_is_idempotent() {
-    // First-principles check: rendering identical Page data twice should reuse
-    // the same execution record rather than failing or creating duplicate mappings.
+async fn inserting_the_same_routing_record_twice_is_idempotent() {
+    // FIRST: rendering identical definition, execution, and data reuses one
+    // logical routing record.
     let store = MemoryStore::default();
-    store.insert(record("abc")).await.unwrap();
-    store.insert(record("abc")).await.unwrap();
-    assert!(store.resolve(&CustomId("abc".into())).await.unwrap().is_some());
+    store.insert(record("rp:abc")).await.unwrap();
+    store.insert(record("rp:abc")).await.unwrap();
+    assert!(store.resolve(&CustomId("rp:abc".into())).await.unwrap().is_some());
 }
 
 #[tokio::test]
-async fn store_rejects_conflicting_records_for_the_same_custom_id() {
-    // First-principles check: one custom ID must never ambiguously point at two
-    // different pieces of callback data.
+async fn store_rejects_conflicting_records_for_the_same_hash() {
+    // FIRST: if one hash is presented with different identity fields, the Store
+    // reports a collision rather than overwriting the first callback mapping.
     let store = MemoryStore::default();
-    store.insert(record("abc")).await.unwrap();
-    let mut conflict = record("abc");
+    store.insert(record("rp:abc")).await.unwrap();
+
+    let mut conflict = record("rp:abc");
     conflict.serialized_data = b"different".to_vec();
+
     assert!(store.insert(conflict).await.is_err());
 }
 
 #[tokio::test]
-async fn removing_a_missing_record_is_harmless() {
-    // First-principles check: cleanup should be safely repeatable when records
-    // have already expired or were removed by another worker.
+async fn removing_a_missing_routing_record_is_harmless() {
+    // FIRST: an explicit removal request for a missing hash is idempotent.
+    // The framework does not remove records automatically through TTL expiry.
     let store = MemoryStore::default();
     store.remove(&CustomId("missing".into())).await.unwrap();
-}
-
-
-#[tokio::test]
-async fn pagination_state_compare_and_set_updates_only_the_expected_current_state() {
-    // FIRST: concurrent or replayed clicks must not overwrite a newer page index.
-    let store = MemoryStore::default();
-    let mut initial = record("page-next");
-    initial.pagination_state = Some(serde_json::json!({
-        "frame_id":"users","page_index":0,"page_count":3
-    }));
-    store.insert(initial).await.unwrap();
-    let id = CustomId("page-next".into());
-    let expected = serde_json::json!({"frame_id":"users","page_index":0,"page_count":3});
-    let next = serde_json::json!({"frame_id":"users","page_index":1,"page_count":3});
-    assert!(store.compare_and_set_pagination_state(&id,&expected,next.clone()).await.unwrap());
-    assert!(!store.compare_and_set_pagination_state(&id,&expected,serde_json::json!({
-        "frame_id":"users","page_index":1,"page_count":3
-    })).await.unwrap());
-    let saved = store.resolve(&id).await.unwrap().unwrap();
-    assert_eq!(saved.pagination_state.unwrap(), next);
 }
