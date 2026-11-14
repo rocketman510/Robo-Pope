@@ -1,6 +1,6 @@
 use crate::page::{
-    Button, ButtonRow, ButtonSlots, ButtonStyle, Component, Container, ContainerItem,
-    File, LinkButton, MediaGallery, Section, SectionAccessory, Separator,
+    Button, ButtonStyle, Component, Container, ContainerItem,
+    File, LinkButton, MediaGallery, MediaItem, Page, PageItem, Section, SectionAccessory, Separator,
     Slot, Text, Thumbnail,
 };
 use super::support::TestData;
@@ -25,11 +25,28 @@ fn section_accepts_a_thumbnail_as_its_single_accessory() {
 }
 
 #[test]
-fn button_row_has_five_explicit_optional_slots() {
-    // First-principles check: the tuple itself prevents a sixth slot from being supplied.
-    let slots: ButtonSlots<TestData> = (None, None, None, None, None);
-    let row = ButtonRow::new(slots);
-    assert_eq!(row.populated(), 0);
+fn button_row_accepts_direct_buttons_and_none_slots() {
+    // FIRST: a Button is passed directly, while None denotes an empty fixed slot.
+    let page = Page::<TestData>::new("button-row")
+        .add_button_row((
+            Button::new(
+                "Open",
+                "open",
+                ButtonStyle::Primary,
+                Some("🔎".into()),
+                false,
+                |_ctx, _data: TestData| async move { Ok(()) },
+            ),
+            None,
+            None,
+            None,
+            None,
+        ));
+
+    assert!(matches!(
+        &page.items[0],
+        PageItem::Component(Component::ButtonRow(row)) if row.populated() == 1
+    ));
 }
 
 #[test]
@@ -46,19 +63,25 @@ fn container_preserves_the_declared_order_of_mixed_children() {
 }
 
 #[test]
-fn media_gallery_keeps_items_in_the_order_added() {
-    // First-principles check: order determines the visible gallery sequence.
+fn media_gallery_supports_replacement_and_incremental_addition() {
+    // FIRST: set_media replaces the configured collection and add_media appends.
     let gallery = MediaGallery::<TestData>::new()
-        .add_media("https://example.test/one.png")
-        .add_media("https://example.test/two.png");
-    assert_eq!(gallery.items.len(), 2);
-    match &gallery.items[0].url {
-        crate::page::Value::Static(url) => assert_eq!(url, "https://example.test/one.png"),
-        crate::page::Value::Dynamic(_) => panic!("the supplied URL was static"),
-    }
-    match &gallery.items[1].url {
-        crate::page::Value::Static(url) => assert_eq!(url, "https://example.test/two.png"),
-        crate::page::Value::Dynamic(_) => panic!("the supplied URL was static"),
+        .set_media([
+            MediaItem::new("https://example.test/one.png"),
+            MediaItem::new("https://example.test/two.png"),
+        ])
+        .add_media(MediaItem::new("https://example.test/three.png"));
+
+    assert_eq!(gallery.items.len(), 3);
+    for (index, expected) in [
+        "https://example.test/one.png",
+        "https://example.test/two.png",
+        "https://example.test/three.png",
+    ].into_iter().enumerate() {
+        match &gallery.items[index].url {
+            crate::page::Value::Static(url) => assert_eq!(url, expected),
+            crate::page::Value::Dynamic(_) => panic!("the supplied URL was static"),
+        }
     }
 }
 
@@ -69,6 +92,8 @@ fn button_callback_receives_page_data_and_app_linked_context() {
         "Open",
         "open-user",
         ButtonStyle::Primary,
+        Some("👤".into()),
+        true,
         |ctx, data| async move {
             let _db = ctx.app.db.clone();
             let _label = data.label;
@@ -81,9 +106,10 @@ fn button_callback_receives_page_data_and_app_linked_context() {
 #[test]
 fn link_button_is_configured_with_a_url_without_an_execution() {
     // First-principles check: URL navigation is distinct from a callback execution.
-    let link = LinkButton::<TestData>::new("Documentation", "https://example.test/docs");
+    let link = LinkButton::<TestData>::new("Documentation", "https://example.test/docs", None, true);
     assert!(matches!(link.label, crate::page::Value::Static(_)));
     assert!(matches!(link.url, crate::page::Value::Static(_)));
+    assert!(matches!(link.disabled, crate::page::Value::Static(true)));
 }
 
 #[test]
