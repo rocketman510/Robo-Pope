@@ -1,5 +1,5 @@
 use crate::app::store::{
-    derive_custom_id, CustomId, MemoryStore, RoutingRecord, Store,
+    derive_custom_id, CustomId, FileStore, MemoryStore, RoutingRecord, Store,
 };
 
 fn record(hash: &str) -> RoutingRecord {
@@ -75,4 +75,61 @@ async fn removing_a_missing_routing_record_is_harmless() {
     // The framework does not remove records automatically through TTL expiry.
     let store = MemoryStore::default();
     store.remove(&CustomId("missing".into())).await.unwrap();
+}
+
+
+fn unique_store_path(label: &str) -> std::path::PathBuf {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    std::env::temp_dir().join(format!(
+        "robo-pope-{label}-{}-{nonce}.json",
+        std::process::id(),
+    ))
+}
+
+#[test]
+fn file_store_rejects_conflicting_duplicate_hashes_when_loading() {
+    // Page API §11: a stored hash collision must be reported, never overwritten.
+    let path = unique_store_path("collision-load");
+    let first = record("rp:duplicate");
+    let mut conflicting = first.clone();
+    conflicting.execution_id = "different-execution".into();
+
+    std::fs::write(
+        &path,
+        serde_json::to_vec(&[first, conflicting]).unwrap(),
+    ).unwrap();
+
+    let result = FileStore::open(&path);
+    assert!(result.is_err(), "conflicting records with one hash must fail to load");
+    let _ = std::fs::remove_file(&path);
+}
+
+#[tokio::test]
+async fn file_store_idempotent_insert_preserves_record_when_persist_fails() {
+    // Page API §11: reinserting an identical identity is idempotent. A failed
+    // snapshot write must not erase the already-valid in-memory routing record.
+    let path = unique_store_path("duplicate-write");
+    let store = FileStore::open(&path).unwrap();
+    let original = record("rp:existing");
+    store.insert(original.clone()).await.unwrap();
+
+    // Make the destination impossible to replace while keeping the FileStore
+    // instance and its already-loaded in-memory record alive.
+    std::fs::remove_file(&path).unwrap();
+    std::fs::create_dir(&path).unwrap();
+
+    assert!(store.insert(original.clone()).await.is_err());
+    let resolved = store.resolve(&CustomId("rp:existing".into())).await.unwrap();
+    assert_eq!(
+        resolved,
+        Some(original),
+        "a failed idempotent write must not roll back a record that predated it",
+    );
+
+    let _ = std::fs::remove_dir_all(&path);
+    let temporary = path.with_extension(format!("tmp-{}", std::process::id()));
+    let _ = std::fs::remove_file(temporary);
 }
