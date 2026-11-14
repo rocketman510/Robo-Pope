@@ -139,7 +139,7 @@ async fn string_select_placeholder_option_label_and_description_resolve_dynamica
                 "choose",
                 [
                     SelectOption::new(
-                        |_ctx, data| async move {
+                        |_ctx: crate::app::RenderCtx<std::sync::Arc<()>>, data: std::sync::Arc<TestData>| async move {
                             Ok(format!("Option {}", data.count))
                         },
                         "option-value",
