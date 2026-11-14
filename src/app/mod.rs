@@ -8,7 +8,6 @@ pub mod router;
 pub mod store;
 pub mod executions;
 
-use std::any::Any;
 use std::collections::HashSet;
 use std::future::Future;
 use std::pin::Pin;
@@ -33,11 +32,11 @@ pub struct App<D = Arc<()>> {
     pub db: D,
     /// Framework persistence for custom-ID routing records.
     pub(crate) store: Arc<dyn Store>,
-    pub pages: PageRegistry,
-    pub modals: ModalRegistry,
+    pub pages: PageRegistry<D>,
+    pub modals: ModalRegistry<D>,
     pub(crate) http: Arc<Http>,
     pub(crate) router: InteractionRouter,
-    pub(crate) executions: ExecutionRegistry,
+    pub(crate) executions: ExecutionRegistry<D>,
     definition_ids: Arc<Mutex<HashSet<String>>>,
 }
 
@@ -102,30 +101,26 @@ impl<D> App<D> {
     pub fn store(&self) -> &dyn Store { self.store.as_ref() }
 }
 
-impl<D> App<D>
-where
-    D: Clone + Any + Send + Sync + 'static,
-{
-    /// Creates an erased framework context for dynamic callbacks and interactions.
-    ///
-    /// The typed host DB remains available on the original App. The erased view
-    /// preserves it in Database::get without requiring Page or Modal data types
-    /// to carry a second host-specific generic parameter.
-    pub(crate) fn erased(&self) -> App<Database> {
-        let database = (&self.db as &dyn Any)
-            .downcast_ref::<Database>()
-            .cloned()
-            .unwrap_or_else(|| Database::new(self.db.clone()));
-        self.with_database(database)
+impl<D: Clone> App<D> {
+    /// Creates a Page builder scoped to this App's concrete database type.
+    pub fn page<T>(&self, id: impl Into<String>) -> crate::page::Page<T, D> {
+        crate::page::Page::new(id)
     }
 
-    /// Routes an incoming Discord interaction to its registered execution.
+    /// Creates a Modal builder scoped to this App's concrete database type.
+    pub fn modal<T>(&self, id: impl Into<String>) -> crate::page::Modal<T, D> {
+        crate::page::Modal::new(id)
+    }
+
+    /// Routes an incoming Discord interaction without erasing the host database type.
     pub async fn dispatch_interaction(
         &self,
         interaction: serenity::all::Interaction,
-    ) -> anyhow::Result<()> {
-        let erased = self.erased();
-        self.router.dispatch(&erased, interaction).await
+    ) -> anyhow::Result<()>
+    where
+        D: Send + Sync + 'static,
+    {
+        self.router.dispatch(self, interaction).await
     }
 
     /// Creates a render-time context tied to the typed App and definition ID.
@@ -134,13 +129,5 @@ where
         definition_id: impl Into<Arc<str>>,
     ) -> RenderCtx<D> {
         RenderCtx::new(self.clone(), definition_id.into())
-    }
-
-    /// Creates the context used by framework values, whose callback ABI is DB-erased.
-    pub(crate) fn render_context_erased(
-        &self,
-        definition_id: impl Into<Arc<str>>,
-    ) -> RenderCtx<Database> {
-        RenderCtx::new(self.erased(), definition_id.into())
     }
 }
