@@ -3,7 +3,7 @@ use std::sync::{
     atomic::{AtomicUsize, Ordering},
 };
 
-use crate::page::{Container, Element, Page, Section, Separator};
+use crate::page::{Container, Element, Page, Section, Separator, Thumbnail};
 use super::support::{app, TestData};
 
 #[tokio::test]
@@ -33,7 +33,11 @@ async fn frame_expands_heterogeneous_elements_in_returned_order() {
         .add_frame(|_ctx, _data| async move {
             Ok(vec![
                 Element::text("First element"),
-                Element::section(Section::new().set_text("Second element", None, None)),
+                Element::section(
+                    Section::new()
+                        .set_text("Second element", None, None)
+                        .set_accessory(Thumbnail::new("https://example.test/thumbnail.png")),
+                ),
                 Element::container(
                     Container::new()
                         .add_text("Third element")
