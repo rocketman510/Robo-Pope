@@ -70,20 +70,6 @@ impl<D> App<D> {
         }
     }
 
-    /// Creates another App view sharing framework state but using a different DB handle.
-    fn with_database<E>(&self, db: E) -> App<E> {
-        App {
-            db,
-            store: self.store.clone(),
-            pages: self.pages.clone(),
-            modals: self.modals.clone(),
-            http: self.http.clone(),
-            router: self.router.clone(),
-            executions: self.executions.clone(),
-            definition_ids: self.definition_ids.clone(),
-        }
-    }
-
     /// Atomically reserves a Page or Modal ID in the shared namespace.
     pub(crate) fn reserve_definition_id(&self, id: &str) -> anyhow::Result<()> {
         let mut ids = self.definition_ids.lock()
